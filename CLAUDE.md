@@ -187,7 +187,18 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 - `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
 
 **Text elements** (`src/elems/text.ts`):
-- `Span`, `Text`, `TextStack`, `TextBox`, `TextFrame`, `TextFlex`, `Bold`, `Italic`
+- `Span`, `Text`, `Verbatim`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
+
+`Text` defaults to collapsed whitespace. `whitespace="pre"` or `"preserve"`
+accepts plain strings, preserves spaces and explicit lines (including blank
+lines), and expands tabs to `tab_size` columns (default 4). Literal lines are
+measured as whole `Span` runs and placed at one common width, without wrapping.
+`width` may widen that box but cannot make it narrower than the source.
+`Verbatim` supplies monospace and preserved whitespace as defaults. `Span`
+passes the whitespace policy to measurement and emits `xml:space="preserve"`.
+JSX formatting-only whitespace is discarded at parse time; explicit string
+expressions survive unchanged. `TextBox` lays a preserved text child out as a
+block, rather than flattening it back into ordinary text spans.
 
 **Plot elements** (`src/elems/plot.ts`):
 - `Bar`, `Bars`, `Scale`, `Labels`, `Axis`, `Mesh`, `Graph`, `Plot`, `BarPlot`, `Legend`
@@ -288,7 +299,7 @@ Key functions for rect manipulation:
 - `core.ts` - `Context`, `Element`, `Group`, `Svg`, `Rect`, plus `prefix_split`, `spec_split`, `align_frac`, `is_element`
 - `layout.ts` - `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`, `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 - `geometry.ts` - `Line`, `UnitLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`, `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
-- `text.ts` - `Span`, `Text`, `TextStack`, `TextBox`, `TextFrame`, `TextFlex`, `Bold`, `Italic`
+- `text.ts` - `Span`, `Text`, `Verbatim`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
 - `plot.ts` - `Bar`, `Bars`, `Scale`, `Labels`, `Axis`, `Mesh`, `Graph`, `Plot`, `BarPlot`, `Legend`
 - `network.ts` - `ArrowSpline`, `Node`, `Edge`, `Network`
 - `symbolic.ts` - `SymPoints`, `SymLine`, `SymSpline`, `SymPoly`, `SymFill`, `SymField`

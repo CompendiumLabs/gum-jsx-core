@@ -4,11 +4,11 @@ import type { Attrs, AlignValue, Rect, Limit, Padding, Rounded } from '../lib/ty
 import { resolveEnv } from '../lib/default'
 import type { Env } from '../env'
 import { THEME } from '../lib/theme'
-import { none, bold, vtext, maxis } from '../lib/const'
+import { none, bold, mono, vtext, maxis } from '../lib/const'
 import { RoundedRect } from './geometry'
 import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, rect_box, check_singleton, prefix_split, prefix_join, sum, max, pad_rect, ensure_pair } from '../lib/utils'
 import { textMetrics, splitWords } from '../lib/text'
-import type { TextMetrics } from '../lib/text'
+import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
 import { make_em, em_bounds, em_hink, em_rect, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
@@ -25,6 +25,7 @@ import type { StackArgs } from './layout'
 //
 
 interface SpanArgs extends ElementArgs {
+    whitespace?: Whitespace
     children?: string[]
     color?: string
     stroke?: string
@@ -34,7 +35,6 @@ interface SpanArgs extends ElementArgs {
     font_style?: string
 }
 
-// no wrapping at all, clobber newlines, mainly internal use
 // the output attributes for a font: the bold and italic KaTeX faces are
 // addressed by base family plus weight and style (see fontFace)
 function font_css({ font_family, font_weight, font_style }: { font_family?: string, font_weight?: number, font_style?: string }, env?: Env): Attrs {
@@ -50,14 +50,14 @@ class Span extends Element {
     vshift: number
 
     constructor(args: SpanArgs = {}) {
-        const { children: children0, color, vshift = vtext, stroke = none, env, ...attr0 } = THEME(args, 'Span')
+        const { children: children0, color, whitespace = 'normal', vshift = vtext, stroke = none, env, ...attr0 } = THEME(args, 'Span')
         const text0 = check_string(children0)
         const [ font_attr0, attr ] = prefix_split([ 'font' ], attr0)
         const font_attr = prefix_join('font', font_attr0)
 
-        // compress whitespace, since that's what SVG does
-        const text = compress_whitespace(text0)
-        const { advance, vrange, raw_vrange = vrange, italic = 0 } = textMetrics(text, { ...font_attr, env })
+        const preserve = whitespace === 'pre' || whitespace === 'preserve'
+        const text = preserve ? text0 : compress_whitespace(text0)
+        const { advance, vrange, raw_vrange = vrange, italic = 0 } = textMetrics(text, { ...font_attr, whitespace, env })
 
         // adjust metrics for vertical shift
         const [ ymin, ymax ] = vrange
@@ -68,7 +68,7 @@ class Span extends Element {
 
         // pass to element; the font is measured by its registry name but named
         // in the output by its css face (family plus weight and style)
-        super({ tag: 'text', unary: false, aspect: advance, fill: color, stroke, ...font_attr, ...font_css(font_attr, env), ...attr })
+        super({ tag: 'text', unary: false, aspect: advance, fill: color, stroke, ...font_attr, ...font_css(font_attr, env), ...attr, ...(preserve ? { 'xml:space': 'preserve' } : {}) })
         this.args = args
 
         // additional props
@@ -408,30 +408,54 @@ interface TextArgs extends StackArgs {
     font_family?: string
     font_weight?: number
     font_style?: string
-    width?: number  // the width in em to wrap at (none: a single line)
+    width?: number  // wrapping width in em, or minimum width for preserved text
     scale?: number  // own em over the parent's em
+    whitespace?: Whitespace
+    tab_size?: number  // tab stops in columns for preserved text
+}
+
+// Literal lines are measured as whole runs. Expand tabs before measuring so
+// SVG, canvas and PDF all see the same spaces and advances.
+function preserve_spans(children: any[], tab_size: number, attr: Attrs): Span[] {
+    if (!Number.isInteger(tab_size) || tab_size <= 0) throw new Error('tab_size must be a positive integer')
+    const text = children.map(child => check_string([child])).join('').replace(/\r\n?/g, '\n')
+    return text.split('\n').map(line => {
+        let column = 0
+        const expanded = Array.from(line, ch => {
+            const size = ch === '\t' ? tab_size - column % tab_size : 1
+            column += size
+            return ch === '\t' ? ' '.repeat(size) : ch
+        }).join('')
+        return new Span({ children: [expanded], ...attr, whitespace: 'preserve' })
+    })
 }
 
 // wrap text or elements to multiple lines with fixed line height
 class Text extends VStack {
     spans: Element[]
     em: EmSpec
+    whitespace: Whitespace
 
     constructor(args: TextArgs = {}) {
-        const { children: children0, width, scale = 1, spacing, padding, justify, debug, env, ...attr0 } = THEME(args, 'Text')
+        const { children: children0, width, scale = 1, whitespace = 'normal', tab_size = 4, spacing, padding, justify, debug, env, ...attr0 } = THEME(args, 'Text')
         const children = ensure_children(children0)
-    	const [ spec, attr ] = spec_split(attr0)
+        const [ spec, attr ] = spec_split(attr0)
+        if (!['normal', 'pre', 'preserve'].includes(whitespace)) throw new Error(`Unknown whitespace mode: ${whitespace}`)
+        const preserve = whitespace !== 'normal'
 
         // split into words and elements
-        const spans = compress_spans(children, { env, ...attr })
+        const spans = preserve ? preserve_spans(children, tab_size, { env, ...attr }) : compress_spans(children, { env, ...attr })
 
         // wrap text to line widths
         const measure = (span: Element) => span.spec.aspect ?? 1
-        const { rows } = wrapWidths(spans, measure, width)
+        const rows = preserve ? spans.map(span => (span as Span).text.length ? [span] : []) : wrapWidths(spans, measure, width).rows
+        // Every literal line has the same box, including blank lines. Width
+        // can add room around the source, but never wraps or squeezes a line.
+        const line_width = preserve ? Math.max(width ?? 0, max(spans.map(measure)) ?? 0) || 1 : width
 
         // construct text lines
         const lines = rows.map(row =>
-            new TextLine({ children: normalize_line(row), padding, justify, width, debug, env })
+            new TextLine({ children: preserve ? row : normalize_line(row), padding, justify, width: line_width, debug, env })
         )
 
         // pass to VStack
@@ -440,7 +464,15 @@ class Text extends VStack {
 
         // additional props
         this.spans = spans
-        this.em = block_em(width ?? this.spec.aspect ?? 1, this.spec.aspect, scale)
+        this.whitespace = whitespace
+        this.em = block_em(line_width ?? this.spec.aspect ?? 1, this.spec.aspect, scale)
+    }
+}
+
+class Verbatim extends Text {
+    constructor(args: TextArgs = {}) {
+        super({ font_family: mono, whitespace: 'preserve', ...THEME(args, 'Verbatim') })
+        this.args = args
     }
 }
 
@@ -730,7 +762,7 @@ class TextBox extends Group {
         // metrics is boxed as it is, anything else is set as text
         const inner_width = width != null ? Math.max(width - pl - pr - ml - mr, 0) : undefined
         const only = children.length == 1 ? children[0] : null
-        const boxed = only != null && !(only instanceof Text) && ((only as WithEm).em != null || is_text_sized(only))
+        const boxed = only != null && (!(only instanceof Text) || only.whitespace !== 'normal') && ((only as WithEm).em != null || is_text_sized(only))
         let inner: Laid
         if (boxed) {
             inner = lay_child(only!, inner_width, { justify, font_attr, text_attr })
@@ -894,5 +926,5 @@ class Italic extends Text {
 // exports
 //
 
-export { Span, ElemSpan, TextLine, Text, TextCol, TextRow, TextGrid, TextFigure, TextBox, TextFrame, Bullets, Bold, Italic, lay_child, place_laid }
+export { Span, ElemSpan, TextLine, Text, Verbatim, TextCol, TextRow, TextGrid, TextFigure, TextBox, TextFrame, Bullets, Bold, Italic, lay_child, place_laid }
 export type { SpanArgs, ElemSpanArgs, TextLineArgs, TextArgs, TextColArgs, TextRowArgs, TextGridArgs, TextFigureArgs, TextBoxArgs, TextFrameArgs, BulletsArgs, RowAlign, Laid }

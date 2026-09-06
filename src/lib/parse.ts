@@ -194,8 +194,10 @@ function isClass(func: any): boolean {
 }
 
 function filterChildren(items: any[]): any[] {
+    // Formatting-only JSXText is discarded by emitChild. Explicit string
+    // expressions must survive, including spaces and blank literal lines.
     return items.flat(Infinity)
-        .filter(item => (item != null) && (item !== false) && (item !== true) && !isWhitespace(item))
+        .filter(item => (item != null) && (item !== false) && (item !== true))
 }
 
 // what a jsx element compiles to: build the element, and if that throws record

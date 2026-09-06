@@ -85,6 +85,8 @@ type TextSizerArgs = {
     env?: Env
 }
 
+type Whitespace = 'normal' | 'pre' | 'preserve'
+
 function textFont(font_family: string, font_weight: number, env?: Env): Font {
     // get font info
     const font = resolveEnv(env).fonts.get(font_family)
@@ -230,9 +232,9 @@ function rawTextMetrics({ advance, vrange: [ vlo, vhi ], raw_vrange: [ rlo, rhi 
     return { advance: advance / fh, vrange: [ (vhi - rhi) / fh, (vhi - rlo) / fh ], italic: italic / fh }
 }
 
-function textMetrics(text: string, args: TextSizerArgs = {}): TextMetrics {
+function textMetrics(text: string, args: TextSizerArgs & { whitespace?: Whitespace } = {}): TextMetrics {
     if (text == '\n') return { advance: 0, vrange: [ 0, 1 ], raw_vrange: [ 0, 1 ], italic: 0 }
-    const text1 = compress_whitespace(text)
+    const text1 = args.whitespace === 'pre' || args.whitespace === 'preserve' ? text : compress_whitespace(text)
     const advance = textSizer(text1, args)
     const vrange = textVertical(text1, args)
     const italic = textItalic(text1, args)
@@ -297,4 +299,4 @@ function mergeStrings(items: any[]): any[] {
 
 export { is_emoji, textMetrics, rawTextMetrics, textSizer, textVertical, textItalic, textHasGlyphs, getBreaks, splitWords, wrapWidths, wrapText, mergeStrings }
 export { DEFAULT_METRICS, EMPTY_METRICS, DEFAULT_VRANGE, EMPTY_VRANGE }
-export type { TextMetrics, TextSizerArgs }
+export type { TextMetrics, TextSizerArgs, Whitespace }
