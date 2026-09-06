@@ -32,6 +32,10 @@ import type { TextMetrics } from './text'
 // types
 //
 
+interface EmArgs {
+    scale?: number  // own em over the surrounding em; compounds when nested
+}
+
 type EmSpec = {
     width: number
     height: number
@@ -167,4 +171,4 @@ function scale_em_spec({ width, height, anchor, scale: scale0, hink, vink }: EmS
 //
 
 export { EMPTY_EM, DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_hink, em_vink, em_aspect, em_rect, hull_overhang, baseline_extents, scale_em_spec }
-export type { EmSpec, EmMetrics }
+export type { EmArgs, EmSpec, EmMetrics }

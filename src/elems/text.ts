@@ -11,7 +11,7 @@ import { textMetrics, splitWords } from '../lib/text'
 import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
 import { make_em, em_bounds, em_hink, em_rect, scale_em_spec } from '../lib/em'
-import type { EmSpec, EmMetrics } from '../lib/em'
+import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
 
 import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac } from './core'
 import { ensure_em_spec, with_em } from './em'
@@ -169,6 +169,7 @@ function compress_spans(children: any[], font_args: Attrs = {}): Element[] {
         // process Text into Span's
         // process Spans into Span's (with args)
         // process Elements into ElemSpan's
+        // Scaled text and spans with em metrics stay inline blocks.
         // every child but the last ends in a space, so a child never needs
         // to start with one (a leading space would double up)
         if (is_string(child)) {
@@ -178,7 +179,7 @@ function compress_spans(children: any[], font_args: Attrs = {}): Element[] {
             return splitWords(text).map((w: string) =>
                 new Span({ children: [ w ], ...font_args })
             )
-        } else if (child instanceof Text) {
+        } else if (child instanceof Text && child.em.scale == 1) {
             const spans = child.spans.flatMap((s: Element, i: number) => {
                 if (!(s instanceof Span)) return [ s ]
                 let { text } = s
@@ -187,7 +188,7 @@ function compress_spans(children: any[], font_args: Attrs = {}): Element[] {
                 return split_span(s, text, font_args)
             })
             return last_child ? spans : [ ...spans, new Span({ children: [ ' ' ], ...font_args }) ]
-        } else if (child instanceof Span) {
+        } else if (child instanceof Span && !('em' in child)) {
             const spans = split_span(child, child.text.trim(), font_args)
             return last_child ? spans : [ ...spans, new Span({ children: [ ' ' ], ...font_args }) ]
         } else if (child instanceof ElemSpan) {
@@ -404,12 +405,11 @@ class TextLine extends Group {
     }
 }
 
-interface TextArgs extends StackArgs {
+interface TextArgs extends StackArgs, EmArgs {
     font_family?: string
     font_weight?: number
     font_style?: string
     width?: number  // wrapping width in em, or minimum width for preserved text
-    scale?: number  // own em over the parent's em
     whitespace?: Whitespace
     tab_size?: number  // tab stops in columns for preserved text
 }
@@ -482,9 +482,8 @@ class Verbatim extends Text {
 
 // what the text containers share: a width and scale of their own, gaps in em,
 // and font and text attributes handed to their text children
-interface TextContainerArgs extends GroupArgs {
+interface TextContainerArgs extends GroupArgs, EmArgs {
     width?: number
-    scale?: number
     justify?: AlignValue
     font_family?: string
     font_weight?: number
@@ -661,10 +660,9 @@ class TextGrid extends Group {
     }
 }
 
-interface TextFigureArgs extends GroupArgs {
+interface TextFigureArgs extends GroupArgs, EmArgs {
     width?: number
     height?: number
-    scale?: number
     caption?: string | Element
     gap?: number
     justify?: AlignValue
@@ -720,7 +718,7 @@ class TextFigure extends Group {
     }
 }
 
-interface TextBoxArgs extends Omit<GroupArgs, 'aspect'> {
+interface TextBoxArgs extends Omit<GroupArgs, 'aspect'>, EmArgs {
     padding?: Padding
     margin?: Padding
     border?: number | boolean
@@ -730,7 +728,6 @@ interface TextBoxArgs extends Omit<GroupArgs, 'aspect'> {
     hug?: boolean
     justify?: AlignValue
     width?: number
-    scale?: number
     font_family?: string
     font_weight?: number
     font_style?: string
@@ -762,7 +759,7 @@ class TextBox extends Group {
         // metrics is boxed as it is, anything else is set as text
         const inner_width = width != null ? Math.max(width - pl - pr - ml - mr, 0) : undefined
         const only = children.length == 1 ? children[0] : null
-        const boxed = only != null && (!(only instanceof Text) || only.whitespace !== 'normal') && ((only as WithEm).em != null || is_text_sized(only))
+        const boxed = only != null && (!(only instanceof Text) || only.whitespace !== 'normal' || only.em.scale != 1) && ((only as WithEm).em != null || is_text_sized(only))
         let inner: Laid
         if (boxed) {
             inner = lay_child(only!, inner_width, { justify, font_attr, text_attr })
@@ -817,9 +814,8 @@ class TextFrame extends TextBox {
 // bullet list
 //
 
-interface BulletsArgs extends StackArgs {
+interface BulletsArgs extends StackArgs, EmArgs {
     width?: number
-    scale?: number
     marker?: string | Element
     indent?: number
     gap?: number
