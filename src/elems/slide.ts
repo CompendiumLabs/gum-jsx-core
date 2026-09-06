@@ -140,7 +140,7 @@ class Slide extends Group {
 
     constructor(args: SlideArgs = {}) {
         const {
-            children, aspect: aspect0 = 16 / 9, padding = 0.1, margin = 0.05, border = 1, rounded = D.rounded,
+            children, aspect: aspect0 = 16 / 9, padding = 0.1, margin = 0.1, border = 1, rounded = D.rounded,
             border_stroke = '#bbb', background, title_size = 0.1, width: width0 = 25, em, gap = 0.5,
             justify = 'left', align = 'center', valign = 'center', overflow: mode = 'shrink', env, ...attr0
         } = THEME(args, 'Slide')
