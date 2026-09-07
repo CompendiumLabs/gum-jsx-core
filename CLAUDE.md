@@ -178,6 +178,41 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 - Supports automatic coordinate system detection (`coord: 'auto'`)
 - Handles clipping and masking
 
+Layout is shared across geometry, text, and math. `lib/layout.ts` defines
+`Sizing`, `LayoutOffer`, and `LayoutResult`; every Element exposes `sizing`
+(optional natural dimensions) and `layout(offer)` (an arranged element plus
+em metrics). Exact offers reserve space; maximum offers are budgets. Reflow
+is a capability, not an element class list. `elems/sizing.ts` supplies default
+measurement, constructor-based reflow, allocation, and packing. `Stack` uses
+the allocator; `TextRow`/`TextCol` are convenience subclasses. Math's em row
+and column helpers use the same packer, retaining anchors and ink overhang.
+Plain geometry stays scale-free until sized. `grow` allocates spare space;
+overflow is visible, clipped, rejected, or uniformly shrunk at the stack.
+An explicit child `stack-size` reserves a fraction of the main dimension
+after gaps and fits the whole child (including its em) into that slot. Other
+children keep natural sizing. Without a main budget, natural children fill
+the unreserved fraction; all-share stacks infer size from their shapes.
+Fractions override weights and sum to at most one. The same allocator handles
+both policies; fitting uses a wrapper and shallow placement clones.
+`even` is shorthand for equal fractional shares, with explicit child fractions
+reserved first and the remaining share divided equally. Text's line boxes
+already have equal heights and are packed naturally, without `even`, to keep
+their common em.
+Core `width`/`height` are layout dimensions; Svg emits its output dimensions
+explicitly, and `pos`/`size` still describe coordinate placement. An explicit
+aspect fits content inside a declared width/height slot without changing the
+slot's dimensions. Transparent singleton Groups forward measurement. Box/Frame adapt to a
+measured child and reflow paragraphs inside insets. They hug by default;
+`stretch` fills offered dimensions while preserving the content's scale.
+`grow` remains a stack weight and `expand` retains geometric covering behavior.
+`fit` explicitly makes a complete drawing
+scale as a figure. Measured insets use layout units; geometric insets retain
+proportional padding. Coordinate placements stay geometric. Box/Frame accept
+element children only; prose needs an explicit Text child. TextBox/TextFrame
+are conveniences that convert bare text and mixed inline content into Text,
+then delegate to Box, with no separate framing implementation. Explicit block
+children pass through unchanged.
+
 **Layout containers** (`src/elems/layout.ts`):
 - `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
 - `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
@@ -197,7 +232,7 @@ measured as whole `Span` runs and placed at one common width, without wrapping.
 `Verbatim` supplies monospace and preserved whitespace as defaults. `Span`
 passes the whitespace policy to measurement and emits `xml:space="preserve"`.
 JSX formatting-only whitespace is discarded at parse time; explicit string
-expressions survive unchanged. `TextBox` lays a preserved text child out as a
+expressions survive unchanged. `Box` lays a preserved text child out as a
 block, rather than flattening it back into ordinary text spans.
 
 **Plot elements** (`src/elems/plot.ts`):

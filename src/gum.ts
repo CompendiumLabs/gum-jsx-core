@@ -46,5 +46,6 @@ export type { ThemeName } from './lib/theme'
 export type { SplineFuncArgs } from './lib/interp'
 export type { PngImageArgs, SvgImageArgs } from './elems/image'
 export type { Zoom, LayoutOptions, LayoutRow } from './inspect'
+export type { Sizing, LayoutOffer, LayoutResult, Overflow } from './lib/layout'
 
 export type * from './lib/types'

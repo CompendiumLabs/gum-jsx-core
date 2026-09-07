@@ -5,9 +5,9 @@ import { DEFAULTS as D, black, white, none } from '../lib/const'
 import { prefix_split, pad_rect } from '../lib/utils'
 
 import { spec_split, align_frac, is_element, ensure_children, Rectangle, Group } from './core'
-import { Box, Attach } from './layout'
+import { Box, Frame, Attach } from './layout'
 import { RoundedRect } from './geometry'
-import { Span, TextFrame, TextCol } from './text'
+import { Span, Text, TextCol } from './text'
 
 import type { AlignValue, Padding, Rounded, Point, Rect } from '../lib/types'
 import type { Element } from './core'
@@ -60,12 +60,13 @@ class TitleBox extends Box {
         const [ spec, attr ] = spec_split(attr1)
 
         // make optional title box; padding is in em, rounding in stroke units
-        let title_box: TextFrame | null = null
+        let title_box: Frame | null = null
         let title_mask: Element | undefined = undefined
         if (title != null) {
             const title_pos: Point = [ 0.5, title_size * title_offset ]
             const title_span = is_element(title) ? title : new Span({ children: [ title ], env })
-            title_box = new TextFrame({ children: [ title_span ], pos: title_pos, ysize: title_size, rounded: title_rounded, padding: title_padding, env, ...title_attr })
+            const title_text = new Text({ children: [title_span], env })
+            title_box = new Frame({ children: [ title_text ], pos: title_pos, ysize: title_size, rounded: title_rounded, padding: title_padding, env, ...title_attr })
             // the mask shows everything but the title cutout; the cover rect is in
             // box coordinates (with margin for overflow), not viewport percentages,
             // which measure from the viewport origin and break when a host crops
@@ -79,7 +80,7 @@ class TitleBox extends Box {
         // make inner box; when the outer box is given a shape (aspect or flex)
         // the inner box fills it rather than hugging the content
         const sized = spec.flex === true || spec.aspect != null
-        const box = new Box({ children, mask: title_mask, flex: sized, env, ...attr })
+        const box = new Box({ children, mask: title_mask, flex: sized, fit: true, env, ...attr })
 
         // pass to Box for margin
         super({ children: [ box, title_box ], margin, env, ...spec })
@@ -160,7 +161,7 @@ class Slide extends Group {
         // column budgets it to any figures it holds
         const width = (em != null && area_width0 != null) ? area_width0 / em : width0
         const height = area_width0 != null ? width * area_height / area_width0 : undefined
-        const col = new TextCol({ children, width, height, gap, justify, env, ...text_attr })
+        const col = new TextCol({ children, width, max_height: height, gap, justify, env, ...text_attr })
         const { width: col_width, height: col_height } = col.em
 
         // an auto aspect fits the canvas to the content
@@ -171,7 +172,7 @@ class Slide extends Group {
         // em; the ratio of its height to the area's is the overflow
         const em_size = area_width / col_width
         const ratio = col_height * em_size / area_height
-        if (mode == 'error' && ratio > 1) throw new Error(`Slide content overflows its frame by ${Math.round((ratio - 1) * 100)}%`)
+        if (mode == 'error' && ratio > 1 + 1e-9) throw new Error(`Slide content overflows its frame by ${Math.round((ratio - 1) * 100)}%`)
 
         // place the column in the area: at its size, aligned, unless it must
         // shrink to fit the height

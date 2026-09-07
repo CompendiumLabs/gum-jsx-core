@@ -6,7 +6,7 @@ import { abs, sub2, mul2, check_singleton, is_string, rect_center, side_direc, p
 import { Context, Element, Group, ensure_children, size_by_em, spec_split } from './core'
 import { Frame } from './layout'
 import { Arrow } from './geometry'
-import { Text, TextFrame } from './text'
+import { Text } from './text'
 
 import type { ElementArgs, GroupArgs } from './core'
 import type { WithEm } from './em'
@@ -45,7 +45,7 @@ interface NodeArgs extends GroupArgs {
 
 // a node is a framed label at a position. given an `em` (coordinate units
 // per em, usually from the Network), the box is sized from the label: a
-// TextFrame hugging the text (or an element with metrics) with `padding`
+// Frame hugging the text (or an element with metrics) with `padding`
 // in em, and the node is its em height times `em` tall, so every
 // node in the network shares one text size and a wrapped label makes a
 // taller node rather than smaller text. without one it is a Frame of the
@@ -66,12 +66,12 @@ class Node extends Group {
         let ysize = ysize0
         if (sized) {
             const label = is_string(child) ? new Text({ children: [ child ], env, ...text_attr }) : child
-            const frame = new TextFrame({ children: [ label ], padding: padding ?? 0.4, rounded: rounded ?? true, border, fill, width, justify, env, ...attr, ...text_attr })
-            ysize ??= em! * frame.em.height
+            const frame = new Frame({ children: [ label ], padding: padding ?? 0.4, rounded: rounded ?? true, border, fill, width, justify, env, ...attr, ...text_attr })
+            ysize ??= em! * frame.em!.height
             box = frame
         } else {
             const inner = is_string(child) ? new Text({ children: [ child ], width, justify, env, ...text_attr }) : child
-            box = new Frame({ children: [ inner ], padding: padding ?? 0.1, rounded: rounded ?? true, border, fill, env, ...attr })
+            box = new Frame({ children: [ inner ], fit: true, padding: padding ?? 0.1, rounded: rounded ?? true, border, fill, env, ...attr })
             ysize ??= 0.2
         }
 

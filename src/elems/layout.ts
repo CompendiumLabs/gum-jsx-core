@@ -6,8 +6,12 @@ import { DEFAULTS as D, none } from '../lib/const'
 import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, identity, invert, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, intersperse, prefix_split, merge_points, pad_rect } from '../lib/utils'
 import { wrapWidths } from '../lib/wrap'
 
-import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
+import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children, is_element } from './core'
 import { RoundedRect, Dot } from './geometry'
+import { layout_stack, layout_element, frame_layout } from './sizing'
+import { make_em, em_rect, em_aspect, hull_overhang, scale_em_spec } from '../lib/em'
+import type { EmSpec } from '../lib/em'
+import type { LayoutOffer, LayoutResult, RowAlign, Overflow } from '../lib/layout'
 
 import type { Point, Rect, Limit, AlignValue, Side, Orient, Padding, Rounded } from '../lib/types'
 import type { ElementArgs, GroupArgs } from './core'
@@ -71,19 +75,112 @@ interface BoxArgs extends GroupArgs {
     shape?: Element
     rounded?: Rounded
     adjust?: boolean
+    scale?: number
+    max_width?: number
+    max_height?: number
+    hug?: boolean
+    stretch?: boolean
+    fit?: boolean
+    justify?: AlignValue
+    valign?: AlignValue
 }
 
 class Box extends Group {
-    constructor(args: BoxArgs = {}) {
-        const { children: children0, padding, margin, border, fill, shape: shape0, rounded, aspect, clip, adjust = true, debug = false, env, ...attr0 } = THEME(args, 'Box')
-        const [ border_attr, fill_attr, attr] = prefix_split([ 'border', 'fill' ], attr0)
-        const children = ensure_children(children0)
+    em?: EmSpec
+    private readonly stretch: boolean
+    get reflow(): boolean { return this.em != null }
 
-        // ensure shape is a function
+    constructor(args: BoxArgs = {}) {
+        const {
+            children: children0, width, height, max_width, max_height, scale = 1,
+            hug = true, stretch = !hug, fit = false, justify = 'center', valign = 'center',
+            padding, margin, border, fill, shape: shape0, rounded, aspect: aspect0,
+            clip, adjust = true, debug = false, env, ...attr0
+        } = THEME(args, 'Box')
+        const [ border_attr, fill_attr, font_attr, text_attr, attr ] = prefix_split([ 'border', 'fill', 'font', 'text' ], attr0)
+        const font = Object.fromEntries(Object.entries(font_attr).map(([k, v]) => ['font_' + k, v]))
+        const typography = { ...font, ...text_attr, justify }
+        const children = ensure_children(children0)
+        if (children.some(c => !is_element(c))) {
+            throw new TypeError('Box/Frame children must be elements. Wrap text in Text, or use TextBox/TextFrame.')
+        }
+        const aspect = typeof aspect0 == 'number' && aspect0 > 0 ? aspect0 : (aspect0 as any) === true ? 1 : undefined
+        const only = children.length == 1 ? children[0] : undefined
+        const natural = only?.sizing
+        const bounded = width != null || height != null || max_width != null || max_height != null
+        const measured = !fit && args.coord == null && (bounded || (only?.spec.rect == null && (natural?.width != null || natural?.height != null)))
+
+        // Background, border, and clipping use the same shape.
         const shape = shape0 ?? maybe_rounded_rect(rounded, env)
 
+        if (measured) {
+            // Measured frames use layout units for their insets. The child
+            // resolves wrapping inside those insets; extra room belongs to
+            // the frame and never changes the child's em.
+            const [ pl, pt, pr, pb ] = pad_rect(padding)
+            const [ ml, mt, mr, mb ] = pad_rect(margin)
+            const dx = pl + pr + ml + mr, dy = pt + pb + mt + mb
+            let w = width ?? (height != null && aspect != null ? height * aspect : undefined)
+            let h = height ?? (width != null && aspect != null ? width / aspect : undefined)
+            if (w != null && h != null && aspect != null) {
+                w = Math.min(w, h * aspect)
+                h = w / aspect
+            }
+            const child = only ?? new Group({ children, aspect: 'auto', env })
+            const available = w ?? max_width
+            const innerWidth = available != null ? Math.max(0, available - dx) : undefined
+            const laid = child.layout({
+                maxWidth: innerWidth != null && (!stretch || w == null) ? Math.min(innerWidth, natural?.width ?? Infinity) : innerWidth,
+                maxHeight: (h ?? max_height) != null ? Math.max(0, (h ?? max_height)! - dy) : undefined,
+                attrs: { ...typography, justify: child.args.justify ?? justify },
+            })
+            const em = laid.em
+            w ??= em.width + dx
+            h ??= em.height + dy
+            if (aspect != null && width == null && height == null) {
+                w = Math.max(w, h * aspect)
+                h = w / aspect
+            }
+            const [ ax, ay ] = ensure_pair(child.spec.align ?? [justify, valign])
+            const x = ml + pl + align_frac(ax) * (w - dx - em.width)
+            const y = mt + pt + align_frac(ay) * (h - dy - em.height)
+            const rect = em_rect(em, x, y + em.anchor)
+            // An unconstrained frame hugs the ink as well as the layout box.
+            // A declared dimension keeps its border fixed when ink overflows.
+            const frameRect: Rect = [
+                width != null ? ml : Math.min(ml, rect[0] - pl),
+                height != null ? mt : Math.min(mt, rect[1] - pt),
+                width != null ? w - mr : Math.max(w - mr, rect[2] + pr),
+                height != null ? h - mb : Math.max(h - mb, rect[3] + pb),
+            ]
+            const bounds: Rect = [frameRect[0] - ml, frameRect[1] - mt, frameRect[2] + mr, frameRect[3] + mb]
+            const { hink, vink, coord } = hull_overhang(clip ? [bounds] : [bounds, rect], w, [0, h])
+            const metrics = make_em({ width: w, height: h, anchor: y + em.anchor, scale: em.scale, hink, vink })
+            // A zero-sized drawing has no coordinate map. Keep its allocation
+            // and anchor, but do not send a degenerate frame to the renderer.
+            if (coord[0] == coord[2] || coord[1] == coord[3]) {
+                super({ children: [], upright: true, env, ...attr })
+                this.args = args
+                this.stretch = stretch
+                this.em = make_em(scale_em_spec(metrics, scale))
+                return
+            }
+            const background = fill != null ? shape.clone({ rect: frameRect, fill, stroke: none, ...fill_attr }) : null
+            const foreground = border != null && border !== false ? shape.clone({ rect: frameRect, stroke_width: border, ...border_attr }) : null
+            const content = new Group({ children: [laid.elem.clone({ rect })], coord, debug, env })
+            const clipping = clip ? new Group({ children: [clip === true ? shape : clip], rect: frameRect, env }) : undefined
+            const body = new Group({ children: [background, content, foreground], coord, clip: clipping, aspect: em_aspect(metrics), env })
+            const framed = frame_layout({ elem: body, em: metrics }, width ?? w, height ?? h)
+            super({ children: [framed.elem], coord: em_rect(framed.em, 0, framed.em.anchor), aspect: em_aspect(framed.em), upright: true, env, ...attr })
+            this.args = args
+            this.stretch = stretch
+            this.em = make_em(scale_em_spec(framed.em, scale))
+            return
+        }
+
         // compute layout
-        const { rect_inner, rect_outer, aspect_outer } = computeBoxLayout(children, { padding, margin, aspect: aspect as number | undefined, adjust })
+        const frameAspect = aspect ?? (width != null && height != null && height > 0 ? width / height : undefined)
+        const { rect_inner, rect_outer, aspect_outer } = computeBoxLayout(children, { padding, margin, aspect: frameAspect as number | undefined, adjust })
 
         // make framing elements
         const rect_cl = (clip === true) ? shape : clip
@@ -95,8 +192,21 @@ class Box extends Group {
         const outer = new Group({ children: [ rect_bg, inner, rect_fg ], rect: rect_outer, clip: rect_cl, env })
 
         // pass to Group
-        super({ children: [ outer ], aspect: aspect_outer, upright: true, env, ...attr })
+        super({ children: [ outer ], width, height, aspect: aspect_outer, upright: true, env, ...font, ...attr })
         this.args = args
+        this.stretch = stretch
+    }
+
+    layout(offer: LayoutOffer = {}): LayoutResult {
+        if (!this.reflow) return layout_element(this, offer)
+        const scale = this.args.scale ?? 1
+        const patch = { ...offer.attrs } as Record<string, any>
+        if (this.args.width == null && offer.width != null && this.stretch) patch.width = offer.width / scale
+        if (this.args.height == null && offer.height != null && this.stretch) patch.height = offer.height / scale
+        if (offer.maxWidth != null || (!this.stretch && offer.width != null)) patch.max_width = (offer.width ?? offer.maxWidth)! / scale
+        if (offer.maxHeight != null || (!this.stretch && offer.height != null)) patch.max_height = (offer.height ?? offer.maxHeight)! / scale
+        const changed = Object.keys(patch).some(k => patch[k] !== this.args[k])
+        return layout_element(changed ? this.clone(patch) : this, offer)
     }
 }
 
@@ -112,145 +222,64 @@ class Frame extends Box {
 // stack/wrap/grid classes
 //
 
-type StackChildOver = {
-    size: number
-    aspect: number
-}
-
-type StackChildExpo = {
-    size?: number
-    aspect: number
-}
-
-type StackChildFlex = {
-    size: number
-    aspect: undefined
-}
-
-type StackChild = StackChildOver | StackChildExpo | StackChildFlex
-
-// TODO: better justify handling with aspect override (right now it's sort of "left" justified)
-function computeStackLayout(direc: string, children: Element[], { spacing = 0, even = false, aspect: aspect0 }: { spacing?: number, even?: boolean, aspect?: number } = {}): { ranges: Limit[], aspect: number | undefined } {
-    // short circuit if empty
-    if (children.length == 0) return { ranges: [], aspect: undefined }
-
-    // get size and aspect data from children: a child's aspect takes part in
-    // the layout unless it opts out with `stack-expand = false`, in which case
-    // it is a fixed share (sized) or an even share of the remainder (unsized)
-    // and only its own placement within that share respects the aspect
-    // adjust for direction (invert aspect if horizontal)
-    const items = children.map(c => {
-        const size = c.attr.stack_size ?? (even ? 1 / children.length : null)
-        const aspect = (c.attr.stack_expand ?? true) ? c.spec.aspect : null
-        return { size, aspect } as StackChild
-    })
-
-    // handle horizontal case (invert aspect)
-    if (direc == 'v') {
-        for (const c of items) c.aspect = invert(c.aspect)
-    }
-
-    // compute total share of non-spacing elements
-    const F_total = 1 - spacing * (children.length - 1)
-
-    // for computing return values
-    const getSizes = (cs: StackChild[]): number[] => cs.map(c => c.size ?? 0)
-    const getAspect0: (a: number | undefined) => number | undefined = (direc == 'v') ? invert : identity
-    const getAspect = (a: number | undefined): number | undefined => (aspect0 ?? getAspect0(a))
-
-    // compute ranges with spacing
-    function getRanges(sizes0: number[]): Limit[] {
-        const sizes1 = sizes0.map(s0 => F_total * s0)
-        const bases = cumsum(sizes1.map(s1 => s1 + spacing)).slice(0, -1)
-        return zip(bases, sizes1).map(([b, s1]) => [b, b + s1])
-    }
-
-    // children = list of dicts with keys size (s_i) and aspect (a_i)
-    // const fixed = children.filter(c => c.size != null && c.aspect == null)
-    const over = items.filter(c => c.size != null && c.aspect != null) as StackChildOver[]
-    const expo = items.filter(c => c.size == null && c.aspect != null) as StackChildExpo[]
-    const flex = items.filter(c => c.size == null && c.aspect == null) as StackChildFlex[]
-
-    // get target aspect from over-constrained children (sized with an aspect):
-    // the shortest length at which one of them exactly fills its share, so
-    // that child fills the stack and the rest fit inside their shares
-    // single element case (exact): s * F_total * L = a
-    // multi element case (approximate): agg(s_i / a_i) * F_total * L = 1
-    const agg: (x: number[]) => number = x => max(x) as number // fit to max aspect, otherwise will underfit
-    const L_over = (over.length > 0) ? 1 / (F_total * agg(over.map(c => c.size / c.aspect))) : undefined
-
-    // knock out (over/exactly)-budgeted case right away
-    // short-circuit since this is relatively simple
-    const S_sum = sum(getSizes(items))
-    if (S_sum >= 1 || (expo.length == 0 && flex.length == 0)) {
-        const sizes = getSizes(items)
-        const ranges = getRanges(sizes)
-        const aspect = getAspect(L_over)
-        return { ranges, aspect }
-    }
-
-    // set length to accommodate the expandables: add up the lengths required
-    // to make them height 1 (w = a), so L_expand * (1 - S_sum) * F_total = sum(a)
-    const L_expand = (expo.length > 0) ? sum(expo.map(c => c.aspect)) / ((1 - S_sum) * F_total) : undefined
-    // the target length is a requested aspect, else the one that lets the
-    // expandables fill the remaining space (an over-constrained child cannot
-    // set it without leaving that space partly empty), else the one that lets
-    // an over-constrained child fill its share; a requested aspect is in
-    // output terms, so map it into the internal (horizontal) frame like the
-    // computed lengths (inverted when vertical)
-    const L_target = (aspect0 != null ? getAspect0(aspect0) : (L_expand ?? L_over)) as number
-
-    // allocate space to expand then flex children
-    // S_exp0 gets full length of expandables given realized L_target
-    // S_exp is the same but constrained so the sums are less than 1
-    // should satisfy: s * F_total * L_target = a
-    const S_exp0 = sum(expo.map(c => c.aspect / (F_total * L_target)))
-    const S_exp = Math.min(S_exp0, 1 - S_sum)
-    const scale = S_exp / S_exp0 // this is 1 in the unconstrained case
-    for (const c of expo) c.size = c.aspect / (F_total * L_target) * scale
-
-    // distribute remaining space to flex children, if any
-    // S_left is the remaining space after pre-allocated and expandables (may hit 0)
-    const S_left = 1 - S_sum - S_exp
-    if (flex.length > 0) {
-        for (const c of flex) c.size = S_left / flex.length
-    }
-
-    // compute heights and aspect
-    const sizes = getSizes(items)
-    const ranges = getRanges(sizes)
-    const aspect = getAspect(L_target)
-    return { ranges, aspect }
-}
-
 interface StackArgs extends GroupArgs {
     direc?: Orient
-    spacing?: boolean | number
+    spacing?: boolean | number  // fraction of the main axis reserved for gaps
+    gap?: number               // gap in layout units
+    scale?: number
+    max_width?: number
+    max_height?: number
     justify?: AlignValue
-    even?: boolean
+    valign?: RowAlign
+    even?: boolean  // divide the unreserved space into equal fractional shares
+    sizes?: number[]
+    overflow?: Overflow
 }
 
-// this is written as vertical, horizonal swaps dimensions and inverts aspects
-// TODO: make native way to mimic using Spacer elements for spacing
+// Geometry, paragraphs, and formulas use the same allocator. A purely
+// geometric stack carries only an aspect until an ancestor gives it a size.
 class Stack extends Group {
+    em?: EmSpec
+    get reflow(): boolean { return true }
+
     constructor(args: StackArgs = {}) {
-        const { children: children0, direc = 'v', spacing = 0, justify = 'center', aspect: aspect0, even = false, ...attr } = THEME(args, 'Stack')
+        const {
+            children: children0, direc = 'v', width, height, max_width, max_height,
+            spacing = 0, gap, scale = 1, justify = 'center', valign = 'center',
+            aspect: aspect0, even = false, sizes, overflow = 'visible', env, ...attr0
+        } = THEME(args, 'Stack')
         const children = ensure_children(children0)
-
-        // compute layout
-        const spacing1 = (spacing as number) / Math.max(children.length - 1, 1)
-        const { ranges, aspect } = computeStackLayout(direc, children, { spacing: spacing1, even, aspect: aspect0 as number | undefined })
-
-        // assign child rects
-        const items = children.length > 0 ? zip(children, ranges).map(([c, b]) => {
-            const rect = join_limits({ [direc]: b })
-            const align = c.spec.align ?? justify
-            return c.clone({ rect, align, stack_size: undefined, stack_expand: undefined })
-        }) : []
-
-        // pass to Group
-        super({ children: items, aspect, upright: true, ...attr })
+        const [ font_attr, text_attr, attr1 ] = prefix_split(['font', 'text'], attr0)
+        const attrs = { ...Object.fromEntries(Object.entries(font_attr).map(([k, v]) => ['font_' + k, v])), ...text_attr }
+        const [ spec, attr ] = spec_split(attr1)
+        const ratio = typeof aspect0 == 'number' && aspect0 > 0 ? aspect0 : undefined
+        const contentWidth = ratio != null ? (width != null && height != null ? Math.min(width, height * ratio) : width ?? (height != null ? height * ratio : undefined)) : width
+        const contentHeight = ratio != null && contentWidth != null ? contentWidth / ratio : height
+        let laid = layout_stack(children, {
+            direc, width: contentWidth, height: contentHeight, maxWidth: max_width, maxHeight: max_height,
+            spacing: spacing as number, gap, justify, valign, even, sizes, overflow, attrs,
+        })
+        const outerWidth = width ?? (ratio != null ? Math.max(laid.metrics.width, laid.metrics.height * ratio) : laid.metrics.width)
+        const outerHeight = height ?? (ratio != null ? outerWidth / ratio : laid.metrics.height)
+        if (outerWidth != laid.metrics.width || outerHeight != laid.metrics.height) {
+            const body = new Group({ children: laid.children, coord: laid.coord, aspect: laid.aspect, env })
+            const framed = frame_layout({ elem: body, em: laid.metrics }, outerWidth, outerHeight)
+            laid = { ...laid, children: [framed.elem], coord: [0, 0, outerWidth, outerHeight], aspect: outerWidth / outerHeight, metrics: framed.em }
+        }
+        super({ children: laid.children, coord: laid.coord, aspect: laid.aspect, upright: true, env, ...attr, ...spec })
         this.args = args
+        if (laid.measured) this.em = make_em(scale_em_spec(laid.metrics, scale))
+    }
+
+    layout(offer: LayoutOffer = {}): LayoutResult {
+        const scale = this.args.scale ?? 1
+        const patch = { ...offer.attrs } as Record<string, any>
+        if (this.args.width == null && offer.width != null) patch.width = offer.width / scale
+        if (this.args.height == null && offer.height != null) patch.height = offer.height / scale
+        if (offer.maxWidth != null) patch.max_width = offer.maxWidth / scale
+        if (offer.maxHeight != null) patch.max_height = offer.maxHeight / scale
+        const changed = Object.keys(patch).some(k => patch[k] !== this.args[k])
+        return layout_element(changed ? this.clone(patch) : this, offer)
     }
 }
 

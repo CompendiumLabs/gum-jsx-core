@@ -5,6 +5,8 @@ import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
 import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
 import type { Env } from '../env'
+import { element_sizing, layout_element } from './sizing'
+import type { Sizing, LayoutOffer, LayoutResult } from '../lib/layout'
 
 import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint, Spec, Limit } from '../lib/types'
 
@@ -274,9 +276,9 @@ function props_repr(d: Attrs, prec: number): string {
 }
 
 // reserved keys
-const SPEC_KEYS = [ 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar' ]
+const SPEC_KEYS = [ 'width', 'height', 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar' ]
 const HELP_KEYS = [ 'pos', 'size', 'xsize', 'ysize', 'rad', 'xrad', 'yrad', 'xrect', 'yrect', 'flex', 'spin', 'orient' ]
-const EXTR_KEYS = [ 'stack_size', 'stack_expand' ]
+const EXTR_KEYS = [ 'stack_size', 'stack_expand', 'grow' ]
 const RESERVED_KEYS = [ ...SPEC_KEYS, ...HELP_KEYS, ...EXTR_KEYS ]
 
 // the keys a parent sets to place a child (see Element.clone)
@@ -299,6 +301,8 @@ function is_element(x: any): x is Element {
 }
 
 interface SpecArgs {
+    width?: number
+    height?: number
     rect?: Rect
     coord?: Rect | 'auto'
     aspect?: number | 'auto'
@@ -313,6 +317,8 @@ interface SpecArgs {
 
 // TODO: children should be Element[] | string
 interface ElementArgs extends SpecArgs {
+    stack_size?: number  // fractional main-axis share, excluding gaps; fit content into the slot
+    grow?: number
     tag?: string
     unary?: boolean
     children?: any
@@ -346,8 +352,12 @@ class Element {
     spec: Spec
     attr: Attrs
 
+    get sizing(): Sizing { return element_sizing(this) }
+    get reflow(): boolean { return false }
+    layout(offer: LayoutOffer = {}): LayoutResult { return layout_element(this, offer) }
+
     constructor(args: ElementArgs = {}) {
-        const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, env: _env, ...attr0 } = args
+        const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, grow: _grow, env: _env, ...attr0 } = args
         const [ spec, attr ] = spec_split(attr0, false)
         this.args = args
 
@@ -578,6 +588,24 @@ interface GroupArgs extends ElementArgs {
 class Group extends Element {
     children: Element[]
 
+    // Only a plain, untransformed singleton group is transparent to layout.
+    // Specialized containers implement their own measurement operation.
+    private get layoutChild(): Element | undefined {
+        return this.constructor === Group && this.children.length == 1 && this.spec.coord == null &&
+            this.spec.rotate == null && this.spec.width == null && this.spec.height == null &&
+            (this.args.aspect == null || this.args.aspect == 'auto') && this.children[0].spec.rect == null
+            ? this.children[0] : undefined
+    }
+    get sizing(): Sizing { return this.layoutChild?.sizing ?? element_sizing(this) }
+    get reflow(): boolean { return this.layoutChild?.reflow ?? false }
+    layout(offer: LayoutOffer = {}): LayoutResult {
+        const child = this.layoutChild
+        if (child == null) return layout_element(this, offer)
+        const laid = child.layout(offer)
+        const out = this.clone({ children: [laid.elem], aspect: laid.elem.spec.aspect })
+        return { elem: Object.assign(out, { em: laid.em }), em: laid.em }
+    }
+
     constructor(args: GroupArgs = {}) {
         const { children: children0, aspect: aspect0, coord: coord0, clip: clip0, mask: mask0, em, debug = false, tag = 'g', env, ...attr } = args
         const children = size_by_em(ensure_children(children0), em)
@@ -748,7 +776,7 @@ class Svg extends Group {
 
     constructor(args: SvgArgs = {}) {
         const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, env, ...attr } = THEME(args, 'Svg')
-        const children = ensure_children(children0)
+        const children = ensure_children(children0).map(c => c.spec.width != null || c.spec.height != null ? c.layout().elem : c)
         const size_base = ensure_pair(size0)
 
         // precompute aspect info
@@ -769,6 +797,7 @@ class Svg extends Group {
         // still scale with the image instead of staying a fixed pixel hairline
         super({ tag: 'svg', children, aspect, xmlns, font_family, font_weight, stroke_width, env, ...dims_attr, ...attr })
         this.args = args
+        Object.assign(this.attr, dims_attr)
 
         // additional props
         this.size = [ width, height ]

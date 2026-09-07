@@ -43,6 +43,8 @@ type Attrs = Record<string, any>
 
 // layout spec: the keys extracted by spec_split
 type Spec = {
+    width?: number
+    height?: number
     rect?: Rect
     coord?: Rect
     aspect?: number

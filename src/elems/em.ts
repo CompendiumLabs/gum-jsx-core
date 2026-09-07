@@ -2,13 +2,14 @@
 // compose them. The math elements build on these with their own spacing rules
 // and styles; the Text* elements with theirs
 
-import { sum, max, merge_limits, ensure_pair } from '../lib/utils'
-import { EMPTY_EM, DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_aspect, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
+import { max, merge_limits, ensure_pair } from '../lib/utils'
+import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_aspect, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
 import type { TextMetrics } from '../lib/text'
 import type { Attrs, Rect, Limit, Align } from '../lib/types'
 
-import { Context, Element, Group, align_frac } from './core'
+import { Context, Element, Group } from './core'
+import { pack_layout } from './sizing'
 
 //
 // elements with metrics
@@ -41,6 +42,7 @@ function ensure_em_spec(element: Element): EmMetrics {
     const metrics = (element as { metrics?: TextMetrics }).metrics
     if (metrics != null) return text_em(metrics)
     const { width, height, anchor } = DEFAULT_EM
+    if (element.spec.width != null || element.spec.height != null) return element.layout().em
     return { width: element.spec.aspect ?? width, height, anchor }
 }
 
@@ -141,31 +143,7 @@ type EmLayout = {
 // horizontal concatenation: widths accumulate left to right and every child's
 // anchor sits on y = 0
 function layout_em_row(items: WithEm[]): EmLayout {
-    // empty case
-    if (items.length == 0) return { children: [], aspect: 0, metrics: EMPTY_EM }
-
-    // find outer vertical range
-    const width = sum(items.map(item => item.em.width))
-    const bounds = merge_limits(items.map(item => em_bounds(item.em)))
-
-    // compute placements
-    let xmax = 0
-    const rects = items.map(item => {
-        const { width: x } = item.em
-        xmax += x
-        return em_rect(item.em, xmax - x, 0)
-    })
-    const children = items.map((item, i) => with_em(item, {}, { rect: rects[i] }))
-
-    // the ink hull covers the layout box plus any overhang from the items
-    const { hink, vink, coord } = hull_overhang(rects, width, bounds)
-
-    // compute layout metrics
-    const metrics = bounds_em(width, bounds, { hink, vink })
-    const aspect = em_aspect(metrics)
-
-    // return layout
-    return { children, coord, aspect, metrics }
+    return pack_layout(items.map(elem => elem.spec.width != null || elem.spec.height != null ? elem.layout() : { elem, em: elem.em }), { valign: 'anchor' })
 }
 
 type EmColOptions = {
@@ -175,38 +153,10 @@ type EmColOptions = {
 }
 
 // vertical stacking in a top-origin frame, each child keeping its own anchor line
-function layout_em_col(items: WithEm[], { justify = 'center', spacing = 0, anchor: anchor0 = 'center' }: EmColOptions = {}): EmLayout {
-    // empty case
-    if (items.length == 0) return { children: [], aspect: 0, metrics: EMPTY_EM }
-
-    // find outer width
-    const width = max(items.map(item => item.em.width)) ?? 0
-    const halign = align_frac(ensure_pair(justify)[0])
-
-    // stack top-down while preserving each child's anchor line
-    let ybottom = 0
-    let yfirst = 0
-    const rects = items.map((item, i) => {
-        const [ ylo, yhi ] = em_bounds(item.em)
-        const yanchor = ybottom + (i > 0 ? spacing : 0) - ylo
-        if (i == 0) yfirst = yanchor
-        ybottom = yanchor + yhi
-        // Align the layout box, then place its full ink at that scale. Fitting
-        // the ink into a layout-width slot would shrink an overhanging child.
-        const x = halign * (width - item.em.width)
-        return em_rect(item.em, x, yanchor)
+function layout_em_col(items: WithEm[], { justify = 'center', spacing = 0, anchor = 'center' }: EmColOptions = {}): EmLayout {
+    return pack_layout(items.map(elem => elem.spec.width != null || elem.spec.height != null ? elem.layout() : { elem, em: elem.em }), {
+        direc: 'v', justify: ensure_pair(justify)[0], gap: spacing, anchor,
     })
-    const children = items.map((item, i) => with_em(item, {}, { rect: rects[i], align: justify }))
-
-    // Keep layout spacing independent of ink. These bounds and coordinates
-    // use the column's top-origin frame, so vink is already relative to its top.
-    const { hink, vink, coord } = hull_overhang(rects, width, [ 0, ybottom ])
-    const anchor = anchor0 == 'first' ? yfirst : 0.5 * ybottom
-    const metrics: EmMetrics = { width, height: ybottom, anchor, hink, vink }
-    const aspect = em_aspect(metrics)
-
-    // return layout
-    return { children, coord, aspect, metrics }
 }
 
 //
