@@ -4,6 +4,8 @@ import { THEME } from '../lib/theme'
 import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
 import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
+import { make_em, scale_em_spec } from '../lib/em'
+import type { EmSpec } from '../lib/em'
 import type { Env } from '../env'
 
 import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint, Spec, Limit } from '../lib/types'
@@ -333,6 +335,32 @@ interface ElementArgs extends SpecArgs {
     [key: string]: any
 }
 
+// an element that may carry em metrics (see lib/em.ts): text, math, the text
+// stacks and anything adapted with with_em
+type MaybeEm = Element & { em?: EmSpec }
+
+// the layout protocol between a stack in em and its children (see elems/em.ts):
+// what a child is offered and what it reports back
+type ReflowKey = 'width' | 'height'
+
+// the slot a child is laid out for, in the container's em. `span` has a child
+// sized by the height keep the slot's width as its box (a column), and
+// `justify` and `attr` (text and font settings) go to children that lay
+// themselves out
+type LayOffer = {
+    width?: number
+    height?: number
+    span?: boolean
+    justify?: AlignValue
+    attr?: Attrs
+}
+
+// the element to place and its box in the container's em
+type Laid = {
+    elem: Element
+    em: EmSpec
+}
+
 // stroke lengths are given in stroke units (see Context.unit) and resolved to
 // pixels at emit time; a dash array is a list of them
 const STROKE_KEYS = [ 'stroke_width', 'stroke_dasharray', 'stroke_dashoffset' ]
@@ -345,6 +373,7 @@ class Element {
     unary: boolean
     spec: Spec
     attr: Attrs
+    declare em?: EmSpec // em metrics, set by measured content (never initialized, so `'em' in x` stays honest)
 
     constructor(args: ElementArgs = {}) {
         const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, env: _env, ...attr0 } = args
@@ -437,6 +466,51 @@ class Element {
     // metadata here; placement-only clones bypass this method entirely.
     rebuild(args: Attrs): Element {
         return new (this.constructor as any)(args)
+    }
+
+    //
+    // layout protocol: what a stack in em asks of a child (see elems/em.ts)
+    //
+
+    // the sizes the element lays itself out for when a container hands them
+    // over: a text block re-wraps for a width, a text stack budgets a height.
+    // an element that does neither is placed as it is
+    get reflow(): ReflowKey[] {
+        return []
+    }
+
+    // whether the element keeps its own size in a stack rather than taking a
+    // slot: one that lays itself out has a size once given a width of its
+    // own, anything else when it carries metrics
+    fixed(): boolean {
+        if (this.reflow.length > 0) return this.args.width != null
+        return this.em != null
+    }
+
+    // whether the element is sized by the height a stack has to give rather
+    // than by its width: an element with an aspect but no metrics (a figure)
+    flex_height(): boolean {
+        return this.em == null && this.spec.aspect != null
+    }
+
+    // the element laid out for a slot `width` wide (none: at its own size)
+    // and, when it is flexible in height, `height` tall: the element to place
+    // and its box in the container's em. an element with metrics keeps its
+    // size (shrunk to the slot if wider), one with an aspect spans the slot at
+    // it, or is `height` tall at it (no wider than the slot), and one with
+    // neither is a square
+    lay(offer: LayOffer = {}): Laid {
+        const { width, height } = offer
+        const em0 = this.em
+        if (em0 != null) {
+            const f = (width != null && em0.width > width) ? width / em0.width : 1
+            return { elem: this, em: make_em(scale_em_spec(em0, f)) }
+        }
+        const aspect = this.spec.aspect
+        const by_height = height != null && aspect != null && aspect > 0
+        const w = by_height ? Math.min(width ?? Infinity, height! * aspect) : (width ?? aspect ?? 1)
+        const h = (aspect != null && aspect > 0) ? w / aspect : w
+        return { elem: this, em: make_em({ width: w, height: h, anchor: 0.5 * h }) }
     }
 
     rect(ctx: Context): Rect {
@@ -551,8 +625,6 @@ function makeUID(prefix: string, env?: Env): string {
 
 // an element with em metrics (text, math, the text containers) placed by
 // `pos` with no size of its own
-type MaybeEm = Element & { em?: { height: number } }
-
 function is_unsized_em(c: Element): boolean {
     const { pos, size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect } = c.args ?? {}
     return (c as MaybeEm).em != null && pos != null && [ size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect ].every(v => v == null)
@@ -889,4 +961,4 @@ class Spacer extends Element {
 //
 
 export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text }
-export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs }
+export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, ReflowKey, LayOffer, Laid }

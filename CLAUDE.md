@@ -182,12 +182,50 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 - `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
 - `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 
+### Two ecosystems: shares and em
+
+Core layout works in **shares** of the parent: the unit square rects are placed in, a
+`stack-size`, a `Stack`'s `spacing`. `Stack`/`VStack`/`HStack` (`computeStackLayout`) divide
+themselves between their children by aspect and share and have an aspect but no size; the parent
+gives them one and everything scales together. That ecosystem is untouched by what follows.
+
+Text and math work in **em**, the common unit of measured content. An element that takes part
+carries an `em` record (`src/lib/em.ts`: `width`, `height`, `anchor`, `scale`, optional
+`hink`/`vink` ink overhang); text and math measure theirs, and `with_em` (`src/elems/em.ts`)
+adapts anything else. The field is `declare`d on `Element` and only ever assigned, so `x.em != null`
+is the test for measured content. The two ecosystems share one layout engine,
+`layout_em_stack(direc, children, options)` in `src/elems/em.ts`: `TextStack` (with `TextCol` and
+`TextRow` as its directions) and, in `@gum-jsx/math`, `MathRow` (a row aligned on anchors) and
+`MathCol` (a column anchored on its middle) all call it with their own defaults. A column offers
+its width and budgets a height; a row offers slots along its width and hands a height down; the
+group draws the children's ink hull (`hull_overhang`) while the metrics keep the box.
+
+The engine never tests classes. It asks each child through the **layout protocol** on `Element`:
+
+- `reflow` — the sizes the element lays itself out for (`[]` for most; `['width']` for `Text`,
+  `Bullets`, `TextBox`, `TextGrid`; `['height']` for `TextFigure`; both for `TextStack`).
+- `fixed()` — keeps its own size in a stack: a reflowing element with a `width` of its own, else
+  anything with `em`.
+- `flex_height()` — sized by a height budget: an element with an aspect and no `em`, an unsized
+  `TextFigure`, a text stack without a `height` holding one.
+- `lay(offer)` — the element laid out for a slot (`width`, `height`, `span`, `justify`, `attr`)
+  as `{ elem, em }`. The default keeps an `em` (shrunk to the slot if wider), spans the slot at an
+  aspect, or is a square; reflowing elements rebuild themselves for it (`lay_width` in `text.ts`,
+  `TextStack.lay`, `TextFigure.lay` with its caption overshoot rule).
+
+A new element joins em layout by overriding these. One child attribute (a reserved key, stripped
+like its namesake in `Stack`) adjusts a slot: `stack-size` is a length along the stack in em
+(not a share, as in `Stack`), the child spanning across and fit inside by its aspect. A `TextBox`
+whose text fits on one line always tightens to that line rather than spanning a column. A share
+`Stack` placed in a text stack is a figure: it spans its slot at its aspect. A column's box is its content even under a height budget
+(`Slide` reads the overflow from it); a row's box is its given width.
+
 **Geometry elements** (`src/elems/geometry.ts`):
 - `Line`, `UnitLine`, `VLine`, `HLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`
 - `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
 
 **Text elements** (`src/elems/text.ts`):
-- `Span`, `Text`, `Verbatim`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
+- `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
 
 `Text` defaults to collapsed whitespace. `whitespace="pre"` or `"preserve"`
 accepts plain strings, preserves spaces and explicit lines (including blank
@@ -299,7 +337,7 @@ Key functions for rect manipulation:
 - `core.ts` - `Context`, `Element`, `Group`, `Svg`, `Rect`, plus `prefix_split`, `spec_split`, `align_frac`, `is_element`
 - `layout.ts` - `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`, `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 - `geometry.ts` - `Line`, `UnitLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`, `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
-- `text.ts` - `Span`, `Text`, `Verbatim`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
+- `text.ts` - `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
 - `plot.ts` - `Bar`, `Bars`, `Scale`, `Labels`, `Axis`, `Mesh`, `Graph`, `Plot`, `BarPlot`, `Legend`
 - `network.ts` - `ArrowSpline`, `Node`, `Edge`, `Network`
 - `symbolic.ts` - `SymPoints`, `SymLine`, `SymSpline`, `SymPoly`, `SymFill`, `SymField`
@@ -309,6 +347,7 @@ Key functions for rect manipulation:
 **Library modules (`src/lib/`):**
 - `utils.ts` - Math utilities, array/vector ops, rect manipulation, color handling
 - `text.ts` - Text measurement and wrapping using opentype.js
+- `em.ts` - The em metrics record and its queries (bounds, ink, hull, scaling)
 - `parse.ts` - JSX transform (Acorn, line preserving) and the code runner
 - `errors.ts` - `ErrorSyntax`/`ErrorRuntime` with source positions, stack parsing
 - `default.ts` - The default Env (a leaf module: `defaultEnv`, `resolveEnv`, `setDefaultEnv`)
