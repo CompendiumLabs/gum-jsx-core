@@ -213,6 +213,13 @@ function stack_bounds<T>(direc: Orient, items: LayoutItem<T>[], { gap = 0, spaci
 
 // the bounds of a box around one child: the child's shifted by the insets
 // (the ranges, and the tie's offset)
+// the one width at which tied children stacked in a column come to a height:
+// sum(oy_i + (w - ox_i) / a_i) = height
+function tied_width(B: Bounds[], height: number): number {
+    const off = (b: Bounds) => b.offset ?? [ 0, 0 ]
+    return (height - sum(B.map(b => off(b)[1])) + sum(B.map(b => off(b)[0] / b.aspect!))) / sum(B.map(b => 1 / b.aspect!))
+}
+
 function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
     const [ ox, oy ] = child.offset ?? [ 0, 0 ]
     const tie = child.aspect != null ? { aspect: child.aspect, offset: [ ox + ix, oy + iy ] as [ number, number ] } : {}
@@ -234,9 +241,11 @@ function scale_bounds(b: Bounds, s: number): Bounds {
 // finds its height: given, or what those children need scaled up by the
 // shares and spacing (all shared: the tightest tied child fills the width).
 // given a height, the shares and spacing come off the top and, of the rest,
-// the growable children take the slack or the flexible ones give way, each
-// by the same fraction of its room; content children (text) never change and
-// overflow honestly. a shared child gets its fraction of the height. with no
+// the growable children take what the figures leave; over budget every
+// flexible child shrinks by one factor, the tied ones narrowing together to a
+// common width and the growables from their height at the width, none below
+// its minimum; content children (text) never change and overflow honestly. a
+// shared child gets its fraction of the height. with no
 // width, content children are at their natural size, the tied ones span the
 // one width that spends the budget (solved from their ties), or with no
 // budget either the column is as wide as its widest child and lays every
@@ -254,7 +263,6 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
     const flexible = unshared.filter(i => B[i].height[1] == INF)
     const grow = flexible.filter(i => B[i].aspect == null)
     const laid: Laid<T>[] = items.map(() => null!)
-    const off = (b: Bounds) => b.offset ?? [ 0, 0 ]
     let W: number
     let H = H0
 
@@ -305,13 +313,39 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
                     grow.forEach((i, j) => { if (short[j]) ranges[j] = [ laid[i].em.height, laid[i].em.height ] })
                 }
             } else if (need > budget + EPS && flexible.length > 0) {
-                // over the budget, the flexible children split what the
-                // content leaves evenly (clamped to their ranges), each laid
-                // out for its share: a figure fits inside it, a row sizes
-                // its figure by it
+                // over the budget, the growable children take what the
+                // content and the figures leave (split evenly, clamped to
+                // their ranges). if the figures alone do not fit, every
+                // flexible child shrinks by one factor s: a tied child to the
+                // common width s W (as the column would be fit at its
+                // aspect), a growable from its height at the width, floored
+                // at its minimum (floored children are frozen and s re-solved)
+                const tied = flexible.filter(i => B[i].aspect != null)
                 const content = sum(unshared.filter(i => !flexible.includes(i)).map(i => laid[i].em.height)) + emgaps
-                const targets = distribute(Math.max(budget - content, 0), flexible.map(i => B[i].height))
-                flexible.forEach((i, j) => { laid[i] = offer(items[i], { width: W, height: targets[j] }) })
+                const figures = sum(tied.map(i => laid[i].em.height))
+                const left = budget - content
+                const floors = grow.map(i => B[i].height[0])
+                if (left - figures >= sum(floors) - EPS) {
+                    const targets = distribute(left - figures, grow.map(i => B[i].height))
+                    grow.forEach((i, j) => { laid[i] = offer(items[i], { width: W, height: targets[j] }) })
+                } else {
+                    const off = (b: Bounds) => b.offset ?? [ 0, 0 ]
+                    const base = sum(tied.map(i => off(B[i])[1] - off(B[i])[0] / B[i].aspect!))
+                    const slope_tied = sum(tied.map(i => W / B[i].aspect!))
+                    const heights = grow.map(i => laid[i].em.height)
+                    const floored = grow.map(() => false)
+                    let s = 0
+                    for (let iter = 0; iter <= grow.length; iter++) {
+                        const frozen = sum(grow.map((_, j) => floored[j] ? floors[j] : 0))
+                        const slope = slope_tied + sum(grow.map((_, j) => floored[j] ? 0 : heights[j]))
+                        s = slope > EPS ? Math.min(Math.max((left - base - frozen) / slope, 0), 1) : 0
+                        const newly = grow.map((_, j) => !floored[j] && s * heights[j] < floors[j] - EPS)
+                        if (!newly.some(x => x)) break
+                        newly.forEach((x, j) => { if (x) floored[j] = true })
+                    }
+                    tied.forEach(i => { laid[i] = offer(items[i], { width: s * W }) })
+                    grow.forEach((i, j) => { laid[i] = offer(items[i], { width: W, height: Math.max(s * heights[j], floors[j]) }) })
+                }
             }
         }
         shared.forEach(i => { laid[i] = offer(items[i], { width: W, height: F[i]! * H! }) })
@@ -324,7 +358,7 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
         shared.forEach(i => { laid[i] = offer(items[i], { height: F[i]! * H! }) })
         if (ti.length > 0) {
             const left = H! - sum(laid.map(l => l?.em.height ?? 0)) - emgaps - spacing * Math.max(n - 1, 0) * H!
-            const Wt = (left - sum(ti.map(i => off(B[i])[1])) + sum(ti.map(i => off(B[i])[0] / B[i].aspect!))) / sum(ti.map(i => 1 / B[i].aspect!))
+            const Wt = tied_width(ti.map(i => B[i]), left)
             ti.forEach(i => { laid[i] = offer(items[i], { width: Math.max(Wt, 0) }) })
         }
         W = n > 0 ? max(laid.map(l => l.em.width)) : 0
@@ -356,8 +390,8 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
 // and splits the rest evenly among the flexible ones, clamped to their
 // ranges. given a height too, tied children are sized by it (their tie), and
 // give way toward their fair share of the width until the other children fit
-// the height (a bisection, since content heights depend on the tied
-// children's widths). with no width every unshared child is at its natural
+// the height and they fit the width themselves (a bisection, since content
+// heights depend on the tied children's widths). with no width every unshared child is at its natural
 // size for the height (text finds the narrowest width that fits) and the
 // width is what they need scaled up by the shares and spacing (all shared:
 // the tightest tied child fills the height). the row is as tall as its
@@ -399,7 +433,7 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
             const fw = distribute(avail - sum(aw), flex.map(i => B[i].width))
             const ws = range(n).map(i => fixed[i] ?? (aspects.includes(i) ? aw[aspects.indexOf(i)] : fw[flex.indexOf(i)]))
             const out = items.map((k, i) => offer(k, { width: ws[i], height: H, fill: flex.includes(i) || F[i] != null }))
-            const fits = flex.every(i => out[i].em.height <= H! + EPS)
+            const fits = flex.every(i => out[i].em.height <= H! + EPS) && sum(aw) <= avail + EPS
             return { laid: out, ws, fits }
         }
         const seek = aspects.some((i, j) => full[j] > share(i))

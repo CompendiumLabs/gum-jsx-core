@@ -216,9 +216,12 @@ needs no em).
 `TextRow` (text defaults) and math's `MathRow`/`MathCol` are all `layout_em_stack` in
 `src/elems/em.ts` over the engine. A column hands its width down, is as tall as its children
 come to, and treats a height as a budget that only becomes its box when something can use it
-(growables take the slack; over budget the flexible children split what the content leaves
-evenly). A row gives fixed children their width, sizes tied children by its height (giving way
-toward their fair share of the width until the content fits, a bisection), and splits the rest
+(growables take what the figures leave; over budget every flexible child shrinks by one
+factor: tied children narrow together to a common width, as a figure would be fit, growables
+from their height at the width, none below its minimum). A row gives
+fixed children their width, sizes tied children by its height (giving way toward their fair
+share of the width until the content fits the height and the tied ones fit the width, a
+bisection), and splits the rest
 evenly with clamps (`distribute`, the flexbox loop); flexible children take their allocation
 as their box (`fill`). `gap` is em, `spacing` a fraction of the length, `share` on a child a
 fraction of the length (gross: half means half); a stack with no width of its own hugs its
