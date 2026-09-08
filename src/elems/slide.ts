@@ -60,7 +60,7 @@ const TITLE_PADDING: Padding = [ 0.6, 0.3 ]
 // box's margin makes room for its top half
 class TitleBox extends Box {
     constructor(args: TitleBoxArgs = {}) {
-        const { children, title, title_scale = 1, title_rounded = D.rounded, title_padding = TITLE_PADDING, title_fill, margin, env, ...attr0 } = THEME(args, 'TitleBox')
+        const { children, title, title_scale = 0.8, title_rounded = 10, title_padding = TITLE_PADDING, title_fill, margin, env, ...attr0 } = THEME(args, 'TitleBox')
         const [ title_attr, attr1 ] = prefix_split([ 'title' ], attr0)
         const [ spec, attr ] = spec_split(attr1)
 
