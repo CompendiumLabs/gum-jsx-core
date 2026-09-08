@@ -61,11 +61,11 @@ function box_insets(p: Padding | undefined, dflt: number): Rect {
 
 // a box around its content, with `padding` inside the border and `margin`
 // outside, both in em. the content is the children with no rect of their own
-// (or the text they are set as, when any is a string, with the box's font and
-// text settings handed down); a child at a rect of its own is placed by it
-// relative to the area inside the padding, as in a group, and one with
-// metrics placed by `pos` alone is at its own size there (a title on the
-// border of an unpadded box, say). the box
+// (elements: TextBox sets strings as text), with the box's font and text
+// settings handed down; a child at a rect of its own is placed by it relative
+// to the area inside the padding, as in a group, and one with metrics placed
+// by `pos` alone is at its own size there (a title on the border of an
+// unpadded box, say). the box
 // hugs its content plus the padding: laid out for a size (by the Svg, a stack
 // or another box) the content is laid out for the area inside the padding, so
 // a column keeps its text size and hugs its height, a figure spans the width
@@ -78,7 +78,6 @@ function box_insets(p: Padding | undefined, dflt: number): Rect {
 class Box extends Group {
     em: EmSpec
     content: Element[]
-    textual: boolean
     insets: [ number, number ]
     margins: [ number, number ]
     aspect_box: number | undefined
@@ -98,15 +97,15 @@ class Box extends Group {
         const [ ml, mt, mr, mb ] = box_insets(margin0, 0.5)
         const insets: [ number, number ] = [ pl + pr + ml + mr, pt + pb + mt + mb ]
 
-        // the content: the children with no rect of their own, or the text
-        // they are set as when any is a string (aligned by justify, left by
-        // default); the rest are placed by their rects. content narrower than
-        // the area sits in it by justify, centered by default
-        const textual = children.some(c => !is_element(c))
+        // the content: the children with no rect of their own; the rest are
+        // placed by their rects. content narrower than the area sits in it by
+        // justify, centered by default; a justify given is also the text
+        // alignment handed down
+        if (children.some(c => !is_element(c))) throw new Error('Box takes elements: wrap text in <Text>, or use a TextBox')
         const placed_by = (c: Element) => c.spec.rect != null || is_unsized_em(c)
-        const content: Element[] = textual ? [ new Text({ children, env }) ] : children.filter(c => !placed_by(c))
-        const decor: Element[] = textual ? [] : children.filter(placed_by)
-        const justify = justify0 ?? (textual ? 'left' : 'center')
+        const content = children.filter(c => !placed_by(c))
+        const decor = children.filter(placed_by)
+        const justify = justify0 ?? 'center'
 
         // the outer size the box spans on an axis: its own, or the offer's (in
         // the box's em) when its shape is its own (see place). the first
@@ -117,7 +116,7 @@ class Box extends Group {
         const span_w = width != null || (fixed && outer_w != null)
         const span_h = height != null || (fixed && outer_h != null)
         const room = (outer: number | undefined, inset: number) => outer != null ? Math.max(outer - inset, 0) : undefined
-        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...(textual ? { justify } : {}) })
+        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...(justify0 != null ? { justify: justify0 } : {}) })
         const first = content.length > 0 ? lay(content[0], room(outer_w, insets[0]), room(outer_h, insets[1])) : null
         const [ cw, ch ] = first != null ? [ first.em.width, first.em.height ] : [ room(outer_w, insets[0]) ?? 1, room(outer_h, insets[1]) ?? 1 ]
         let box_w = span_w ? outer_w! - ml - mr : cw + pl + pr
@@ -169,7 +168,6 @@ class Box extends Group {
         this.args = args
         this.em = make_em(scale_em_spec({ width: total_w, height: total_h, anchor, scale: 1 }, scale))
         this.content = content
-        this.textual = textual
         this.insets = insets
         this.margins = [ ml + mr, mt + mb ]
         this.aspect_box = aspect
@@ -192,7 +190,7 @@ class Box extends Group {
     // laid out again for the offer: a box of an aspect at the size that fits
     // it (margins outside), a flex one filling it, else with its content laid
     // out for it; a filled slot is the box's own width, so the frame spans it,
-    // and a text alignment handed down reaches text content.
+    // and a text alignment handed down reaches a text content.
     // nothing offered: as it is. rotated: a figure, fit by its bounds
     place(offer: Offer = {}): Laid {
         const { width, height, fill, justify, attr = {} } = offer
@@ -211,7 +209,7 @@ class Box extends Group {
         } else if (fixed) {
             size = { width: width ?? height, height: height ?? width }
         }
-        const justify_attr = (justify != null && this.args.justify == null && this.textual) ? { justify } : {}
+        const justify_attr = (justify != null && this.args.justify == null && this.content[0] instanceof Text) ? { justify } : {}
         const own = (fill && width != null && this.args.width == null && !fixed) ? { width: width / s, offer: { height } } : { offer: size }
         const elem = this.clone({ ...attr, ...justify_attr, ...own }) as Box
         return { elem, em: elem.em }
@@ -227,17 +225,25 @@ class Frame extends Box {
     }
 }
 
-// the same boxes with the defaults for a box around text: some padding
+// the same boxes for a box around text: strings among the children (with
+// any inline elements) are set as a Text, aligned left by default; the
+// padding default is for text
+function text_children(args: BoxArgs): BoxArgs {
+    const children = ensure_children(args.children)
+    const textual = children.some(c => !is_element(c))
+    return textual ? { justify: 'left', ...args, children: [ new Text({ children, env: args.env }) ] } : args
+}
+
 class TextBox extends Box {
     constructor(args: BoxArgs = {}) {
-        super(THEME(args, 'TextBox'))
+        super(THEME(text_children(args), 'TextBox'))
         this.args = args
     }
 }
 
 class TextFrame extends Frame {
     constructor(args: BoxArgs = {}) {
-        super(THEME(args, 'TextFrame'))
+        super(THEME(text_children(args), 'TextFrame'))
         this.args = args
     }
 }

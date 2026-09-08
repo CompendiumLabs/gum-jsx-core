@@ -231,8 +231,8 @@ so a figure fills it, a text column wraps to it, and a paragraph alone is as wid
 `Box` (`src/elems/box.ts`; `Frame` is border 1, `TextBox`/`TextFrame` the same with a text
 padding default, `TitleBox`/`TitleFrame`/`LabelBox` in `slide.ts`) is the one box: `padding`
 and `margin` in em, exact bounds (`box_bounds` over the content's, an affine tie), one lay. Its
-content is the children with no rect of their own (strings become a `Text` with the box's
-`font-*`/`text-*` settings); offered a size it lays the first content child out for the area
+content is the children with no rect of their own (elements; `TextBox`/`TextFrame` set strings
+as a `Text`, left-aligned by default) with the box's `font-*`/`text-*` settings handed down; offered a size it lays the first content child out for the area
 inside the padding and hugs it (`Box.place` rebuilds with the `offer`), so wrapping a column
 in a frame changes nothing inside it; nothing offered, the content is at its natural size (the
 protocol's one-em convention for a figure). A box with an `aspect` is a figure of that shape
