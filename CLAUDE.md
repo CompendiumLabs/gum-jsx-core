@@ -228,7 +228,15 @@ fraction of the length (gross: half means half); a stack with no width of its ow
 children. `Svg` offers its lone child the canvas in em (`em`, or `width`/`height`; default
 `D.svg_ems` across the larger side), then fits the box it comes back with to the pixel size,
 so a figure fills it, a text column wraps to it, and a paragraph alone is as wide as its line.
-A stack placed by rect in a group gets no offer and hugs its children at their natural sizes.
+`Box` (and so `Frame`, `TitleBox`, `TitleFrame`, `LabelBox`) is the share world's container in
+the protocol: offered a size it lays its content (the children with no rect of their own) out
+for the padded area and hugs the first one's laid box (`Box.place` rebuilds with the `offer`,
+finding the padding again for the laid shape; `Box.natural` is the content's bounds over its
+fraction), so wrapping a column in a frame changes nothing inside it. A box with an `aspect`
+fits the offer at it and a `flex` one fills it; their content is offered `fit`, so text that
+does not fit the area scales into it (`Text.place`) rather than overflowing. Plain groups stay
+the share world: a child at a rect gets no offer and is fit into the rect, so a stack placed
+by rect hugs its children at their natural sizes.
 
 **Geometry elements** (`src/elems/geometry.ts`):
 - `Line`, `UnitLine`, `VLine`, `HLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`

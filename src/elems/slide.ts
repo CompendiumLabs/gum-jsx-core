@@ -35,7 +35,7 @@ class LabelBox extends Box {
         let attach: Attach | null = null
         if (label0 != null) {
             const label = is_element(label0) ? label0 : new Span({ children: [ label0 ], env })
-            attach = new Attach({ children: [ label ], env, ...label_attr })
+            attach = new Attach({ children: [ label ], rect: D.rect, env, ...label_attr })
         }
 
         // pass layout spec to the outer box, not the inner box

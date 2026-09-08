@@ -43,6 +43,7 @@ interface Offer {
     width?: number
     height?: number
     fill?: boolean        // the width offered is the child's box (a row's flexible child takes its allocation)
+    fit?: boolean         // the child is fit into the slot afterwards (a box's content): text that does not fit scales rather than overflows
     justify?: AlignValue
     attr?: Attrs
 }

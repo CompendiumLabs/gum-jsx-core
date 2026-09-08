@@ -12,9 +12,9 @@ import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
 import { make_em, em_bounds, em_hink, scale_em_spec } from '../lib/em'
 import type { EmArgs, EmSpec } from '../lib/em'
-import { INF, point, box_bounds, scale_bounds } from '../lib/layout'
+import { INF, EPS, point, box_bounds, scale_bounds } from '../lib/layout'
 
-import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac, place_in_box } from './core'
+import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac, place_in_box, fit_laid } from './core'
 import { place_laid, child_align, row_offsets, box_aspect } from './em'
 import type { WithEm, RowAlign } from './em'
 import type { ElementArgs, GroupArgs, MaybeEm, Bounds, Offer, Laid } from './core'
@@ -402,7 +402,17 @@ class Text extends Group {
         const size = cwidth != null ? {} : (offer.fill && width != null) ? { width: width / this.em.scale } : { offer: { width, height } }
         const justify_attr = (justify != null && cjustify == null) ? { justify } : {}
         const elem = this.clone({ ...attr, ...size, ...justify_attr }) as Text
-        return { elem, em: elem.em }
+        if (!offer.fit) return { elem, em: elem.em }
+
+        // to be fit into the slot (a box's content): text that does not fit
+        // it at its em is scaled to it, as the wrapped block or as one line,
+        // whichever comes out larger
+        const over = (em: EmSpec) => (width != null && em.width > width + EPS) || (height != null && em.height > height + EPS)
+        if (!over(elem.em)) return { elem, em: elem.em }
+        const line = cwidth != null ? elem : this.args.offer == null ? this : this.clone({ ...attr, ...justify_attr, offer: undefined }) as Text
+        const scale = (em: EmSpec) => Math.min(width != null ? width / em.width : Infinity, height != null ? height / em.height : Infinity)
+        const best = scale(line.em) > scale(elem.em) ? line : elem
+        return fit_laid(best, best.em, { width, height })
     }
 }
 

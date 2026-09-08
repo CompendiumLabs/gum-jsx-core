@@ -1066,5 +1066,5 @@ class Spacer extends Element {
 // exports
 //
 
-export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid, place_in_box }
+export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid, place_in_box, fit_laid }
 export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, Bounds, Offer, Laid }
