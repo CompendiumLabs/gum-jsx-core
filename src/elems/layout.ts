@@ -6,6 +6,8 @@ import { DEFAULTS as D, none } from '../lib/const'
 import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points, pad_rect } from '../lib/utils'
 import { wrapWidths } from '../lib/wrap'
 
+import { scale_bounds } from '../lib/layout'
+
 import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
 import { RoundedRect, Dot } from './geometry'
 import { layout_em_stack, layout_em_bounds } from './em'
@@ -183,11 +185,7 @@ class Stack extends Group {
 
     // composed from the children's bounds, in the parent's em
     natural(): Bounds {
-        const b = layout_em_bounds(this.direc, this.items, this.options)
-        const s = this.scale
-        const sc = ([ lo, hi ]: [ number, number ]): [ number, number ] => [ lo * s, hi * s ]
-        const offset = b.offset != null ? [ b.offset[0] * s, b.offset[1] * s ] as [ number, number ] : undefined
-        return { width: sc(b.width), height: sc(b.height), aspect: b.aspect, offset }
+        return scale_bounds(layout_em_bounds(this.direc, this.items, this.options), this.scale)
     }
 
     // laid out again for the offer, with the text alignment and settings

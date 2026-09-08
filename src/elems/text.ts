@@ -12,9 +12,9 @@ import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
 import { make_em, em_bounds, em_hink, scale_em_spec } from '../lib/em'
 import type { EmArgs, EmSpec } from '../lib/em'
-import { INF, point, box_bounds } from '../lib/layout'
+import { INF, point, box_bounds, scale_bounds } from '../lib/layout'
 
-import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac } from './core'
+import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac, place_in_box } from './core'
 import { place_laid, child_align, row_offsets, box_aspect } from './em'
 import type { WithEm, RowAlign } from './em'
 import type { ElementArgs, GroupArgs, MaybeEm, Bounds, Offer, Laid } from './core'
@@ -598,49 +598,43 @@ class TextBox extends Group {
     insets: [ number, number ]
 
     constructor(args: TextBoxArgs = {}) {
-        const { children: children0, padding: padding0 = 0.4, margin: margin0, border, fill, rounded: rounded0, aspect: aspect0, justify = 'left', width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'TextBox')
+        const { children: children0, padding = 0.4, margin = 0, border, fill, rounded: rounded0, aspect: aspect0, justify = 'left', width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'TextBox')
         const [ border_attr, fill_attr, font_attr0, text_attr, attr1 ] = prefix_split([ 'border', 'fill', 'font', 'text' ], attr0)
         const font_attr = prefix_join('font', font_attr0)
         const [ spec, attr ] = spec_split(attr1)
         const children = ensure_children(children0)
 
-        // padding and margin in em; a boolean takes the default
-        const [ pl, pt, pr, pb ] = pad_rect(padding0 === true ? 0.4 : padding0 === false ? 0 : padding0)
-        const [ ml, mt, mr, mb ] = pad_rect(margin0 === true ? 0.4 : (margin0 == null || margin0 === false) ? 0 : margin0)
+        // padding and margin in em; `true` takes the default
+        const em_pad = (p: Padding) => pad_rect(p === true ? 0.4 : p === false ? 0 : p)
+        const [ pl, pt, pr, pb ] = em_pad(padding)
+        const [ ml, mt, mr, mb ] = em_pad(margin)
         const insets: [ number, number ] = [ pl + pr + ml + mr, pt + pb + mt + mb ]
-        const [ ix, iy ] = insets
 
-        // the content: one element is boxed as it is, anything else is set
-        // as text (a plain text child too, so the box's settings reach it)
+        // the content: one element is boxed as it is, anything else is set as
+        // text. it is laid out inside the insets for the box's own size or
+        // the offer's, with the box's text settings handed down
         const only = children.length == 1 && is_element(children[0]) ? children[0] : null
-        const plain = only instanceof Text && only.whitespace == 'normal' && only.em.scale == 1 && !only.fit
-        const content = (only != null && !plain) ? only : new Text({ children, justify, env, ...text_attr, ...font_attr })
-
-        // laid out inside the insets, for the box's own size or the offer's
+        const content = only ?? new Text({ children, env })
         const outer_width = width ?? (offer?.width != null ? offer.width / scale : undefined)
         const outer_height = height ?? (offer?.height != null ? offer.height / scale : undefined)
-        const inner = content.lay({
-            width: outer_width != null ? Math.max(outer_width - ix, 0) : undefined,
-            height: outer_height != null ? Math.max(outer_height - iy, 0) : undefined,
-            justify, attr: { ...font_attr, ...text_attr },
-        })
-        const { width: w, height: h, anchor } = inner.em
+        const room = (outer: number | undefined, inset: number) => outer != null ? Math.max(outer - inset, 0) : undefined
+        const inner = content.lay({ width: room(outer_width, insets[0]), height: room(outer_height, insets[1]), justify, attr: { ...font_attr, ...text_attr } })
 
         // the box hugs the content plus the padding, or spans its own size;
         // an aspect grows it
-        let box_width = width != null ? width - ml - mr : w + pl + pr
-        let box_height = height != null ? height - mt - mb : h + pt + pb
+        let box_width = width != null ? width - ml - mr : inner.em.width + pl + pr
+        let box_height = height != null ? height - mt - mb : inner.em.height + pt + pb
         const aspect = aspect0 === true ? 1 : aspect0 === false ? undefined : aspect0
         if (aspect != null) {
             if (box_width / box_height < aspect) box_width = aspect * box_height
             else box_height = box_width / aspect
         }
-        const x0 = ml + pl + align_frac(justify) * (box_width - pl - pr - w)
-        const y0 = mt + pt + 0.5 * (box_height - pt - pb - h)
         const total_width = box_width + ml + mr
         const total_height = box_height + mt + mb
 
-        // the background and the frame, drawn inside the margin
+        // the content placed inside the insets, between the background and
+        // the frame, which are drawn inside the margin
+        const { child, anchor } = place_in_box(inner, total_width, total_height, [ justify, 'center' ], [ ml + pl, mt + pt, mr + pr, mb + pb ])
         const rounded = rounded0 === false ? undefined : rounded0
         const shape_rect: Rect = [ ml, mt, ml + box_width, mt + box_height ]
         const make_shape = (extra: Attrs) => rounded != null
@@ -648,23 +642,18 @@ class TextBox extends Group {
             : new Rectangle({ rect: shape_rect, env, ...extra })
         const background = fill != null ? make_shape({ fill, stroke: none, ...fill_attr }) : null
         const frame = (border != null && border !== false) ? make_shape({ stroke_width: border === true ? 1 : border, fill: none, ...border_attr }) : null
-        const placed = place_laid(inner, x0, y0)
 
         // pass to Group
-        super({ children: [ background, placed, frame ], coord: [ 0, 0, total_width, total_height ], aspect: box_aspect(total_width, total_height), upright: true, env, ...attr, ...spec, width, height })
+        super({ children: [ background, child, frame ], coord: [ 0, 0, total_width, total_height ], aspect: box_aspect(total_width, total_height), upright: true, env, ...attr, ...spec, width, height })
         this.args = args
         this.content = content
         this.insets = insets
-        this.em = make_em(scale_em_spec({ width: total_width, height: total_height, anchor: y0 + anchor, scale: 1 }, scale))
+        this.em = make_em(scale_em_spec({ width: total_width, height: total_height, anchor, scale: 1 }, scale))
     }
 
     // the content's bounds shifted by the insets
     natural(): Bounds {
-        const s = this.em.scale
-        const b = box_bounds(this.content.bounds(), this.insets)
-        const sc = ([ lo, hi ]: [ number, number ]): [ number, number ] => [ lo * s, hi * s ]
-        const offset = b.offset != null ? [ b.offset[0] * s, b.offset[1] * s ] as [ number, number ] : undefined
-        return { width: sc(b.width), height: sc(b.height), aspect: b.aspect, offset }
+        return scale_bounds(box_bounds(this.content.bounds(), this.insets), this.em.scale)
     }
 
     // laid out again for the slot (a filled slot as a width of its own, so

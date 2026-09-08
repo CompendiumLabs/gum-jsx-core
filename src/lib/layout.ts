@@ -219,6 +219,13 @@ function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
     return { width: [ child.width[0] + ix, child.width[1] + ix ], height: [ child.height[0] + iy, child.height[1] + iy ], ...tie }
 }
 
+// bounds in a child's em scaled into its parent's
+function scale_bounds(b: Bounds, s: number): Bounds {
+    const sc = ([ lo, hi ]: Range): Range => [ lo * s, hi * s ]
+    const offset = b.offset != null ? [ b.offset[0] * s, b.offset[1] * s ] as [ number, number ] : undefined
+    return { width: sc(b.width), height: sc(b.height), aspect: b.aspect, offset }
+}
+
 //
 // stacks
 //
@@ -481,5 +488,5 @@ function layout_stack<T>(direc: Orient, items: LayoutItem<T>[], options: StackOp
 // exports
 //
 
-export { INF, EPS, point, free_bounds, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
+export { INF, EPS, point, free_bounds, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, scale_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
 export type { Range, Bounds, Offer, Laid, LayoutItem, RowAlign, StackOptions, Placement, StackLayout }

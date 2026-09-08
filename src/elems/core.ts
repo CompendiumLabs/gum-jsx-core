@@ -781,18 +781,28 @@ function fit_laid(elem: Element, em0: EmSpec, { width, height }: Offer): Laid {
     return { elem, em: make_em(scale_em_spec(em0, w / em0.width)) }
 }
 
+// a laid element placed in a box of a size by align (centered by default),
+// inside the insets [ left, top, right, bottom ]: the placed clone, for a
+// group with the box as its coord, and the content's anchor in the box
+function place_in_box(laid: Laid, width: number, height: number, align?: Align, insets: Rect = [ 0, 0, 0, 0 ]): { child: Element, anchor: number } {
+    const { elem, em } = laid
+    const [ l, t, r, b ] = insets
+    const [ ha, va ] = (align != null ? ensure_pair(align) : [ 'center', 'center' ]).map(a => align_frac(a as AlignValue))
+    const x = l + ha * (width - l - r - em.width)
+    const y = t + va * (height - t - b - em.height)
+    const child = elem.clone({ rect: em_rect(em, x, y + em.anchor) })
+    return { child, anchor: y + em.anchor }
+}
+
 // a laid element boxed at a size: as it is when its box is that size, else
-// placed in a group of that size by align (centered by default), which
-// reports the box and the content's anchor
+// placed in a group of that size by align, which reports the box and the
+// content's anchor
 function box_laid(laid: Laid, width: number, height: number, align?: Align): Laid {
     const { elem, em } = laid
     if (Math.abs(em.width - width) < EPS && Math.abs(em.height - height) < EPS) return laid
-    const [ ha, va ] = (align != null ? ensure_pair(align) : [ 'center', 'center' ]).map(a => align_frac(a as AlignValue))
-    const x = ha * (width - em.width)
-    const y = va * (height - em.height)
-    const child = elem.clone({ rect: em_rect(em, x, y + em.anchor) })
+    const { child, anchor } = place_in_box(laid, width, height, align)
     const group = new Group({ children: [ child ], coord: [ 0, 0, width, height ], aspect: height > 0 ? width / height : undefined, upright: true, env: elem.env }) as MaybeEm
-    const boxed = make_em({ width, height, anchor: y + em.anchor, scale: em.scale })
+    const boxed = make_em({ width, height, anchor, scale: em.scale })
     group.em = boxed
     return { elem: group, em: boxed }
 }
@@ -1056,5 +1066,5 @@ class Spacer extends Element {
 // exports
 //
 
-export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid }
+export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid, place_in_box }
 export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, Bounds, Offer, Laid }
