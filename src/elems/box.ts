@@ -101,7 +101,6 @@ class Box extends Group {
         // placed by their rects. content narrower than the area sits in it by
         // justify, centered by default; a justify given is also the text
         // alignment handed down
-        if (children.some(c => !is_element(c))) throw new Error('Box takes elements: wrap text in <Text>, or use a TextBox')
         const placed_by = (c: Element) => c.spec.rect != null || is_unsized_em(c)
         const content = children.filter(c => !placed_by(c))
         const decor = children.filter(placed_by)
