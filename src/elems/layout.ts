@@ -7,11 +7,10 @@ import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, c
 import { wrapWidths } from '../lib/wrap'
 
 import { scale_bounds } from '../lib/layout'
-import type { Range } from '../lib/layout'
 
 import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
 import { RoundedRect, Dot } from './geometry'
-import { layout_em_stack, layout_em_bounds } from './em'
+import { layout_em_stack, layout_em_bounds, box_aspect } from './em'
 import { make_em, scale_em_spec } from '../lib/em'
 
 import type { Point, Rect, Limit, AlignValue, Side, Orient, Padding, Rounded } from '../lib/types'
@@ -52,7 +51,8 @@ function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust
     if (padding == null && margin == null) {
         return {
             rect_inner: D.rect, rect_outer: D.rect,
-            aspect_inner: aspect_child, aspect_outer: aspect_child
+            aspect_inner: aspect_child, aspect_outer: aspect_child,
+            fractions: [ 1, 1 ] as [ number, number ],
         }
     }
 
@@ -66,24 +66,11 @@ function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust
     if (adjust && aspect_inner != null) margin1 = aspect_invariant(margin1, 1 / aspect_inner) as Rect
     const { rect: rect_outer, aspect: aspect_outer } = apply_padding(margin1, aspect_inner)
 
-    // return inner/outer rects and aspect
-    return { rect_inner, rect_outer, aspect_inner, aspect_outer: aspect ?? aspect_outer }
-}
-
-// the size of the bounds of a box rotated by an angle (degrees)
-function rotated_size(w: number, h: number, deg: number): [ number, number ] {
-    if (!deg) return [ w, h ]
-    const t = deg * Math.PI / 180
-    const [ c, s ] = [ Math.abs(Math.cos(t)), Math.abs(Math.sin(t)) ]
-    return [ w * c + h * s, w * s + h * c ]
-}
-
-// the content's fraction of the box on each axis: inside the margin, then
-// inside the padding
-function box_fractions(rect_inner: Rect, rect_outer: Rect): [ number, number ] {
+    // return inner/outer rects, aspect, and the content's fraction of the box
+    // on each axis (inside the margin, then inside the padding)
     const [ iw, ih ] = rect_dims(rect_inner)
     const [ ow, oh ] = rect_dims(rect_outer)
-    return [ iw * ow, ih * oh ]
+    return { rect_inner, rect_outer, aspect_inner, aspect_outer: aspect ?? aspect_outer, fractions: [ iw * ow, ih * oh ] as [ number, number ] }
 }
 
 interface BoxArgs extends GroupArgs {
@@ -115,7 +102,6 @@ class Box extends Group {
         const [ border_attr, fill_attr, attr] = prefix_split([ 'border', 'fill' ], attr0)
         const children = ensure_children(children0)
         const aspect = aspect0 as number | undefined
-        const flex = attr.flex === true
         const content = children.filter(c => c.spec.rect == null)
 
         // ensure shape is a function
@@ -123,61 +109,39 @@ class Box extends Group {
 
         // the rects for a content aspect: the box's own comes first
         const rects = (aspect_child?: number) => computeBoxLayout(children, { padding, margin, aspect, adjust, aspect_child })
-        let { rect_inner, rect_outer, aspect_outer } = rects()
-        let fractions = box_fractions(rect_inner, rect_outer)
+        let L = rects()
         let placed = children
         let em: EmSpec | undefined
-        let aspect_laid: number | undefined
 
-        // laid out for an offer: the box fits it at its own aspect or fills it
-        // when flex, and the content is laid out for the padded area of that
+        // laid out for an offer (see place): a box with a shape of its own is
+        // the size offered, and its content is laid out for the padded area
         // (to be fit into it, so text that does not fit scales). else the
         // first content child is laid out for the area of the offer and the
         // box hugs what it came to, with the padding found again for that
         // shape (and the child laid out again if that moved the area); the
         // rest of the content is laid out for the area of the box
-        if (offer != null && (offer.width != null || offer.height != null) && content.length > 0) {
-            const fixed = aspect != null || flex
-            const slot = (w: number | undefined, h: number | undefined, [ fx, fy ]: [ number, number ]): Offer =>
-                ({ width: w != null ? w * fx : undefined, height: h != null ? h * fy : undefined, fit: fixed || undefined })
-            let width: number, height: number
-            let first: Laid
-            if (fixed) {
-                if (aspect != null) {
-                    const A = aspect_outer!
-                    if (offer.width != null && offer.height != null) { width = Math.min(offer.width, offer.height * A); height = width / A }
-                    else if (offer.width != null) { width = offer.width; height = width / A }
-                    else { height = offer.height!; width = height * A }
-                } else {
-                    width = offer.width ?? offer.height!
-                    height = offer.height ?? width
-                }
-                first = content[0].lay(slot(width, height, fractions))
-            } else {
-                first = content[0].lay(slot(offer.width, offer.height, fractions))
+        if (offer != null && content.length > 0) {
+            const fixed = aspect != null || attr.flex === true
+            const slot = (w?: number, h?: number): Offer => ({ width: w != null ? w * L.fractions[0] : undefined, height: h != null ? h * L.fractions[1] : undefined, fit: fixed || undefined })
+            let first = content[0].lay(slot(offer.width, offer.height))
+            let [ width, height ] = [ offer.width ?? offer.height!, offer.height ?? offer.width! ]
+            if (!fixed) {
                 if (adjust && first.em.width > 0 && first.em.height > 0) {
-                    ({ rect_inner, rect_outer, aspect_outer } = rects(first.em.width / first.em.height))
-                    const fractions1 = box_fractions(rect_inner, rect_outer)
-                    if (Math.abs(fractions1[0] - fractions[0]) > 1e-9 || Math.abs(fractions1[1] - fractions[1]) > 1e-9) {
-                        fractions = fractions1
-                        first = content[0].lay(slot(offer.width, offer.height, fractions))
+                    const L1 = rects(first.em.width / first.em.height)
+                    if (Math.abs(L1.fractions[0] - L.fractions[0]) > 1e-9 || Math.abs(L1.fractions[1] - L.fractions[1]) > 1e-9) {
+                        L = L1
+                        first = content[0].lay(slot(offer.width, offer.height))
                     }
                 }
-                width = first.em.width / fractions[0]
-                height = first.em.height / fractions[1]
+                [ width, height ] = [ first.em.width / L.fractions[0], first.em.height / L.fractions[1] ]
             }
-            const laid = [ first, ...content.slice(1).map(c => c.lay(slot(width, height, fractions))) ]
+            const laid = [ first, ...content.slice(1).map(c => c.lay(slot(width, height))) ]
 
             // the laid content in place of the children, and the box with the
-            // first content's anchor (it sits in the middle of the area); a
-            // rotated box reports the bounds of its rotation
+            // first content's anchor (it sits in the middle of the area)
             placed = children.map(c => { const i = content.indexOf(c); return i >= 0 ? laid[i].elem : c })
-            const top = rect_outer[1] + rect_inner[1] * (rect_outer[3] - rect_outer[1])
-            const anchor = top * height + 0.5 * (fractions[1] * height - first.em.height) + first.em.anchor
-            const rotate = attr.rotate_invar ? 0 : (attr.rotate ?? 0)
-            const [ bw, bh ] = rotated_size(width, height, rotate)
-            em = make_em({ width: bw, height: bh, anchor: rotate ? 0.5 * bh : anchor })
-            aspect_laid = height > 0 ? width / height : undefined
+            const top = L.rect_outer[1] + L.rect_inner[1] * (L.rect_outer[3] - L.rect_outer[1])
+            em = make_em({ width, height, anchor: top * height + 0.5 * (L.fractions[1] * height - first.em.height) + first.em.anchor })
         }
 
         // make framing elements
@@ -186,36 +150,35 @@ class Box extends Group {
         const rect_fg = border != null ? shape.clone({ stroke_width: border, ...border_attr }) : null
 
         // make inner groups
-        const inner = new Group({ children: placed, rect: rect_inner, debug, env })
-        const outer = new Group({ children: [ rect_bg, inner, rect_fg ], rect: rect_outer, clip: rect_cl, env })
+        const inner = new Group({ children: placed, rect: L.rect_inner, debug, env })
+        const outer = new Group({ children: [ rect_bg, inner, rect_fg ], rect: L.rect_outer, clip: rect_cl, env })
 
         // pass to Group
-        super({ children: [ outer ], aspect: em != null ? aspect_laid : aspect_outer, upright: true, env, ...attr })
+        super({ children: [ outer ], aspect: em != null ? box_aspect(em.width, em.height) : L.aspect_outer, upright: true, env, ...attr })
         this.args = args
         this.em = em
         this.content = content
-        this.fractions = fractions
+        this.fractions = L.fractions
     }
 
-    // the first content child's bounds over its fraction of the box, its tie
-    // scaled with them; a box with an aspect of its own is a ray at it, a flex
-    // one is free
+    // the first content child's bounds over its fraction of the box; a box
+    // with a shape of its own is any element of its aspect
     natural(): Bounds {
         const { aspect, flex } = this.args
-        if (aspect != null) return { width: [ 0, Infinity ], height: [ 0, Infinity ], aspect: this.spec.aspect }
-        if (flex === true || this.content.length == 0) return super.natural()
+        if (aspect != null || flex === true || this.content.length == 0) return super.natural()
         const [ fx, fy ] = this.fractions
-        const b = this.content[0].bounds()
-        const sc = ([ lo, hi ]: Range, f: number): Range => [ lo / f, hi / f ]
-        const offset = b.offset != null ? [ b.offset[0] / fx, b.offset[1] / fy ] as [ number, number ] : undefined
-        return { width: sc(b.width, fx), height: sc(b.height, fy), aspect: b.aspect != null ? b.aspect * fy / fx : undefined, offset }
+        return scale_bounds(this.content[0].bounds(), 1 / fx, 1 / fy)
     }
 
-    // laid out again for the offer (nothing offered, or no content: as any
-    // element of its aspect)
+    // laid out again for the offer: a box with a shape of its own is sized
+    // as any element of its aspect and rebuilt at that size, one without
+    // takes the shape of its content laid out for the offer. nothing
+    // offered, no content, or a rotation (a figure): as any element
     place(offer: Offer = {}): Laid {
-        if ((offer.width == null && offer.height == null) || this.content.length == 0) return super.place(offer)
-        const elem = this.clone({ offer }) as Box
+        const { aspect, flex, rotate } = this.args
+        if ((offer.width == null && offer.height == null) || this.content.length == 0 || rotate) return super.place(offer)
+        const size = (aspect != null || flex === true) ? super.place(offer).em : offer
+        const elem = this.clone({ offer: { width: size.width, height: size.height } }) as Box
         return { elem, em: elem.em! }
     }
 }

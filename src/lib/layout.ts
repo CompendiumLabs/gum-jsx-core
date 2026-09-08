@@ -227,11 +227,12 @@ function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
     return { width: [ child.width[0] + ix, child.width[1] + ix ], height: [ child.height[0] + iy, child.height[1] + iy ], ...tie }
 }
 
-// bounds in a child's em scaled into its parent's
-function scale_bounds(b: Bounds, s: number): Bounds {
-    const sc = ([ lo, hi ]: Range): Range => [ lo * s, hi * s ]
-    const offset = b.offset != null ? [ b.offset[0] * s, b.offset[1] * s ] as [ number, number ] : undefined
-    return { width: sc(b.width), height: sc(b.height), aspect: b.aspect, offset }
+// bounds in a child's em scaled into its parent's, by a factor per axis (a
+// scaled child; a box's content over its fraction of the box)
+function scale_bounds(b: Bounds, sx: number, sy: number = sx): Bounds {
+    const sc = ([ lo, hi ]: Range, s: number): Range => [ lo * s, hi * s ]
+    const offset = b.offset != null ? [ b.offset[0] * sx, b.offset[1] * sy ] as [ number, number ] : undefined
+    return { width: sc(b.width, sx), height: sc(b.height, sy), aspect: b.aspect != null ? b.aspect * sx / sy : undefined, offset }
 }
 
 //

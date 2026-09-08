@@ -233,8 +233,9 @@ the protocol: offered a size it lays its content (the children with no rect of t
 for the padded area and hugs the first one's laid box (`Box.place` rebuilds with the `offer`,
 finding the padding again for the laid shape; `Box.natural` is the content's bounds over its
 fraction), so wrapping a column in a frame changes nothing inside it. A box with an `aspect`
-fits the offer at it and a `flex` one fills it; their content is offered `fit`, so text that
-does not fit the area scales into it (`Text.place`) rather than overflowing. Plain groups stay
+fits the offer at it and a `flex` one fills it (sized by `Element.place`, then rebuilt at that
+size); their content is offered `fit`, so text that does not fit the area scales into it
+(`Text.place`) rather than overflowing. A rotated box is placed as a figure. Plain groups stay
 the share world: a child at a rect gets no offer and is fit into the rect, so a stack placed
 by rect hugs its children at their natural sizes.
 
