@@ -16,8 +16,22 @@ type ThemeLayer = Record<string, ThemeAttrs>
 const BOOLEANS: ThemeLayer = {
     Box: {
         border: 1,
-        padding: 0.1,
-        margin: 0.1,
+        padding: 0.5,
+        margin: 0.5,
+        rounded: D.rounded,
+    },
+
+    TextBox: {
+        border: 1,
+        padding: 0.4,
+        margin: 0.4,
+        rounded: D.rounded,
+    },
+
+    TextFrame: {
+        border: 1,
+        padding: 0.4,
+        margin: 0.4,
         rounded: D.rounded,
     },
 
@@ -56,6 +70,14 @@ const BOOLEANS: ThemeLayer = {
 //
 
 const THEME_LIGHT: ThemeLayer = {
+    TextBox: {
+        padding: 0.4,
+    },
+
+    TextFrame: {
+        padding: 0.4,
+    },
+
     Svg: {
         fill: none,
         stroke: black,
@@ -71,6 +93,14 @@ const THEME_LIGHT: ThemeLayer = {
 }
 
 const THEME_DARK: ThemeLayer = {
+    TextBox: {
+        padding: 0.4,
+    },
+
+    TextFrame: {
+        padding: 0.4,
+    },
+
     Svg: {
         fill: none,
         stroke: white,

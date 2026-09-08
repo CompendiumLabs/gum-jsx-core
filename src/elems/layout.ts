@@ -3,194 +3,20 @@
 import { THEME } from '../lib/theme'
 import type { Env } from '../env'
 import { DEFAULTS as D, none } from '../lib/const'
-import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points, pad_rect, rect_dims } from '../lib/utils'
+import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points, pad_rect } from '../lib/utils'
 import { wrapWidths } from '../lib/wrap'
 
 import { scale_bounds } from '../lib/layout'
 
 import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
 import { RoundedRect, Dot } from './geometry'
-import { layout_em_stack, layout_em_bounds, box_aspect } from './em'
+import { layout_em_stack, layout_em_bounds } from './em'
 import { make_em, scale_em_spec } from '../lib/em'
 
 import type { Point, Rect, Limit, AlignValue, Side, Orient, Padding, Rounded } from '../lib/types'
 import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
 import type { EmArgs, EmSpec } from '../lib/em'
 import type { EmStackOptions, RowAlign } from './em'
-
-//
-// padding/margin utils
-//
-
-function maybe_rounded_rect(rounded: Rounded | undefined, env?: Env): Element {
-    if (rounded == null) {
-        return new Rectangle({ env })
-    } else {
-        return new RoundedRect({ rounded, env })
-    }
-}
-
-// map padding/margin into internal boxes
-function apply_padding(padding: Rect, aspect0: number | undefined): { rect: Rect, aspect: number | undefined } {
-    const [ pl, pt, pr, pb ] = padding
-    const [ pw, ph ] = [ pl + 1 + pr, pt + 1 + pb ]
-    const rect = [ pl / pw, pt / ph, 1 - pr / pw, 1 - pb / ph ] as Rect
-    const aspect = (aspect0 != null) ? aspect0 * (pw / ph) : undefined
-    return { rect, aspect }
-}
-
-//
-// box/frame classes
-//
-
-function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust = true, aspect_child: aspect_child0 }: { padding?: Padding, margin?: Padding, aspect?: number, adjust?: boolean, aspect_child?: number } = {}) : { rect_inner: Rect, rect_outer: Rect, fractions: [ number, number ], aspect_inner?: number, aspect_outer?: number } {
-    // the box aspect: its own, the content's as laid out, or the first child's
-    const aspect_child = aspect ?? aspect_child0 ?? children[0]?.spec?.aspect
-
-    // handle all null case
-    if (padding == null && margin == null) {
-        return {
-            rect_inner: D.rect, rect_outer: D.rect,
-            aspect_inner: aspect_child, aspect_outer: aspect_child,
-            fractions: [ 1, 1 ] as [ number, number ],
-        }
-    }
-
-    // apply padding to outer rect
-    let padding1 = pad_rect(padding)
-    if (adjust && aspect_child != null) padding1 = aspect_invariant(padding1, 1 / aspect_child) as Rect
-    const { rect: rect_inner, aspect: aspect_inner } = apply_padding(padding1, aspect_child)
-
-    // apply margin to global rect
-    let margin1 = pad_rect(margin)
-    if (adjust && aspect_inner != null) margin1 = aspect_invariant(margin1, 1 / aspect_inner) as Rect
-    const { rect: rect_outer, aspect: aspect_outer } = apply_padding(margin1, aspect_inner)
-
-    // return inner/outer rects, aspect, and the content's fraction of the box
-    // on each axis (inside the margin, then inside the padding)
-    const [ iw, ih ] = rect_dims(rect_inner)
-    const [ ow, oh ] = rect_dims(rect_outer)
-    const fractions: [ number, number ] = [ iw * ow, ih * oh ]
-    return { rect_inner, rect_outer, fractions, aspect_inner, aspect_outer: aspect ?? aspect_outer }
-}
-
-interface BoxArgs extends GroupArgs {
-    padding?: Padding
-    margin?: Padding
-    border?: boolean | number
-    fill?: string
-    shape?: Element
-    rounded?: Rounded
-    adjust?: boolean
-}
-
-// a box around its content: padding inside the border and margin outside,
-// both as fractions of the box (adjusted to its aspect, so they look the same
-// on every side). the content is the children with no rect of their own,
-// which fill the padded area; a child at a rect of its own is placed by it as
-// in any group. offered a size (by the Svg, a stack or another box), the box
-// lays its content out for the area and takes the shape of what comes back:
-// a column in a frame keeps its text size and hugs its height, a figure
-// gives the box its aspect, a stretch fills it. a box with an `aspect` of its
-// own fits the offer at it instead, and a `flex` one fills the offer
-class Box extends Group {
-    em?: EmSpec
-    content: Element[]
-    fractions: [ number, number ]
-
-    constructor(args: BoxArgs = {}) {
-        const { children: children0, padding, margin, border, fill, shape: shape0, rounded, aspect: aspect0, flex, clip, adjust = true, debug = false, offer, env, ...attr0 } = THEME(args, 'Box')
-        const [ border_attr, fill_attr, attr] = prefix_split([ 'border', 'fill' ], attr0)
-        const children = ensure_children(children0)
-        const aspect = aspect0 as number | undefined
-        const content = children.filter(c => c.spec.rect == null)
-
-        // ensure shape is a function
-        const shape = shape0 ?? maybe_rounded_rect(rounded, env)
-
-        // the rects for a content aspect: the box's own comes first
-        const rects = (aspect_child?: number) => computeBoxLayout(children, { padding, margin, aspect, adjust, aspect_child })
-        let L = rects()
-        let placed = children
-        let em: EmSpec | undefined
-
-        // laid out for an offer (see place): a box with a shape of its own is
-        // the size offered, and its content is laid out for the padded area
-        // (to be fit into it, so text that does not fit scales). else the
-        // first content child is laid out for the area of the offer and the
-        // box hugs what it came to, with the padding found again for that
-        // shape (and the child laid out again if that moved the area); the
-        // rest of the content is laid out for the area of the box
-        if (offer != null && content.length > 0) {
-            const fixed = aspect != null || flex
-            const slot = (w?: number, h?: number): Offer => ({ width: w != null ? w * L.fractions[0] : undefined, height: h != null ? h * L.fractions[1] : undefined, fit: fixed || undefined })
-            let first = content[0].lay(slot(offer.width, offer.height))
-            let [ width, height ] = [ offer.width ?? offer.height!, offer.height ?? offer.width! ]
-            if (!fixed) {
-                if (adjust && first.em.width > 0 && first.em.height > 0) {
-                    const L1 = rects(first.em.width / first.em.height)
-                    if (Math.abs(L1.fractions[0] - L.fractions[0]) > 1e-9 || Math.abs(L1.fractions[1] - L.fractions[1]) > 1e-9) {
-                        L = L1
-                        first = content[0].lay(slot(offer.width, offer.height))
-                    }
-                }
-                [ width, height ] = [ first.em.width / L.fractions[0], first.em.height / L.fractions[1] ]
-            }
-            const laid = [ first, ...content.slice(1).map(c => c.lay(slot(width, height))) ]
-
-            // the laid content in place of the children, and the box with the
-            // first content's anchor (it sits in the middle of the area)
-            placed = children.map(c => { const i = content.indexOf(c); return i >= 0 ? laid[i].elem : c })
-            const top = L.rect_outer[1] + L.rect_inner[1] * (L.rect_outer[3] - L.rect_outer[1])
-            em = make_em({ width, height, anchor: top * height + 0.5 * (L.fractions[1] * height - first.em.height) + first.em.anchor })
-        }
-
-        // make framing elements
-        const rect_cl = (clip === true) ? shape : clip
-        const rect_bg = fill != null ? shape.clone({ fill, stroke: none, ...fill_attr }) : null
-        const rect_fg = border != null ? shape.clone({ stroke_width: border, ...border_attr }) : null
-
-        // make inner groups
-        const inner = new Group({ children: placed, rect: L.rect_inner, debug, env })
-        const outer = new Group({ children: [ rect_bg, inner, rect_fg ], rect: L.rect_outer, clip: rect_cl, env })
-
-        // pass to Group
-        super({ children: [ outer ], aspect: em != null ? box_aspect(em.width, em.height) : L.aspect_outer, upright: true, env, ...attr })
-        this.args = args
-        this.em = em
-        this.content = content
-        this.fractions = L.fractions
-    }
-
-    // the first content child's bounds over its fraction of the box; a box
-    // with a shape of its own is any element of its aspect
-    natural(): Bounds {
-        const { aspect, flex } = this.args
-        if (aspect != null || flex === true || this.content.length == 0) return super.natural()
-        const [ fx, fy ] = this.fractions
-        return scale_bounds(this.content[0].bounds(), 1 / fx, 1 / fy)
-    }
-
-    // laid out again for the offer: a box with a shape of its own is sized
-    // as any element of its aspect and rebuilt at that size, one without
-    // takes the shape of its content laid out for the offer. nothing
-    // offered, no content, or a rotation (a figure): as any element
-    place(offer: Offer = {}): Laid {
-        const { aspect, flex, rotate } = this.args
-        if ((offer.width == null && offer.height == null) || this.content.length == 0 || rotate) return super.place(offer)
-        const size = (aspect != null || flex === true) ? super.place(offer).em : offer
-        const elem = this.clone({ offer: { width: size.width, height: size.height } }) as Box
-        return { elem, em: elem.em! }
-    }
-}
-
-class Frame extends Box {
-    constructor(args: BoxArgs = {}) {
-        const { border = 1, ...attr } = THEME(args, 'Frame')
-        super({ border, ...attr })
-        this.args = args
-    }
-}
 
 //
 // stack
@@ -536,5 +362,5 @@ class Absolute extends Element {
 // exports
 //
 
-export { computeBoxLayout, Box, Frame, Stack, VStack, HStack, HWrap, Grid, Points, Anchor, Attach, Absolute }
-export type { BoxArgs, StackArgs, HWrapArgs, GridArgs, PointsArgs, AnchorArgs, AttachArgs, AbsoluteArgs }
+export { Stack, VStack, HStack, HWrap, Grid, Points, Anchor, Attach, Absolute }
+export type { StackArgs, HWrapArgs, GridArgs, PointsArgs, AnchorArgs, AttachArgs, AbsoluteArgs }

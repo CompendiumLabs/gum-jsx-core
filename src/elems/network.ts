@@ -4,9 +4,9 @@ import { THEME } from '../lib/theme'
 import { abs, sub2, mul2, check_singleton, is_string, rect_center, side_direc, prefix_split, join_limits } from '../lib/utils'
 
 import { Context, Element, Group, ensure_children, size_by_em, spec_split } from './core'
-import { Frame } from './layout'
 import { Arrow } from './geometry'
-import { Text, TextFrame } from './text'
+import { Text } from './text'
+import { Frame, TextFrame } from './box'
 
 import type { ElementArgs, GroupArgs } from './core'
 import type { WithEm } from './em'
@@ -71,7 +71,7 @@ class Node extends Group {
             box = frame
         } else {
             const inner = is_string(child) ? new Text({ children: [ child ], width, justify, env, ...text_attr }) : child
-            box = new Frame({ children: [ inner ], padding: padding ?? 0.1, rounded: rounded ?? true, border, fill, env, ...attr })
+            box = new Frame({ children: [ inner ], padding: padding ?? 0.3, rounded: rounded ?? true, border, fill, env, ...attr })
             ysize ??= 0.2
         }
 

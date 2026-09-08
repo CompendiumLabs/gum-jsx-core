@@ -2,16 +2,16 @@
 
 import { THEME } from '../lib/theme'
 import { DEFAULTS as D, none, blue, white } from '../lib/const'
-import { sign, abs, linspace, invert_orient, join_limits, split_limits, ensure_vector, is_scalar, is_string, is_object, ensure_singleton, check_singleton, rounder, enumerate, aspect_invariant, rect_aspect, merge_rects, expand_limits, flip_rect, resolve_limits, smoothstep, prefix_split, prefix_join } from '../lib/utils'
+import { sign, abs, linspace, invert_orient, join_limits, split_limits, ensure_vector, is_scalar, is_string, is_object, ensure_singleton, check_singleton, rounder, enumerate, aspect_invariant, pad_rect, rect_aspect, merge_rects, expand_limits, flip_rect, resolve_limits, smoothstep, prefix_split, prefix_join } from '../lib/utils'
 import { Span } from './text'
 
-import { Element, Group, Spacer, spec_split, is_element, ensure_children, size_by_em } from './core'
-import { Box, Frame, Attach, HStack, VStack, Anchor } from './layout'
+import { Element, Group, Spacer, Rectangle, spec_split, is_element, ensure_children, size_by_em } from './core'
+import { Attach, HStack, VStack, Anchor } from './layout'
+import { Frame } from './box'
 import { RoundedRect, UnitLine, HLine, Arc, ArrowHead } from './geometry'
 
-import type { Point, Rect, Limit, Attrs, Orient, Rounded, Zone, AlignValue, Side } from '../lib/types'
+import type { Point, Rect, Limit, Attrs, Orient, Rounded, Zone, AlignValue, Side, Padding } from '../lib/types'
 import type { ElementArgs, GroupArgs } from './core'
-import type { BoxArgs } from './layout'
 import type { RoundedRectArgs } from './geometry'
 
 //
@@ -495,7 +495,7 @@ function ensure_legendlabel(label: any, attr: Attrs = {}): Element {
 // TODO: have a .badge/.label api for plottable elements
 class Legend extends Frame {
     constructor(args: LegendArgs = {}) {
-        const { children, lines, vspacing = 0.1, hspacing = 0.25, rounded = D.rounded, padding = 0.05, fill = white, justify = 'left', debug, env, ...attr0 } = THEME(args, 'Legend')
+        const { children, lines, vspacing = 0.1, hspacing = 0.25, rounded = D.rounded, padding = 0.4, fill = white, justify = 'left', debug, env, ...attr0 } = THEME(args, 'Legend')
         const [ badge_attr, text_attr, attr ] = prefix_split([ 'badge', 'text' ], attr0)
 
         // construct legend badges and labels
@@ -582,7 +582,7 @@ class Graph extends Group {
 // plot class
 //
 
-interface PlotArgs extends BoxArgs {
+interface PlotArgs extends GroupArgs {
     em?: number
     xlim?: Limit
     ylim?: Limit
@@ -610,14 +610,25 @@ interface PlotArgs extends BoxArgs {
     ylabel_offset?: number
     xtick_size?: number
     ytick_size?: number
-    margin?: number
+    margin?: Padding
     padding?: number
     debug?: boolean
 }
 
-class Plot extends Box {
+// the rect inside a margin given as a fraction of the plot area on each side
+// (adjusted to the area's aspect, so it is the same distance all round), and
+// the aspect of the whole
+function margin_rect(margin: Padding | undefined, aspect: number | undefined): { rect: Rect, aspect: number | undefined } {
+    let pad = pad_rect(margin)
+    if (aspect != null) pad = aspect_invariant(pad, 1 / aspect) as Rect
+    const [ l, t, r, b ] = pad
+    const [ w, h ] = [ l + 1 + r, t + 1 + b ]
+    return { rect: [ l / w, t / h, 1 - r / w, 1 - b / h ], aspect: aspect != null ? aspect * w / h : undefined }
+}
+
+class Plot extends Group {
     constructor(args: PlotArgs = {}) {
-        let { children: children0, xlim, ylim, axis = true, xaxis, yaxis, xticks = 5, yticks = 5, xanchor, yanchor, grid, xgrid, ygrid, xlabel, ylabel, title, tick_size = 0.015, label_size = 0.05, label_offset = [0.1, 0.15], title_size = 0.075, title_offset = 0.05, xlabel_size, ylabel_size, xlabel_offset, ylabel_offset, xtick_label_offset = 0.75, ytick_label_offset = 0.25, xtick_size, ytick_size, padding, margin, coord: coord0 = 'auto', aspect: aspect0 = 'auto', clip, em, debug = false, env, ...attr0
+        let { children: children0, fill, xlim, ylim, axis = true, xaxis, yaxis, xticks = 5, yticks = 5, xanchor, yanchor, grid, xgrid, ygrid, xlabel, ylabel, title, tick_size = 0.015, label_size = 0.05, label_offset = [0.1, 0.15], title_size = 0.075, title_offset = 0.05, xlabel_size, ylabel_size, xlabel_offset, ylabel_offset, xtick_label_offset = 0.75, ytick_label_offset = 0.25, xtick_size, ytick_size, padding, margin, coord: coord0 = 'auto', aspect: aspect0 = 'auto', clip, em, debug = false, env, ...attr0
         } = THEME(args, 'Plot')
         const children = size_by_em(ensure_children(children0), em)
 
@@ -733,9 +744,11 @@ class Plot extends Box {
             items.push(title)
         }
 
-        // pass to Box
+        // pass to Group: the plot area inside the margin
         const inner = new Group({ children: items, aspect, env })
-        super({ children: [ inner ], margin, env, ...attr })
+        const { rect, aspect: aspect_outer } = margin_rect(margin, aspect)
+        const background = fill != null ? new Rectangle({ fill, stroke: none, env }) : null
+        super({ children: [ background, inner.clone({ rect }) ], aspect: aspect_outer, env, ...attr })
         this.args = args
     }
 }

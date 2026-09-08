@@ -5,13 +5,14 @@ import { DEFAULTS as D, black, white, none } from '../lib/const'
 import { prefix_split, pad_rect } from '../lib/utils'
 
 import { spec_split, align_frac, is_element, ensure_children, Rectangle, Group } from './core'
-import { Box, Attach } from './layout'
+import { Attach } from './layout'
+import { Box, TextFrame, box_insets } from './box'
 import { RoundedRect } from './geometry'
-import { Span, TextFrame, TextCol } from './text'
+import { Span, TextCol } from './text'
 
 import type { AlignValue, Padding, Rounded, Point, Rect } from '../lib/types'
 import type { Element } from './core'
-import type { BoxArgs } from './layout'
+import type { BoxArgs, BoxGeometry } from './box'
 
 //
 // title/slide classes
@@ -46,43 +47,49 @@ class LabelBox extends Box {
 
 interface TitleBoxArgs extends BoxArgs {
     title?: Element | string
-    title_size?: number
+    title_scale?: number      // the title's em over the box's
     title_fill?: string
-    title_offset?: number
     title_rounded?: Rounded
-    title_padding?: Padding
+    title_padding?: Padding   // in em of the title
 }
 
+const TITLE_PADDING: Padding = [ 0.6, 0.3 ]
+
+// a box with a title on its top border: a TextFrame at its own size (one em,
+// or `title-scale`) centered on the border, the frame cut behind it; the
+// box's margin makes room for its top half
 class TitleBox extends Box {
     constructor(args: TitleBoxArgs = {}) {
-        const { children, title, title_size = 0.1, title_offset = 0, title_rounded = D.rounded, title_padding = [ 0.6, 0.3 ], margin, env, ...attr0 } = THEME(args, 'TitleBox')
-        const [ title_attr, attr1 ] = prefix_split(['title'], attr0)
+        const { children, title, title_scale = 1, title_rounded = D.rounded, title_padding = TITLE_PADDING, title_fill, margin, env, ...attr0 } = THEME(args, 'TitleBox')
+        const [ title_attr, attr1 ] = prefix_split([ 'title' ], attr0)
         const [ spec, attr ] = spec_split(attr1)
 
-        // make optional title box; padding is in em, rounding in stroke units
+        // the title box, and the mask that cuts the frame behind it (in the
+        // inner box's em: the frame's top edge is its y = 0)
         let title_box: TextFrame | null = null
-        let title_mask: Element | undefined = undefined
+        let title_mask: ((g: BoxGeometry) => Element) | undefined
+        let half = 0
         if (title != null) {
-            const title_pos: Point = [ 0.5, title_size * title_offset ]
             const title_span = is_element(title) ? title : new Span({ children: [ title ], env })
-            title_box = new TextFrame({ children: [ title_span ], pos: title_pos, ysize: title_size, rounded: title_rounded, padding: title_padding, env, ...title_attr })
-            // the mask shows everything but the title cutout; the cover rect is in
-            // box coordinates (with margin for overflow), not viewport percentages,
-            // which measure from the viewport origin and break when a host crops
-            // the viewBox
-            title_mask = new Group({ children: [
-                new Rectangle({ rect: [ -0.5, -0.5, 1.5, 1.5 ], fill: white, env }),
-                new RoundedRect({ pos: title_pos, ysize: title_size, aspect: title_box.spec.aspect, rounded: title_rounded, fill: black, env })
-            ], fill_rule: 'evenodd' , env})
+            title_box = new TextFrame({ children: [ title_span ], pos: [ 0.5, 0 ], scale: title_scale, rounded: title_rounded, padding: title_padding, fill: title_fill, env, ...title_attr })
+            const { width: tw, height: th } = title_box.em
+            half = th / 2
+            title_mask = ({ total_w, total_h, box_w, ml, mt }) => new Group({ children: [
+                new Rectangle({ rect: [ -total_w, -total_h, 2 * total_w, 2 * total_h ], fill: white, env }),
+                new RoundedRect({ rect: [ ml + box_w / 2 - tw / 2, mt - th / 2, ml + box_w / 2 + tw / 2, mt + th / 2 ], rounded: title_rounded, fill: black, env }),
+            ], fill_rule: 'evenodd', env })
         }
 
-        // make inner box; when the outer box is given a shape (aspect or flex)
-        // the inner box fills it rather than hugging the content
+        // the inner box holds the content and draws the frame, its top padding
+        // at least the title's lower half; with a shape of its own (aspect or
+        // flex) it fills the outer rather than hugging
         const sized = spec.flex === true || spec.aspect != null
-        const box = new Box({ children, mask: title_mask, flex: sized, env, ...attr })
+        const [ pl, pt, pr, pb ] = box_insets(attr.padding, 0.5)
+        const box = new Box({ children, mask: title_mask, flex: sized, env, ...attr, padding: [ pl, Math.max(pt, half + 0.2), pr, pb ] })
 
-        // pass to Box for margin
-        super({ children: [ box, title_box ], margin, env, ...spec })
+        // pass to Box: the margin outside, its top at least the title's half
+        const [ ml0, mt0, mr0, mb0 ] = box_insets(margin, 0.5)
+        super({ children: [ box, title_box ], margin: [ ml0, Math.max(mt0, half), mr0, mb0 ], env, ...spec })
         this.args = args
     }
 }
@@ -99,8 +106,9 @@ class TitleFrame extends TitleBox {
     }
 }
 
-interface SlideArgs extends TitleFrameArgs {
+interface SlideArgs extends Omit<TitleFrameArgs, 'aspect'> {
     aspect?: number | 'auto'
+    title_size?: number   // the title box's height as a fraction of the frame's
     padding?: Padding
     margin?: Padding
     rounded?: Rounded
@@ -113,16 +121,6 @@ interface SlideArgs extends TitleFrameArgs {
     align?: AlignValue
     valign?: AlignValue
     overflow?: 'shrink' | 'clip' | 'error'
-}
-
-// convert a padding given in units of the outer height into the inner-relative
-// fractions that Box uses with adjust = false, and return the inner aspect
-function canvas_padding(pad: Padding | undefined, aspect: number): { padding: Rect, aspect: number } {
-    const [ l, t, r, b ] = pad_rect(pad)
-    const w = aspect - l - r
-    const h = 1 - t - b
-    if (w <= 0 || h <= 0) throw new Error(`Slide padding/margin too large for aspect ${aspect}`)
-    return { padding: [ l / w, t / h, r / w, b / h ], aspect: w / h }
 }
 
 // a slide is a fixed-aspect canvas (16:9 by default) holding a TitleFrame that
@@ -183,17 +181,16 @@ class Slide extends Group {
             : [ 0, v * (1 - ratio), 1, v * (1 - ratio) + ratio ]
         const area = new Group({ children: [ col.clone({ rect }) ], aspect: area_width / area_height, clip: mode == 'clip' ? true : undefined, env })
 
-        // the frame fills the canvas inside the margin, its padding as
-        // fractions of itself (so the same distance in every direction)
+        // the frame fills the canvas inside the margin, laid out in the
+        // slide's em with its padding (in slide heights) in em
         const frame_width = canvas_aspect - ml - mr
         const frame_height = 1 - mt - mb
-        const frame_aspect = frame_width / frame_height
-        const { padding: frame_padding } = canvas_padding([ pl / frame_height, pt / frame_height, pr / frame_height, pb / frame_height ], frame_aspect)
-        const frame = new TitleFrame({
-            children: [ area ], aspect: frame_aspect, padding: frame_padding, adjust: false,
-            rect: [ ml, mt, canvas_aspect - mr, 1 - mb ],
-            border, rounded, border_stroke, title_size, env, ...attr,
+        const title_scale = (title_size * frame_height / em_size) / (1 + 2 * pad_rect(TITLE_PADDING)[1])
+        const frame0 = new TitleFrame({
+            children: [ area ], aspect: frame_width / frame_height, padding: [ pl, pt, pr, pb ].map(p => p / em_size) as Rect,
+            border, rounded, border_stroke, title_scale, env, ...attr,
         })
+        const frame = frame0.lay({ width: frame_width / em_size, height: frame_height / em_size }).elem.clone({ rect: [ ml, mt, canvas_aspect - mr, 1 - mb ] })
 
         // the canvas is the slide itself
         const backdrop = background != null ? new Rectangle({ fill: background, stroke: none, env }) : null

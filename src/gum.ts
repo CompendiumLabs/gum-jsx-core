@@ -10,10 +10,11 @@ import { Env, corePlugin, CORE_ELEMS, bindConstructor, defaultEnv, setDefaultEnv
 import { is_emoji } from './lib/text'
 
 import { Context, Element, Group, Svg, Rectangle, Spacer, is_element } from './elems/core'
-import { Box, Frame, Stack, VStack, HStack, HWrap, Grid, Points, Anchor, Attach, Absolute } from './elems/layout'
+import { Stack, VStack, HStack, HWrap, Grid, Points, Anchor, Attach, Absolute } from './elems/layout'
+import { Box, Frame, TextBox, TextFrame } from './elems/box'
 import { Line, UnitLine, VLine, HLine, CoordLine, Segments, Square, Ellipse, Arc, Circle, Dot, Ray, Polygon, Triangle, Fill, Path, Command, MoveCmd, LineCmd, ArcCmd, CornerCmd, RoundedCornerCmd, CubicSplineCmd, Spline, RoundedRect, RoundedLine, ArrowHead, Arrow } from './elems/geometry'
 import { spline1d, spline2d } from './lib/interp'
-import { Span, TextLine, Text, Verbatim, TextStack, TextCol, TextRow, TextGrid, TextFigure, TextBox, TextFrame, Bullets, Bold, Italic } from './elems/text'
+import { Span, TextLine, Text, Verbatim, TextStack, TextCol, TextRow, TextGrid, TextFigure, Bullets, Bold, Italic } from './elems/text'
 import { Node, Edge, Network } from './elems/network'
 import { SymPoints, SymLine, SymSpline, SymPoly, SymFill, Field, SymField } from './elems/symbolic'
 import { Bar, VBar, HBar, Bars, VBars, HBars, Scale, VScale, HScale, Label, HLabel, VLabel, Labels, HLabels, VLabels, Axis, HAxis, VAxis, OuterLabel, Mesh, HMesh, VMesh, Mesh2D, Graph, Plot, BarPlot, Legend } from './elems/plot'

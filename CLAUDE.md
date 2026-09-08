@@ -179,7 +179,7 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 - Handles clipping and masking
 
 **Layout containers** (`src/elems/layout.ts`):
-- `Box`, `Frame` (padding as fractions of the child: the share world), `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
+- `Box`, `Frame`, `TextBox`, `TextFrame` (`box.ts`: padding and margin in em), `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
 - `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 
 ### The layout protocol
@@ -228,23 +228,31 @@ fraction of the length (gross: half means half); a stack with no width of its ow
 children. `Svg` offers its lone child the canvas in em (`em`, or `width`/`height`; default
 `D.svg_ems` across the larger side), then fits the box it comes back with to the pixel size,
 so a figure fills it, a text column wraps to it, and a paragraph alone is as wide as its line.
-`Box` (and so `Frame`, `TitleBox`, `TitleFrame`, `LabelBox`) is the share world's container in
-the protocol: offered a size it lays its content (the children with no rect of their own) out
-for the padded area and hugs the first one's laid box (`Box.place` rebuilds with the `offer`,
-finding the padding again for the laid shape; `Box.natural` is the content's bounds over its
-fraction), so wrapping a column in a frame changes nothing inside it. A box with an `aspect`
-fits the offer at it and a `flex` one fills it (sized by `Element.place`, then rebuilt at that
-size); their content is offered `fit`, so text that does not fit the area scales into it
-(`Text.place`) rather than overflowing. A rotated box is placed as a figure. Plain groups stay
-the share world: a child at a rect gets no offer and is fit into the rect, so a stack placed
-by rect hugs its children at their natural sizes.
+`Box` (`src/elems/box.ts`; `Frame` is border 1, `TextBox`/`TextFrame` the same with a text
+padding default, `TitleBox`/`TitleFrame`/`LabelBox` in `slide.ts`) is the one box: `padding`
+and `margin` in em, exact bounds (`box_bounds` over the content's, an affine tie), one lay. Its
+content is the children with no rect of their own (strings become a `Text` with the box's
+`font-*`/`text-*` settings); offered a size it lays the first content child out for the area
+inside the padding and hugs it (`Box.place` rebuilds with the `offer`), so wrapping a column
+in a frame changes nothing inside it; nothing offered, the content is at its natural size (the
+protocol's one-em convention for a figure). A box with an `aspect` is a figure of that shape
+(fit to the offer in `place`, the content fit into the area by the context as any figure's
+content is, text offered `fit` so it scales rather than wraps into a sliver; grown around the
+content when nothing is offered), a `flex` one fills the offer. Children at a rect of their own
+are decorations placed relative to the padded area, one with metrics placed by `pos` alone at
+its own size (`is_unsized_em`: how `TitleBox` puts its title on the border); `clip` and `mask`
+may be functions of the box geometry, in em (the title's cutout in the border). A rotated box
+is placed as a figure by its rotated aspect. `Plot` keeps a fractional `margin` of its own
+(`margin_rect`), its labels being share-world. Plain groups stay the share world: a child at a
+rect gets no offer and is fit into the rect, so a stack placed by rect hugs its children at
+their natural sizes.
 
 **Geometry elements** (`src/elems/geometry.ts`):
 - `Line`, `UnitLine`, `VLine`, `HLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`
 - `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
 
 **Text elements** (`src/elems/text.ts`):
-- `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
+- `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `Bullets`, `Bold`, `Italic`
 
 `Text` defaults to collapsed whitespace. `whitespace="pre"` or `"preserve"`
 accepts plain strings, preserves spaces and explicit lines (including blank
@@ -354,9 +362,10 @@ Key functions for rect manipulation:
 
 **Element modules (`src/elems/`):**
 - `core.ts` - `Context`, `Element`, `Group`, `Svg`, `Rect`, plus `prefix_split`, `spec_split`, `align_frac`, `is_element`
-- `layout.ts` - `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`, `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
+- `box.ts` - `Box`, `Frame`, `TextBox`, `TextFrame`
+- `layout.ts` - `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`, `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 - `geometry.ts` - `Line`, `UnitLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`, `Polygon`, `Triangle`, `Path`, `Spline`, `Arc`, `RoundedRect`, `ArrowHead`, `Arrow`
-- `text.ts` - `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `TextBox`, `TextFrame`, `Bullets`, `Bold`, `Italic`
+- `text.ts` - `Span`, `Text`, `Verbatim`, `TextStack`, `TextCol`, `TextRow`, `TextGrid`, `TextFigure`, `Bullets`, `Bold`, `Italic`
 - `plot.ts` - `Bar`, `Bars`, `Scale`, `Labels`, `Axis`, `Mesh`, `Graph`, `Plot`, `BarPlot`, `Legend`
 - `network.ts` - `ArrowSpline`, `Node`, `Edge`, `Network`
 - `symbolic.ts` - `SymPoints`, `SymLine`, `SymSpline`, `SymPoly`, `SymFill`, `SymField`

@@ -580,117 +580,6 @@ class TextFigure extends Stack {
     }
 }
 
-interface TextBoxArgs extends Omit<GroupArgs, 'aspect'>, EmArgs {
-    padding?: Padding
-    margin?: Padding
-    border?: number | boolean
-    rounded?: Rounded
-    fill?: string
-    aspect?: number | boolean
-    justify?: AlignValue
-    width?: number
-    height?: number
-    font_family?: string
-    font_weight?: number
-    font_style?: string
-}
-
-// a box drawn around text (or around one element, a formula or a column
-// say): `padding` and `margin` are in em, and the box hugs its content plus
-// them, so a badge in a column does not span it; a `width` or `height` of
-// its own it spans instead. `rounded` corners use stroke units. an `aspect`
-// widens (or heightens) the box around the content, which is placed in it by
-// justify. `border` is a stroke width and `fill` a background; `border-*`
-// and `fill-*` reach the frame and background
-class TextBox extends Group {
-    em: EmSpec
-    content: Element
-    insets: [ number, number ]
-
-    constructor(args: TextBoxArgs = {}) {
-        const { children: children0, padding = 0.4, margin = 0, border, fill, rounded: rounded0, aspect: aspect0, justify = 'left', width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'TextBox')
-        const [ border_attr, fill_attr, font_attr0, text_attr, attr1 ] = prefix_split([ 'border', 'fill', 'font', 'text' ], attr0)
-        const font_attr = prefix_join('font', font_attr0)
-        const [ spec, attr ] = spec_split(attr1)
-        const children = ensure_children(children0)
-
-        // padding and margin in em; `true` takes the default
-        const em_pad = (p: Padding) => pad_rect(p === true ? 0.4 : p === false ? 0 : p)
-        const [ pl, pt, pr, pb ] = em_pad(padding)
-        const [ ml, mt, mr, mb ] = em_pad(margin)
-        const insets: [ number, number ] = [ pl + pr + ml + mr, pt + pb + mt + mb ]
-
-        // the content: one element is boxed as it is, anything else is set as
-        // text. it is laid out inside the insets for the box's own size or
-        // the offer's, with the box's text settings handed down
-        const only = children.length == 1 && is_element(children[0]) ? children[0] : null
-        const content = only ?? new Text({ children, env })
-        const outer_width = width ?? (offer?.width != null ? offer.width / scale : undefined)
-        const outer_height = height ?? (offer?.height != null ? offer.height / scale : undefined)
-        const room = (outer: number | undefined, inset: number) => outer != null ? Math.max(outer - inset, 0) : undefined
-        const inner = content.lay({ width: room(outer_width, insets[0]), height: room(outer_height, insets[1]), justify, attr: { ...font_attr, ...text_attr } })
-
-        // the box hugs the content plus the padding, or spans its own size;
-        // an aspect grows it
-        let box_width = width != null ? width - ml - mr : inner.em.width + pl + pr
-        let box_height = height != null ? height - mt - mb : inner.em.height + pt + pb
-        const aspect = aspect0 === true ? 1 : aspect0 === false ? undefined : aspect0
-        if (aspect != null) {
-            if (box_width / box_height < aspect) box_width = aspect * box_height
-            else box_height = box_width / aspect
-        }
-        const total_width = box_width + ml + mr
-        const total_height = box_height + mt + mb
-
-        // the content placed inside the insets, between the background and
-        // the frame, which are drawn inside the margin
-        const { child, anchor } = place_in_box(inner, total_width, total_height, [ justify, 'center' ], [ ml + pl, mt + pt, mr + pr, mb + pb ])
-        const rounded = rounded0 === false ? undefined : rounded0
-        const shape_rect: Rect = [ ml, mt, ml + box_width, mt + box_height ]
-        const make_shape = (extra: Attrs) => rounded != null
-            ? new RoundedRect({ rounded, rect: shape_rect, env, ...extra })
-            : new Rectangle({ rect: shape_rect, env, ...extra })
-        const background = fill != null ? make_shape({ fill, stroke: none, ...fill_attr }) : null
-        const frame = (border != null && border !== false) ? make_shape({ stroke_width: border === true ? 1 : border, fill: none, ...border_attr }) : null
-
-        // pass to Group
-        super({ children: [ background, child, frame ], coord: [ 0, 0, total_width, total_height ], aspect: box_aspect(total_width, total_height), upright: true, env, ...attr, ...spec, width, height })
-        this.args = args
-        this.content = content
-        this.insets = insets
-        this.em = make_em(scale_em_spec({ width: total_width, height: total_height, anchor, scale: 1 }, scale))
-    }
-
-    // the content's bounds shifted by the insets
-    natural(): Bounds {
-        return scale_bounds(box_bounds(this.content.bounds(), this.insets), this.em.scale)
-    }
-
-    // laid out again for the slot (a filled slot as a width of its own, so
-    // the frame spans it)
-    place(offer: Offer = {}): Laid {
-        const { width, height, fill, justify, attr = {} } = offer
-        const justify_attr = (justify != null && this.args.justify == null) ? { justify } : {}
-        const size = (fill && width != null && this.args.width == null) ? { width: width / this.em.scale } : { offer: { width, height } }
-        const elem = this.clone({ ...attr, ...justify_attr, ...size }) as TextBox
-        return { elem, em: elem.em }
-    }
-}
-
-interface TextFrameArgs extends TextBoxArgs {}
-
-class TextFrame extends TextBox {
-    constructor(args: TextFrameArgs = {}) {
-        const { border = 1, ...attr } = THEME(args, 'TextFrame')
-        super({ border, ...attr })
-        this.args = args
-    }
-}
-
-//
-// bullet list
-//
-
 interface BulletsArgs extends StackArgs {
     marker?: string | Element
     indent?: number
@@ -792,5 +681,5 @@ class Italic extends Text {
 // exports
 //
 
-export { Span, ElemSpan, TextLine, Text, Verbatim, TextStack, TextCol, TextRow, TextGrid, TextFigure, TextBox, TextFrame, Bullets, Bold, Italic, TEXT_ANCHOR }
-export type { SpanArgs, ElemSpanArgs, TextLineArgs, TextArgs, TextStackArgs, TextColArgs, TextRowArgs, TextGridArgs, TextFigureArgs, TextBoxArgs, TextFrameArgs, BulletsArgs }
+export { Span, ElemSpan, TextLine, Text, Verbatim, TextStack, TextCol, TextRow, TextGrid, TextFigure, Bullets, Bold, Italic, TEXT_ANCHOR }
+export type { SpanArgs, ElemSpanArgs, TextLineArgs, TextArgs, TextStackArgs, TextColArgs, TextRowArgs, TextGridArgs, TextFigureArgs, BulletsArgs }
