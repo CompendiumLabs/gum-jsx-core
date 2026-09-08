@@ -26,8 +26,8 @@ const BOOLEANS: ThemeLayer = {
     },
 
     HWrap: {
-        hspacing: 0.1,
-        vspacing: 0.1,
+        hgap: 0.5,
+        vgap: 0.5,
     },
 
     Grid: {

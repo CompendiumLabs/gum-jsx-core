@@ -3,14 +3,18 @@
 import { THEME } from '../lib/theme'
 import type { Env } from '../env'
 import { DEFAULTS as D, none } from '../lib/const'
-import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, identity, invert, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, intersperse, prefix_split, merge_points, pad_rect } from '../lib/utils'
+import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points, pad_rect } from '../lib/utils'
 import { wrapWidths } from '../lib/wrap'
 
 import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
 import { RoundedRect, Dot } from './geometry'
+import { layout_em_stack, layout_em_bounds } from './em'
+import { make_em, scale_em_spec } from '../lib/em'
 
 import type { Point, Rect, Limit, AlignValue, Side, Orient, Padding, Rounded } from '../lib/types'
-import type { ElementArgs, GroupArgs } from './core'
+import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
+import type { EmArgs, EmSpec } from '../lib/em'
+import type { EmStackOptions, RowAlign } from './em'
 
 //
 // padding/margin utils
@@ -109,148 +113,91 @@ class Frame extends Box {
 }
 
 //
-// stack/wrap/grid classes
+// stack
 //
 
-type StackChildOver = {
-    size: number
-    aspect: number
-}
-
-type StackChildExpo = {
-    size?: number
-    aspect: number
-}
-
-type StackChildFlex = {
-    size: number
-    aspect: undefined
-}
-
-type StackChild = StackChildOver | StackChildExpo | StackChildFlex
-
-// TODO: better justify handling with aspect override (right now it's sort of "left" justified)
-function computeStackLayout(direc: string, children: Element[], { spacing = 0, even = false, aspect: aspect0 }: { spacing?: number, even?: boolean, aspect?: number } = {}): { ranges: Limit[], aspect: number | undefined } {
-    // short circuit if empty
-    if (children.length == 0) return { ranges: [], aspect: undefined }
-
-    // get size and aspect data from children: a child's aspect takes part in
-    // the layout unless it opts out with `stack-expand = false`, in which case
-    // it is a fixed share (sized) or an even share of the remainder (unsized)
-    // and only its own placement within that share respects the aspect
-    // adjust for direction (invert aspect if horizontal)
-    const items = children.map(c => {
-        const size = c.attr.stack_size ?? (even ? 1 / children.length : null)
-        const aspect = (c.attr.stack_expand ?? true) ? c.spec.aspect : null
-        return { size, aspect } as StackChild
-    })
-
-    // handle horizontal case (invert aspect)
-    if (direc == 'v') {
-        for (const c of items) c.aspect = invert(c.aspect)
-    }
-
-    // compute total share of non-spacing elements
-    const F_total = 1 - spacing * (children.length - 1)
-
-    // for computing return values
-    const getSizes = (cs: StackChild[]): number[] => cs.map(c => c.size ?? 0)
-    const getAspect0: (a: number | undefined) => number | undefined = (direc == 'v') ? invert : identity
-    const getAspect = (a: number | undefined): number | undefined => (aspect0 ?? getAspect0(a))
-
-    // compute ranges with spacing
-    function getRanges(sizes0: number[]): Limit[] {
-        const sizes1 = sizes0.map(s0 => F_total * s0)
-        const bases = cumsum(sizes1.map(s1 => s1 + spacing)).slice(0, -1)
-        return zip(bases, sizes1).map(([b, s1]) => [b, b + s1])
-    }
-
-    // children = list of dicts with keys size (s_i) and aspect (a_i)
-    // const fixed = children.filter(c => c.size != null && c.aspect == null)
-    const over = items.filter(c => c.size != null && c.aspect != null) as StackChildOver[]
-    const expo = items.filter(c => c.size == null && c.aspect != null) as StackChildExpo[]
-    const flex = items.filter(c => c.size == null && c.aspect == null) as StackChildFlex[]
-
-    // get target aspect from over-constrained children (sized with an aspect):
-    // the shortest length at which one of them exactly fills its share, so
-    // that child fills the stack and the rest fit inside their shares
-    // single element case (exact): s * F_total * L = a
-    // multi element case (approximate): agg(s_i / a_i) * F_total * L = 1
-    const agg: (x: number[]) => number = x => max(x) as number // fit to max aspect, otherwise will underfit
-    const L_over = (over.length > 0) ? 1 / (F_total * agg(over.map(c => c.size / c.aspect))) : undefined
-
-    // knock out (over/exactly)-budgeted case right away
-    // short-circuit since this is relatively simple
-    const S_sum = sum(getSizes(items))
-    if (S_sum >= 1 || (expo.length == 0 && flex.length == 0)) {
-        const sizes = getSizes(items)
-        const ranges = getRanges(sizes)
-        const aspect = getAspect(L_over)
-        return { ranges, aspect }
-    }
-
-    // set length to accommodate the expandables: add up the lengths required
-    // to make them height 1 (w = a), so L_expand * (1 - S_sum) * F_total = sum(a)
-    const L_expand = (expo.length > 0) ? sum(expo.map(c => c.aspect)) / ((1 - S_sum) * F_total) : undefined
-    // the target length is a requested aspect, else the one that lets the
-    // expandables fill the remaining space (an over-constrained child cannot
-    // set it without leaving that space partly empty), else the one that lets
-    // an over-constrained child fill its share; a requested aspect is in
-    // output terms, so map it into the internal (horizontal) frame like the
-    // computed lengths (inverted when vertical)
-    const L_target = (aspect0 != null ? getAspect0(aspect0) : (L_expand ?? L_over)) as number
-
-    // allocate space to expand then flex children
-    // S_exp0 gets full length of expandables given realized L_target
-    // S_exp is the same but constrained so the sums are less than 1
-    // should satisfy: s * F_total * L_target = a
-    const S_exp0 = sum(expo.map(c => c.aspect / (F_total * L_target)))
-    const S_exp = Math.min(S_exp0, 1 - S_sum)
-    const scale = S_exp / S_exp0 // this is 1 in the unconstrained case
-    for (const c of expo) c.size = c.aspect / (F_total * L_target) * scale
-
-    // distribute remaining space to flex children, if any
-    // S_left is the remaining space after pre-allocated and expandables (may hit 0)
-    const S_left = 1 - S_sum - S_exp
-    if (flex.length > 0) {
-        for (const c of flex) c.size = S_left / flex.length
-    }
-
-    // compute heights and aspect
-    const sizes = getSizes(items)
-    const ranges = getRanges(sizes)
-    const aspect = getAspect(L_target)
-    return { ranges, aspect }
-}
-
-interface StackArgs extends GroupArgs {
+interface StackArgs extends GroupArgs, EmArgs {
     direc?: Orient
-    spacing?: boolean | number
-    justify?: AlignValue
-    even?: boolean
+    gap?: number                 // between children, in em
+    spacing?: boolean | number   // between children, as a fraction of the stack's length
+    justify?: AlignValue         // across a column (and along a row narrower than its width); also the text alignment handed down
+    valign?: RowAlign            // across a row: top, anchor, center, bottom
+    anchor?: 'first' | 'center'  // where the stack's anchor is
+    even?: boolean               // every child an equal share
+    width?: number               // the stack's size in em: what a column offers, a row divides
+    height?: number
+    font_family?: string
+    font_weight?: number
+    font_style?: string
 }
 
-// this is written as vertical, horizonal swaps dimensions and inverts aspects
-// TODO: make native way to mimic using Spacer elements for spacing
+// one stack for figures, text and math, vertical or horizontal, laid out in
+// em by the engine (see lib/layout.ts and layout_em_stack): every child is
+// laid for its slot by what it is. a figure (an aspect) spans a column's
+// width or takes a row's height, text wraps to its slot, a formula keeps its
+// size, a bare element fills what is left; a child with a `width` or `height`
+// of its own keeps it, one with a `share` gets that fraction of the stack's
+// length. `gap` is in em, `spacing` a fraction of the length (the share
+// world's unit, so a stack of figures stays scale-free). the stack reports
+// its box in em like any measured element, so stacks nest; a child's `scale`
+// sets its size relative to the stack's em, and its own `align` places it in
+// its slot in place of the stack's justify or valign. font and text settings
+// (`font-*`, `text-*`) are handed to the text children
 class Stack extends Group {
+    em: EmSpec
+    items: Element[]
+    direc: Orient
+    options: EmStackOptions
+
     constructor(args: StackArgs = {}) {
-        const { children: children0, direc = 'v', spacing = 0, justify = 'center', aspect: aspect0, even = false, ...attr } = THEME(args, 'Stack')
+        const { children: children0, direc = 'v', gap = 0, spacing: spacing0 = 0, justify = 'center', valign = 'center', anchor = 'first', even = false, width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'Stack')
+        const [ font_attr0, text_attr, attr1 ] = prefix_split([ 'font', 'text' ], attr0)
+        const font_attr = prefix_join('font', font_attr0)
+        const [ spec, attr ] = spec_split(attr1)
         const children = ensure_children(children0)
+        const spacing = spacing0 === true ? 0.1 : spacing0 === false ? 0 : spacing0
 
-        // compute layout
-        const spacing1 = (spacing as number) / Math.max(children.length - 1, 1)
-        const { ranges, aspect } = computeStackLayout(direc, children, { spacing: spacing1, even, aspect: aspect0 as number | undefined })
+        // an even stack gives every child the same share of what the spacing leaves
+        const n = children.length
+        const items = even ? children.map(c => c.share != null ? c : c.clone({ share: (1 - spacing * Math.max(n - 1, 0)) / n })) : children
 
-        // assign child rects
-        const items = children.length > 0 ? zip(children, ranges).map(([c, b]) => {
-            const rect = join_limits({ [direc]: b })
-            const align = c.spec.align ?? justify
-            return c.clone({ rect, align, stack_size: undefined, stack_expand: undefined })
-        }) : []
+        // the size laid out for: its own, or the offer (in the stack's em);
+        // with neither (a stack placed by rect in a group, which has no em to
+        // offer) it hugs its children at their natural sizes and is fit to
+        // its rect, as in the share world
+        const W = width ?? (offer?.width != null ? offer.width / scale : undefined)
+        const H = height ?? (offer?.height != null ? offer.height / scale : undefined)
+        // a stack with no width of its own hugs its children across the axis:
+        // the width offered is what they may take, not what the stack is
+        const options: EmStackOptions = { gap, spacing, justify, valign, anchor, hug: width == null, attr: { ...font_attr, ...text_attr } }
+        const { metrics, ...layout } = layout_em_stack(direc, items, { ...options, width: W, height: H })
 
         // pass to Group
-        super({ children: items, aspect, upright: true, ...attr })
+        super({ env, ...layout, upright: true, ...attr, ...spec, width, height })
         this.args = args
+        this.items = items
+        this.direc = direc
+        this.options = options
+        this.em = make_em(scale_em_spec(make_em(metrics), scale))
+    }
+
+    // composed from the children's bounds, in the parent's em
+    natural(): Bounds {
+        const b = layout_em_bounds(this.direc, this.items, this.options)
+        const s = this.scale
+        const sc = ([ lo, hi ]: [ number, number ]): [ number, number ] => [ lo * s, hi * s ]
+        const offset = b.offset != null ? [ b.offset[0] * s, b.offset[1] * s ] as [ number, number ] : undefined
+        return { width: sc(b.width), height: sc(b.height), aspect: b.aspect, offset }
+    }
+
+    // laid out again for the offer, with the text alignment and settings
+    // handed down to a stack that has none of its own
+    place(offer: Offer = {}): Laid {
+        const { width, height, fill, justify, attr = {} } = offer
+        const justify_attr = justify != null && this.args.justify == null ? { justify } : {}
+        const size = (fill && width != null && this.args.width == null) ? { width: width / this.scale, offer: { height } } : { offer: { width, height } }
+        const elem = this.clone({ ...attr, ...justify_attr, ...size }) as Stack
+        return { elem, em: elem.em }
     }
 }
 
@@ -270,32 +217,25 @@ class HStack extends Stack {
     }
 }
 
-function default_measure(c: Element): number {
-    return c.spec.aspect ?? 1
-}
-
 interface HWrapArgs extends StackArgs {
-    padding?: number
-    width?: number  // the row width to wrap at, in units of the row height
-    measure?: (c: Element) => number
+    hgap?: number   // between items in a row, in em
+    vgap?: number   // between rows, in em
 }
 
-// like stack but wraps elements to multiple lines/columns
-class HWrap extends VStack {
+// items wrapped into rows of a `width` in em: each item at its natural size
+// for a one em row, as many to a row as fit, the rows stacked
+class HWrap extends Stack {
     constructor(args: HWrapArgs = {}) {
-        const { children: children0, hspacing, vspacing, width, justify = 'left', measure: measure0, debug, env, ...attr } = THEME(args, 'HWrap')
+        const { children: children0, width, hgap = 0, vgap = 0, justify = 'left', env, ...attr } = THEME(args, 'HWrap')
         const children = ensure_children(children0)
-        const measure = measure0 ?? default_measure
 
-        // intersperse spacers if needed and wrap widths
-        const items = hspacing > 0 ? intersperse(children, new Spacer({ aspect: hspacing, env })) : children
-        const { rows } = wrapWidths(items, measure, width)
+        // wrap by the widths the items come out at one em tall
+        const measure = (c: Element) => c.lay({ height: 1 }).em.width + hgap
+        const { rows } = wrapWidths(children, measure, width != null ? width + hgap : undefined)
+        const lines = rows.map(row => new Stack({ direc: 'h', children: row, gap: hgap, justify, valign: 'top', env }))
 
-        // make HStack rows
-        const lines = rows.map(row => new HStack({ children: row, align: justify, aspect: width, debug, env }))
-
-        // pass to VStack
-        super({ children: lines, spacing: vspacing, even: true, debug, env, ...attr })
+        // pass to Stack
+        super({ direc: 'v', children: lines, gap: vgap, justify, width, env, ...attr })
         this.args = args
     }
 }

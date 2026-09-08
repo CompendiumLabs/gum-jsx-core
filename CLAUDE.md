@@ -157,7 +157,7 @@ The library is built around a class hierarchy split across element modules:
 
 **Element** (`src/elems/core.ts`) - Base class for all components
 - Stores `args` (constructor arguments) as a dictionary for easy cloning; `env` (a getter over `args.env`) is the Env it was built against
-- Has a `spec` object containing layout parameters (rect, coord, aspect, aspect0, expand, align, upright, offset, rotate, rotate_adjust, rotate_invar)
+- Has a `spec` object containing layout parameters (rect, coord, aspect, aspect0, expand, align, upright, offset, rotate, rotate_adjust, rotate_invar, and the protocol's width, height, share, fit)
 - Has an `attr` object containing SVG attributes (stroke, fill, etc.)
 - Renders to SVG via the `svg(ctx)` method that takes a Context object
 
@@ -179,46 +179,54 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 - Handles clipping and masking
 
 **Layout containers** (`src/elems/layout.ts`):
-- `Box`, `Frame`, `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
+- `Box`, `Frame` (padding as fractions of the child: the share world), `Stack`, `VStack`, `HStack`, `HWrap`, `Grid`
 - `Points`, `Anchor`, `Attach`, `Absolute`, `Field`, `Spacer`
 
-### Two ecosystems: shares and em
+### The layout protocol
 
-Core layout works in **shares** of the parent: the unit square rects are placed in, a
-`stack-size`, a `Stack`'s `spacing`. `Stack`/`VStack`/`HStack` (`computeStackLayout`) divide
-themselves between their children by aspect and share and have an aspect but no size; the parent
-gives them one and everything scales together. That ecosystem is untouched by what follows.
+Everything is laid out in **em**, the size of the text, by one engine, `src/lib/layout.ts`
+(dependency free; the design was worked out in the `lab/stack` prototype at the org root).
+Every element answers two questions, both in its parent's em (an element with a `scale` lays
+itself out in its own em and reports its box scaled):
 
-Text and math work in **em**, the common unit of measured content. An element that takes part
-carries an `em` record (`src/lib/em.ts`: `width`, `height`, `anchor`, `scale`, optional
-`hink`/`vink` ink overhang); text and math measure theirs, and `with_em` (`src/elems/em.ts`)
-adapts anything else. The field is `declare`d on `Element` and only ever assigned, so `x.em != null`
-is the test for measured content. The two ecosystems share one layout engine,
-`layout_em_stack(direc, children, options)` in `src/elems/em.ts`: `TextStack` (with `TextCol` and
-`TextRow` as its directions) and, in `@gum-jsx/math`, `MathRow` (a row aligned on anchors) and
-`MathCol` (a column anchored on its middle) all call it with their own defaults. A column offers
-its width and budgets a height; a row offers slots along its width and hands a height down; the
-group draws the children's ink hull (`hull_overhang`) while the metrics keep the box.
+- `bounds()` — the sizes it can come out at: a `[min, max]` range per axis (`max` may be
+  `Infinity`) plus an `aspect` when its width follows from its height and back, as
+  `w − ox = aspect · (h − oy)` with an `offset` (a shape's ray, shifted once padding or gaps
+  surround it, so the relation survives composition). The classification a container needs
+  falls out: *fixed* on an axis (`min == max`: a formula, text with a width), *tied*
+  (`aspect`), *flexible* in height (`max == Infinity`: takes a budget), *growable* (flexible,
+  no aspect: takes slack), *content* (finite max height: height follows from width).
+- `lay(offer)` — laid out for `{ width?, height?, fill?, justify?, attr? }`: the element to
+  place and its box (`Laid = { elem, em }`, the em record of `src/lib/em.ts` with its anchor
+  and ink overhang).
 
-The engine never tests classes. It asks each child through the **layout protocol** on `Element`:
+`Element` implements both from what an element already declares: `spec.aspect` is a tied ray,
+an `em` record a point (shrunk to a narrower slot, never grown), neither a stretch that fills
+what it is offered (one side offered: a square). Subclasses override `natural()` and
+`place(offer)`; the base applies a size of the element's own (`width`/`height` in its em,
+reserved spec keys, pinning the bounds to a point and boxing the result in a `Group` when the
+content is smaller), `share` (its fraction of a stack's length), and `fit` (an element with
+metrics scaled to its slot like a figure: share-world text). `Text` is content: bounds from
+its longest word to its one line, `place` wraps for the width (or the narrowest width that
+fits an offered height); `Stack`, `TextBox`, `TextGrid` and `Bullets` rebuild themselves for
+the offer (the internal `offer` arg). `Group`, `Box`, `Frame`, `Grid` and the plots are
+shapes: children placed by rect are scaled into it, as ever (that is the share world, and it
+needs no em).
 
-- `reflow` — the sizes the element lays itself out for (`[]` for most; `['width']` for `Text`,
-  `Bullets`, `TextBox`, `TextGrid`; `['height']` for `TextFigure`; both for `TextStack`).
-- `fixed()` — keeps its own size in a stack: a reflowing element with a `width` of its own, else
-  anything with `em`.
-- `flex_height()` — sized by a height budget: an element with an aspect and no `em`, an unsized
-  `TextFigure`, a text stack without a `height` holding one.
-- `lay(offer)` — the element laid out for a slot (`width`, `height`, `span`, `justify`, `attr`)
-  as `{ elem, em }`. The default keeps an `em` (shrunk to the slot if wider), spans the slot at an
-  aspect, or is a square; reflowing elements rebuild themselves for it (`lay_width` in `text.ts`,
-  `TextStack.lay`, `TextFigure.lay` with its caption overshoot rule).
-
-A new element joins em layout by overriding these. One child attribute (a reserved key, stripped
-like its namesake in `Stack`) adjusts a slot: `stack-size` is a length along the stack in em
-(not a share, as in `Stack`), the child spanning across and fit inside by its aspect. A `TextBox`
-whose text fits on one line always tightens to that line rather than spanning a column. A share
-`Stack` placed in a text stack is a figure: it spans its slot at its aspect. A column's box is its content even under a height budget
-(`Slide` reads the overflow from it); a row's box is its given width.
+**Stack** (`src/elems/layout.ts`) is the one stack: `VStack`/`HStack`, `TextStack`/`TextCol`/
+`TextRow` (text defaults) and math's `MathRow`/`MathCol` are all `layout_em_stack` in
+`src/elems/em.ts` over the engine. A column hands its width down, is as tall as its children
+come to, and treats a height as a budget that only becomes its box when something can use it
+(growables take the slack; over budget the flexible children split what the content leaves
+evenly). A row gives fixed children their width, sizes tied children by its height (giving way
+toward their fair share of the width until the content fits, a bisection), and splits the rest
+evenly with clamps (`distribute`, the flexbox loop); flexible children take their allocation
+as their box (`fill`). `gap` is em, `spacing` a fraction of the length, `share` on a child a
+fraction of the length (gross: half means half); a stack with no width of its own hugs its
+children. `Svg` offers its lone child the canvas in em (`em`, or `width`/`height`; default
+`D.svg_ems` across the larger side), then fits the box it comes back with to the pixel size,
+so a figure fills it, a text column wraps to it, and a paragraph alone is as wide as its line.
+A stack placed by rect in a group gets no offer and hugs its children at their natural sizes.
 
 **Geometry elements** (`src/elems/geometry.ts`):
 - `Line`, `UnitLine`, `VLine`, `HLine`, `Square`, `Ellipse`, `Circle`, `Dot`, `Ray`
@@ -348,6 +356,7 @@ Key functions for rect manipulation:
 - `utils.ts` - Math utilities, array/vector ops, rect manipulation, color handling
 - `text.ts` - Text measurement and wrapping using opentype.js
 - `em.ts` - The em metrics record and its queries (bounds, ink, hull, scaling)
+- `layout.ts` - The layout engine: bounds, offers, the column and row algorithms, `distribute`
 - `parse.ts` - JSX transform (Acorn, line preserving) and the code runner
 - `errors.ts` - `ErrorSyntax`/`ErrorRuntime` with source positions, stack parsing
 - `default.ts` - The default Env (a leaf module: `defaultEnv`, `resolveEnv`, `setDefaultEnv`)

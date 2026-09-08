@@ -55,6 +55,7 @@ const DEFAULTS = {
     N: 100,
     svg_size: 500,
     unit_size: 1000,  // image size at which stroke_width = 1 is one pixel
+    svg_ems: 40,      // the em an Svg offers its content: this many across its larger side
     rounded: 10,     // default rectangle corner radius, in stroke units
     calc_size: 16,
 }

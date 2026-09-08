@@ -53,6 +53,11 @@ type Spec = {
     rotate?: number
     rotate_invar?: boolean
     rotate_adjust?: boolean
+    width?: number    // a size of its own, in its em (see Element.bounds)
+    height?: number
+    share?: number    // its fraction of a stack's length along the axis
+    fit?: boolean     // scaled to its slot like a figure (an element with metrics)
+    offer?: { width?: number, height?: number }   // internal: the offer a container is rebuilt for
 }
 
 // command line arguments

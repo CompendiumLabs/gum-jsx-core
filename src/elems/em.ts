@@ -10,7 +10,9 @@ import type { TextMetrics } from '../lib/text'
 import type { Attrs, Rect, Limit, Align, AlignValue, Orient } from '../lib/types'
 
 import { Context, Element, Group, align_frac } from './core'
-import type { Laid } from './core'
+import type { Laid, MaybeEm } from './core'
+import { layout_stack, stack_bounds } from '../lib/layout'
+import type { Bounds, StackOptions, RowAlign } from '../lib/layout'
 
 //
 // elements with metrics
@@ -148,8 +150,6 @@ function child_align({ elem }: Laid): [ AlignValue | undefined, AlignValue | und
 
 // the vertical offsets that align laid children in a row: by their tops,
 // their anchors, their middles or their bottoms, or a child's own align
-type RowAlign = 'top' | 'anchor' | 'center' | 'bottom'
-
 function row_offsets(laid: Laid[], valign: RowAlign): number[] {
     const height = max(laid.map(l => l.em.height)) ?? 0
     const anchor = max(laid.map(l => l.em.anchor)) ?? 0
@@ -163,16 +163,12 @@ function box_aspect(width: number, height: number): number | undefined {
     return (width > 0 && height > 0) ? width / height : undefined
 }
 
-type EmStackOptions = {
-    width?: number
-    height?: number
-    gap?: number
-    sizes?: number[]
-    justify?: AlignValue
-    valign?: RowAlign
-    anchor?: 'first' | 'center'
-    attr?: Attrs
-}
+// the options of a stack in em (see lib/layout.ts): a width and/or height,
+// the gap in em and the spacing as a fraction of the length, how children
+// sit across the stack (justify for a column, valign for a row) and where
+// the stack's anchor is (its first child's, or its middle), and the text
+// settings handed to children that lay themselves out
+type EmStackOptions = StackOptions
 
 type EmLayout = {
     children: Element[]
@@ -181,164 +177,34 @@ type EmLayout = {
     metrics: EmMetrics
 }
 
-// a stack laid out in em: every child is laid for its slot (see Element.lay)
-// and they are packed along the axis, `gap` em apart, and aligned across it.
-// the layout reports its box in em like any measured element, so stacks nest
-//
-// a column offers its `width` to every child: text takes it (unless it has a
-// width of its own), a formula keeps its size, and a bare element spans it at
-// its aspect. with no width, children are laid at their own sizes and the
-// column is as wide as the widest. given a `height`, it is a budget: the children sized
-// by the width are laid first and what is left is split evenly among the
-// height-flexible ones (see Element.flex_height), each sized to its share
-// instead of spanning the width. the column's box is its content, anchored
-// on its first child (`anchor: 'first'`, text) or its middle (`'center'`,
-// math)
-//
-// a row offers slots along its `width`: fixed children (see Element.fixed)
-// keep their size and the rest share what is left, or `sizes` splits the
-// width as given; with no width, every child is at its own size. a `height`
-// is handed down to the children that budget one (a nested stack) and sizes
-// a bare element to it at its aspect, no wider than the row. the children
-// align across the row by `valign` and a row narrower than its width is
-// placed along it by `justify`
-//
-// in either, a child with a `stack-size` is that long along the axis, in em,
-// spans the stack across, and is fit inside that box by its aspect
+// a stack laid out in em by the engine: every child is laid for its slot
+// (see Element.lay), packed along the axis and aligned across it, and the
+// placements become rects in the stack's em frame. the stack draws the ink
+// hull of its children (a formula with overhang), while the metrics keep the
+// box, so stacks nest
 function layout_em_stack(direc: Orient, children: Element[], options: EmStackOptions = {}): EmLayout {
-    const { width, height, gap = 0, sizes, justify = 'left', valign = 'top', anchor: anchor0 = 'first', attr = {} } = options
-    const vertical = direc == 'v'
-    const n = children.length
-    const gaps = gap * Math.max(n - 1, 0)
-    const offer = (c: Element, size: { width?: number, height?: number, span?: boolean }): Laid => c.lay({ ...size, justify, attr })
-
-    // the sized children are their `stack-size` long; the rest are laid for
-    // their slots
-    const sized_em = children.map(c => c.attr.stack_size as number | undefined)
-    const sized_sum = sum(sized_em.map(s => s ?? 0))
-    const free = sized_em.map(s => s == null)
-    const laid: (Laid | null)[] = children.map(() => null)
-    let cross: number
-    if (vertical) {
-        // the width: given, or the widest child laid at its own size
-        const natural = children.map((c, i) => (width == null && free[i] && !c.flex_height()) ? offer(c, {}) : null)
-        cross = width ?? max(natural.map(l => l?.em.width).filter(w => w != null) as number[]) ?? 1
-
-        // the children sized by the width first, then the height-flexible ones
-        // get an even share of what is left of the budget
-        const soft = children.map((c, i) => free[i] && height != null && c.flex_height())
-        children.forEach((c, i) => {
-            if (!free[i] || soft[i]) return
-            laid[i] = (width != null || c.flex_height()) ? offer(c, { width: cross }) : natural[i]!
-        })
-        const used = sum(laid.map(l => l?.em.height ?? 0)) + gaps + sized_sum
-        const nsoft = soft.filter(s => s).length
-        const share = (height != null && nsoft > 0) ? (height - used) / nsoft : 0
-        const each = share > 0 ? share : undefined
-        children.forEach((c, i) => {
-            if (soft[i]) laid[i] = offer(c, { width: cross, height: each, span: true })
-        })
-    } else {
-        // the row's slots: by the given splits, by the children's own sizes
-        // with the slack shared, or every child at its own size. a child
-        // sized by the height keeps that width like a fixed one
-        const slots: (number | undefined)[] = children.map(() => undefined)
-        if (sizes != null && width != null) {
-            const total = sum(sizes)
-            children.forEach((c, i) => {
-                if (free[i]) slots[i] = (sizes[i] ?? 0) / total * (width - gaps)
-            })
-        } else if (width != null) {
-            const sized = (c: Element) => height != null && c.flex_height() && !c.reflow.includes('width')
-            children.forEach((c, i) => {
-                if (!free[i]) return
-                if (c.fixed()) laid[i] = offer(c, { height })
-                else if (sized(c)) laid[i] = offer(c, { width: width - gaps, height })
-            })
-            const used = sum(laid.map(l => l?.em.width ?? 0)) + sized_sum
-            const flex = children.filter((c, i) => free[i] && laid[i] == null).length
-            const slot = flex > 0 ? Math.max(width - gaps - used, 0) / flex : 0
-            children.forEach((c, i) => {
-                if (free[i] && laid[i] == null) slots[i] = slot
-            })
-        }
-        children.forEach((c, i) => {
-            if (free[i] && laid[i] == null) laid[i] = offer(c, { width: slots[i], height })
-        })
-        cross = 0 // the content height, found once the children are aligned
-    }
-
-    // the boxes of the sized children: their length, spanning the stack
-    // across (a row's height is settled below)
-    const boxes: Laid[] = children.map((c, i) => {
-        if (laid[i] != null) return laid[i]!
-        const size = sized_em[i]!
-        const [ w, h ] = vertical ? [ cross, size ] : [ size, cross ]
-        return { elem: c, em: make_em({ width: w, height: h, anchor: 0.5 * h }) }
+    const { placed, width, height, anchor } = layout_stack<Element>(direc, children, options)
+    const rects = placed.map(({ laid, x, y }) => em_rect(laid.em, x, y + laid.em.anchor))
+    const elems = placed.map(({ laid }, i) => {
+        // the placed child carries the box it was laid to (a fitted or
+        // shrunk one differs from its own)
+        const out = laid.elem.clone({ rect: rects[i] }) as MaybeEm
+        if ((laid.elem as MaybeEm).em != null) out.em = laid.em
+        return out
     })
+    const { hink, vink, coord } = hull_overhang(rects, width, [ 0, height ])
+    const metrics: EmMetrics = { width, height, anchor, hink, vink }
+    return { children: elems, coord, aspect: em_aspect(metrics), metrics }
+}
 
-    // pack along the axis and align across it
-    let rects: Rect[]
-    let box_width: number
-    let box_height: number
-    let anchor: number
-    if (vertical) {
-        // a column is as tall as its content; each child is placed across it
-        // by justify (or its own align)
-        let y = 0
-        rects = boxes.map((l, i) => {
-            if (i > 0) y += gap
-            const x = align_frac(child_align(l)[0] ?? justify) * (cross - l.em.width)
-            const rect = em_rect(l.em, x, y + l.em.anchor)
-            y += l.em.height
-            return rect
-        })
-        box_width = cross
-        box_height = y
-        anchor = anchor0 == 'center' ? 0.5 * box_height : (boxes[0]?.em.anchor ?? 0)
-    } else {
-        // a row's height is its tallest laid child once they are aligned; the
-        // sized children then span it. a row narrower than its width is
-        // placed along it by justify
-        const free_boxes = boxes.filter((_, i) => laid[i] != null)
-        const ys = row_offsets(free_boxes, valign)
-        box_height = free_boxes.length > 0 ? (max(free_boxes.map((l, j) => ys[j] + l.em.height)) ?? 0) : (height ?? 1)
-        const offsets: number[] = []
-        for (let i = 0, j = 0; i < n; i++) {
-            if (laid[i] != null) {
-                offsets.push(ys[j++])
-            } else {
-                boxes[i] = { elem: boxes[i].elem, em: make_em({ width: boxes[i].em.width, height: box_height, anchor: 0.5 * box_height }) }
-                offsets.push(0)
-            }
-        }
-        const packed = sum(boxes.map(l => l.em.width)) + gaps
-        box_width = width ?? packed
-        let x = align_frac(justify) * Math.max(box_width - packed, 0)
-        rects = boxes.map((l, i) => {
-            if (i > 0) x += gap
-            const rect = em_rect(l.em, x, offsets[i] + l.em.anchor)
-            x += l.em.width
-            return rect
-        })
-        anchor = boxes.length > 0 ? offsets[0] + boxes[0].em.anchor : 0
-    }
-    const placed = boxes.map((l, i) => laid[i] != null
-        ? l.elem.clone({ rect: rects[i] })
-        : l.elem.clone({ rect: rects[i], align: l.elem.spec.align ?? justify, stack_size: undefined })
-    )
-
-    // the stack draws the ink hull of its children, which the box may not
-    // cover (a formula with overhang); the metrics keep the box
-    const { hink, vink, coord } = hull_overhang(rects, box_width, [ 0, box_height ])
-    const metrics: EmMetrics = { width: box_width, height: box_height, anchor, hink, vink }
-    const aspect = em_aspect(metrics)
-    return { children: placed, coord, aspect, metrics }
+// the bounds of a stack in em from its children's (see lib/layout.ts)
+function layout_em_bounds(direc: Orient, children: Element[], options: EmStackOptions = {}): Bounds {
+    return stack_bounds<Element>(direc, children, options)
 }
 
 //
 // exports
 //
 
-export { ensure_em_spec, with_em, ensure_em, scale_em, em_context, place_items, place_laid, child_align, row_offsets, box_aspect, layout_em_stack }
+export { ensure_em_spec, with_em, ensure_em, scale_em, em_context, place_items, place_laid, child_align, row_offsets, box_aspect, layout_em_stack, layout_em_bounds }
 export type { WithEm, Placed, RowAlign, EmStackOptions, EmLayout }

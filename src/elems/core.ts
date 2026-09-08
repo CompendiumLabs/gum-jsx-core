@@ -4,8 +4,10 @@ import { THEME } from '../lib/theme'
 import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
 import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
-import { make_em, scale_em_spec } from '../lib/em'
+import { make_em, scale_em_spec, em_rect } from '../lib/em'
 import type { EmSpec } from '../lib/em'
+import { INF, EPS, point, free_bounds, tie_width, tie_height } from '../lib/layout'
+import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
 import type { Env } from '../env'
 
 import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint, Spec, Limit } from '../lib/types'
@@ -275,15 +277,16 @@ function props_repr(d: Attrs, prec: number): string {
         .join(' ')
 }
 
-// reserved keys
-const SPEC_KEYS = [ 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar' ]
+// reserved keys: the placement spec, the layout protocol's (a size of the
+// element's own in em, its share of a stack, and the internal offer a
+// container is rebuilt for), and the conveniences
+const SPEC_KEYS = [ 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar', 'width', 'height', 'share', 'fit', 'offer' ]
 const HELP_KEYS = [ 'pos', 'size', 'xsize', 'ysize', 'rad', 'xrad', 'yrad', 'xrect', 'yrect', 'flex', 'spin', 'orient' ]
-const EXTR_KEYS = [ 'stack_size', 'stack_expand' ]
-const RESERVED_KEYS = [ ...SPEC_KEYS, ...HELP_KEYS, ...EXTR_KEYS ]
+const RESERVED_KEYS = [ ...SPEC_KEYS, ...HELP_KEYS ]
 
 // the keys a parent sets to place a child (see Element.clone)
 const PLACE_SPEC_KEYS = [ 'rect', 'align', 'expand' ]
-const PLACE_ATTR_KEYS = EXTR_KEYS
+const PLACE_ATTR_KEYS: string[] = []
 
 function spec_split(attr: Attrs, extended: boolean = true): [Attrs, Attrs] {
     const SPLIT_KEYS = extended ? RESERVED_KEYS : SPEC_KEYS
@@ -311,6 +314,11 @@ interface SpecArgs {
     rotate?: number
     rotate_invar?: boolean
     rotate_adjust?: boolean
+    width?: number
+    height?: number
+    share?: number
+    fit?: boolean
+    offer?: Offer
 }
 
 // TODO: children should be Element[] | string
@@ -339,27 +347,9 @@ interface ElementArgs extends SpecArgs {
 // stacks and anything adapted with with_em
 type MaybeEm = Element & { em?: EmSpec }
 
-// the layout protocol between a stack in em and its children (see elems/em.ts):
-// what a child is offered and what it reports back
-type ReflowKey = 'width' | 'height'
-
-// the slot a child is laid out for, in the container's em. `span` has a child
-// sized by the height keep the slot's width as its box (a column), and
-// `justify` and `attr` (text and font settings) go to children that lay
-// themselves out
-type LayOffer = {
-    width?: number
-    height?: number
-    span?: boolean
-    justify?: AlignValue
-    attr?: Attrs
-}
-
-// the element to place and its box in the container's em
-type Laid = {
-    elem: Element
-    em: EmSpec
-}
+// the layout protocol (see lib/layout.ts): what a container asks of a child.
+// a Laid is the element to place and its box in the container's em
+type Laid = LaidItem<Element>
 
 // stroke lengths are given in stroke units (see Context.unit) and resolved to
 // pixels at emit time; a dash array is a list of them
@@ -439,9 +429,8 @@ class Element {
     // when the overrides are only the placement keys a parent sets to put a
     // child in its box, it is a shallow copy with those keys swapped instead:
     // rect, align, and expand go to the spec, which only the parent's context
-    // mapping reads, and stack_size and stack_expand go to the attr, which only
-    // an enclosing Stack reads, so no constructor sees them and the rest of
-    // the element (its children, metrics, em box) carries over as is. layout
+    // mapping reads, so no constructor sees them and the rest of the element
+    // (its children, metrics, em box) carries over as is. layout
     // clones its children this way many times over, and a reconstruction
     // re-runs everything below (text wrapping, math parsing), so this is what
     // keeps deep layouts cheap. an unset placement key goes the long way, as
@@ -469,48 +458,108 @@ class Element {
     }
 
     //
-    // layout protocol: what a stack in em asks of a child (see elems/em.ts)
+    // layout protocol: what a container asks of a child (see lib/layout.ts).
+    // everything is in the parent's em: an element with a `scale` lays itself
+    // out in its own em and reports its box scaled
     //
 
-    // the sizes the element lays itself out for when a container hands them
-    // over: a text block re-wraps for a width, a text stack budgets a height.
-    // an element that does neither is placed as it is
-    get reflow(): ReflowKey[] {
-        return []
+    // the element's em over its parent's
+    get scale(): number {
+        return this.em?.scale ?? this.args?.scale ?? 1
     }
 
-    // whether the element keeps its own size in a stack rather than taking a
-    // slot: one that lays itself out has a size once given a width of its
-    // own, anything else when it carries metrics
-    fixed(): boolean {
-        if (this.reflow.length > 0) return this.args.width != null
-        return this.em != null
+    // its fraction of a stack's length along the axis, if any
+    get share(): number | undefined {
+        return this.spec.share
     }
 
-    // whether the element is sized by the height a stack has to give rather
-    // than by its width: an element with an aspect but no metrics (a figure)
-    flex_height(): boolean {
-        return this.em == null && this.spec.aspect != null
+    // where it sits in its slot, as [ horizontal, vertical ], in place of the
+    // container's justify or valign
+    get align(): [ AlignValue | undefined, AlignValue | undefined ] | undefined {
+        const align = this.spec.align
+        return align != null ? ensure_pair(align) as [ AlignValue, AlignValue ] : undefined
     }
 
-    // the element laid out for a slot `width` wide (none: at its own size)
-    // and, when it is flexible in height, `height` tall: the element to place
-    // and its box in the container's em. an element with metrics keeps its
-    // size (shrunk to the slot if wider), one with an aspect spans the slot at
-    // it, or is `height` tall at it (no wider than the slot), and one with
-    // neither is a square
-    lay(offer: LayOffer = {}): Laid {
+    // a size of its own, in the parent's em
+    private own_size(): [ number | undefined, number | undefined ] {
+        const s = this.scale
+        const { width, height } = this.spec
+        return [ width != null ? width * s : undefined, height != null ? height * s : undefined ]
+    }
+
+    // the sizes it can come out at with nothing said: a formula is its box, a
+    // shape any size at its aspect, anything else any size at all. content
+    // (text) overrides this with the range it can be laid out in
+    natural(): Bounds {
+        const em = this.em
+        if (em != null) return { width: point(em.width), height: point(em.height) }
+        const aspect = this.spec.aspect
+        return (aspect != null && aspect > 0) ? { width: [ 0, INF ], height: [ 0, INF ], aspect } : free_bounds()
+    }
+
+    // an element with metrics and `fit` is scaled to its slot like a figure
+    // (text in a share stack, a formula in a title's share): a ray at its box's
+    // aspect
+    private fitted(): EmSpec | undefined {
+        const em = this.em
+        return (this.spec.fit && em != null && em.width > 0 && em.height > 0) ? em : undefined
+    }
+
+    // the bounds a container reads: the natural ones, or pinned to a point on
+    // an axis by a size of the element's own (and on the other through the
+    // tie, or for content by laying it out at that width)
+    bounds(): Bounds {
+        const fit = this.fitted()
+        const b = fit != null ? { width: [ 0, INF ] as [ number, number ], height: [ 0, INF ] as [ number, number ], aspect: fit.width / fit.height } : this.natural()
+        const [ w, h ] = this.own_size()
+        if (w == null && h == null) return b
+        if (w != null && h != null) return { width: point(w), height: point(h) }
+        if (w != null) {
+            const hh = b.aspect != null ? point(tie_height(b, w)) : b.height[1] < INF ? point(this.place({ width: w }).em.height) : b.height
+            return { ...b, width: point(w), height: hh }
+        }
+        const ww = b.aspect != null ? point(tie_width(b, h!)) : b.width
+        return { ...b, width: ww, height: point(h!) }
+    }
+
+    // the element laid out for an offer of a width and/or height: the element
+    // to place and its box. an element with metrics keeps its size (shrunk to
+    // the slot if wider), one with an aspect fits the offer at it (nothing
+    // offered: one em tall), and one with neither fills it (one side offered:
+    // a square on it)
+    place(offer: Offer = {}): Laid {
         const { width, height } = offer
         const em0 = this.em
         if (em0 != null) {
-            const f = (width != null && em0.width > width) ? width / em0.width : 1
+            const f = (width != null && em0.width > width + EPS) ? width / em0.width : 1
             return { elem: this, em: make_em(scale_em_spec(em0, f)) }
         }
         const aspect = this.spec.aspect
-        const by_height = height != null && aspect != null && aspect > 0
-        const w = by_height ? Math.min(width ?? Infinity, height! * aspect) : (width ?? aspect ?? 1)
-        const h = (aspect != null && aspect > 0) ? w / aspect : w
+        let w: number, h: number
+        if (aspect != null && aspect > 0) {
+            if (width != null && height != null) { w = Math.min(width, height * aspect); h = w / aspect }
+            else if (width != null) { w = width; h = w / aspect }
+            else if (height != null) { h = height; w = h * aspect }
+            else { h = 1; w = aspect }
+        } else {
+            // a stretch fills what it is offered; offered one side it is
+            // square, offered nothing one em square
+            w = width ?? height ?? 1
+            h = height ?? w
+        }
         return { elem: this, em: make_em({ width: w, height: h, anchor: 0.5 * h }) }
+    }
+
+    // lay applies a size of the element's own over the offer, and makes the
+    // box that size whatever the content did (the content sits in it by the
+    // element's align); subclasses override place
+    lay(offer: Offer = {}): Laid {
+        const [ w, h ] = this.own_size()
+        const fit_em = this.fitted()
+        const laid = fit_em != null ? fit_laid(this, fit_em, { width: w ?? offer.width, height: h ?? offer.height }) : this.place({ ...offer, width: w ?? offer.width, height: h ?? offer.height })
+        const fill = offer.fill && offer.width != null && w == null ? offer.width : undefined
+        if (w == null && h == null && fill == null) return laid
+        return box_laid(laid, w ?? fill ?? laid.em.width, h ?? laid.em.height, this.spec.align)
     }
 
     rect(ctx: Context): Rect {
@@ -720,6 +769,34 @@ class Group extends Element {
     }
 }
 
+// an element with metrics scaled into an offer like a figure: as wide as the
+// width, as tall as the height, or inside both; nothing offered keeps it
+function fit_laid(elem: Element, em0: EmSpec, { width, height }: Offer): Laid {
+    const aspect = em0.width / em0.height
+    let w: number
+    if (width != null && height != null) w = Math.min(width, height * aspect)
+    else if (width != null) w = width
+    else if (height != null) w = height * aspect
+    else w = em0.width
+    return { elem, em: make_em(scale_em_spec(em0, w / em0.width)) }
+}
+
+// a laid element boxed at a size: as it is when its box is that size, else
+// placed in a group of that size by align (centered by default), which
+// reports the box and the content's anchor
+function box_laid(laid: Laid, width: number, height: number, align?: Align): Laid {
+    const { elem, em } = laid
+    if (Math.abs(em.width - width) < EPS && Math.abs(em.height - height) < EPS) return laid
+    const [ ha, va ] = (align != null ? ensure_pair(align) : [ 'center', 'center' ]).map(a => align_frac(a as AlignValue))
+    const x = ha * (width - em.width)
+    const y = va * (height - em.height)
+    const child = elem.clone({ rect: em_rect(em, x, y + em.anchor) })
+    const group = new Group({ children: [ child ], coord: [ 0, 0, width, height ], aspect: height > 0 ? width / height : undefined, upright: true, env: elem.env }) as MaybeEm
+    const boxed = make_em({ width, height, anchor: y + em.anchor, scale: em.scale })
+    group.em = boxed
+    return { elem: group, em: boxed }
+}
+
 //
 // metadata classes
 //
@@ -809,22 +886,41 @@ interface SvgArgs extends GroupArgs {
     font_weight?: number
     prec?: number
     unit_size?: number
+    em?: number       // pixels per em offered to the content (default: the size over D.svg_ems)
+    width?: number    // the offer in em, instead (the width and height the content is laid out for)
+    height?: number
 }
 
+// the root: one child with no rect of its own is laid out for the canvas in
+// em (see Element.lay) and, with `aspect` auto, the canvas takes the shape
+// of the box it comes out as: a figure fills it, a text column wraps to it,
+// a paragraph on its own is as wide as its line. the box then fills the
+// pixel size, so the em the content was offered is only a starting point:
+// `em` (pixels per em) or `width`/`height` (in em) set it
 class Svg extends Group {
     size: Size
     viewrect: Rect
     style: Style
     prec: number
     unit_size: number
+    dims: boolean
 
     constructor(args: SvgArgs = {}) {
-        const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, env, ...attr } = THEME(args, 'Svg')
-        const children = ensure_children(children0)
+        const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em: em0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
+        const children0_1 = ensure_children(children0)
         const size_base = ensure_pair(size0)
 
-        // precompute aspect info
-        const aspect = aspect0 == 'auto' ? children_aspect(children) : aspect0
+        // lay a lone child out for the canvas in em
+        let children = children0_1
+        let aspect: number | undefined = aspect0 == 'auto' ? undefined : aspect0
+        const only = children.length == 1 && children[0].spec.rect == null ? children[0] : null
+        if (only != null) {
+            const [ sw, sh ] = size_base.map(abs)
+            const em = em0 ?? Math.max(sw, sh) / D.svg_ems
+            const laid = only.lay({ width: width0 ?? sw / em, height: height0 ?? sh / em })
+            children = [ laid.elem ]
+            if (aspect0 == 'auto') aspect = laid.em.height > 0 && laid.em.width > 0 ? laid.em.width / laid.em.height : undefined
+        }
         const [ width, height ] = embed_size(size_base, { aspect })
 
         // compute outer viewBox
@@ -833,13 +929,12 @@ class Svg extends Group {
 
         // make style element
         const style_elem = new Style({ children: style ?? '', env })
-        const dims_attr = dims ? { width, height } : {}
 
         // pass to Group
         // the root carries the default stroke width as an inherited presentation
         // attribute (like stroke and fill), so strokes with no explicit width
         // still scale with the image instead of staying a fixed pixel hairline
-        super({ tag: 'svg', children, aspect, xmlns, font_family, font_weight, stroke_width, env, ...dims_attr, ...attr })
+        super({ tag: 'svg', children, aspect, xmlns, font_family, font_weight, stroke_width, env, ...attr })
         this.args = args
 
         // additional props
@@ -848,19 +943,20 @@ class Svg extends Group {
         this.style = style_elem
         this.prec = prec
         this.unit_size = unit_size
+        this.dims = dims
     }
 
     props(ctx: Context): Attrs {
         const attr = super.props(ctx)
-        const { viewrect } = this
+        const { viewrect, size: [ width, height ], dims } = this
         const { prec } = ctx
 
         // construct viewBox
         const [ x, y, w, h ] = rect_box(viewrect)
         const viewBox = `${rounder(x, prec)} ${rounder(y, prec)} ${rounder(w, prec)} ${rounder(h, prec)}`
 
-        // return attributes
-        return { viewBox, ...attr }
+        // return attributes; the pixel dimensions are the size, not the em ones
+        return { viewBox, ...(dims ? { width, height } : {}), ...attr }
     }
 
     inner(ctx: Context): string {
@@ -960,5 +1056,5 @@ class Spacer extends Element {
 // exports
 //
 
-export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text }
-export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, ReflowKey, LayOffer, Laid }
+export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid }
+export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, Bounds, Offer, Laid }
