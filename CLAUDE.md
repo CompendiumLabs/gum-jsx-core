@@ -184,8 +184,7 @@ deep-copy children or preserve an entire stale metric snapshot in `clone`.
 
 ### The layout protocol
 
-Everything is laid out in **em**, the size of the text, by one engine, `src/lib/layout.ts`
-(dependency free; the design was worked out in the `lab/stack` prototype at the org root).
+Everything is laid out in **em**, the size of the text, by one engine, `src/lib/layout.ts`.
 Every element answers two questions, both in its parent's em (an element with a `scale` lays
 itself out in its own em and reports its box scaled):
 
