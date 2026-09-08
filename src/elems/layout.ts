@@ -43,7 +43,7 @@ function apply_padding(padding: Rect, aspect0: number | undefined): { rect: Rect
 // box/frame classes
 //
 
-function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust = true, aspect_child: aspect_child0 }: { padding?: Padding, margin?: Padding, aspect?: number, adjust?: boolean, aspect_child?: number } = {}) {
+function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust = true, aspect_child: aspect_child0 }: { padding?: Padding, margin?: Padding, aspect?: number, adjust?: boolean, aspect_child?: number } = {}) : { rect_inner: Rect, rect_outer: Rect, fractions: [ number, number ], aspect_inner?: number, aspect_outer?: number } {
     // the box aspect: its own, the content's as laid out, or the first child's
     const aspect_child = aspect ?? aspect_child0 ?? children[0]?.spec?.aspect
 
@@ -70,7 +70,8 @@ function computeBoxLayout(children: Element[], { padding, margin, aspect, adjust
     // on each axis (inside the margin, then inside the padding)
     const [ iw, ih ] = rect_dims(rect_inner)
     const [ ow, oh ] = rect_dims(rect_outer)
-    return { rect_inner, rect_outer, aspect_inner, aspect_outer: aspect ?? aspect_outer, fractions: [ iw * ow, ih * oh ] as [ number, number ] }
+    const fractions: [ number, number ] = [ iw * ow, ih * oh ]
+    return { rect_inner, rect_outer, fractions, aspect_inner, aspect_outer: aspect ?? aspect_outer }
 }
 
 interface BoxArgs extends GroupArgs {
@@ -98,7 +99,7 @@ class Box extends Group {
     fractions: [ number, number ]
 
     constructor(args: BoxArgs = {}) {
-        const { children: children0, padding, margin, border, fill, shape: shape0, rounded, aspect: aspect0, clip, adjust = true, debug = false, offer, env, ...attr0 } = THEME(args, 'Box')
+        const { children: children0, padding, margin, border, fill, shape: shape0, rounded, aspect: aspect0, flex, clip, adjust = true, debug = false, offer, env, ...attr0 } = THEME(args, 'Box')
         const [ border_attr, fill_attr, attr] = prefix_split([ 'border', 'fill' ], attr0)
         const children = ensure_children(children0)
         const aspect = aspect0 as number | undefined
@@ -121,7 +122,7 @@ class Box extends Group {
         // shape (and the child laid out again if that moved the area); the
         // rest of the content is laid out for the area of the box
         if (offer != null && content.length > 0) {
-            const fixed = aspect != null || attr.flex === true
+            const fixed = aspect != null || flex
             const slot = (w?: number, h?: number): Offer => ({ width: w != null ? w * L.fractions[0] : undefined, height: h != null ? h * L.fractions[1] : undefined, fit: fixed || undefined })
             let first = content[0].lay(slot(offer.width, offer.height))
             let [ width, height ] = [ offer.width ?? offer.height!, offer.height ?? offer.width! ]
