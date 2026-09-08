@@ -30,8 +30,8 @@ const BOOLEANS: ThemeLayer = {
 
     TextFrame: {
         border: 1,
-        padding: 0.4,
-        margin: 0.4,
+        padding: 0.25,
+        margin: 0.25,
         rounded: D.rounded,
     },
 
