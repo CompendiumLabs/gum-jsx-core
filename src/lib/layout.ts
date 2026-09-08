@@ -397,9 +397,9 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
 
 // a row gives fixed children their width, shared ones their fraction of it,
 // and splits the rest evenly among the flexible ones, clamped to their
-// ranges; with no height, the tied children among those pool their shares
-// and split them at one common height (a wide shape and a tall one come out
-// the same height). given a height too, tied children are sized by it (their tie), and
+// ranges, where the tied children pool their shares and split them at one
+// common height (a wide shape and a tall one come out the same height). given
+// a height too, tied children are sized by it (their tie), and
 // give way toward their fair share of the width until the other children fit
 // the height and they fit the width themselves (a bisection, since content
 // heights depend on the tied children's widths). with no width every unshared child is at its natural
@@ -433,7 +433,16 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
 
         // the fair shares of the free children, and the full-height widths
         // of the tied ones (no wider than leaves the rest their minimum)
+        // the fair shares: even, clamped to the ranges, except that the
+        // tied children pool theirs and split the pool at one common height
+        // (tied_height), so a wide shape and a tall one come out the same
+        // height rather than the same width
         const shares = distribute(avail, free.map(i => B[i].width))
+        const tied = free.filter(i => B[i].aspect != null)
+        if (tied.length > 1) {
+            const h = tied_height(tied.map(i => B[i]), sum(tied.map(i => shares[free.indexOf(i)])))
+            tied.forEach(i => { shares[free.indexOf(i)] = tie_width(B[i], h) })
+        }
         const share = (i: number) => shares[free.indexOf(i)]
         const room = avail - sum(flex.map(i => B[i].width[0]))
         const full = aspects.map(i => Math.min(tie_width(B[i], H!), Math.max(room, 0)))
@@ -441,14 +450,7 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
         // lay for a point between fair share (0) and full height (1)
         const layAt = (f: number): { laid: Laid<T>[], ws: number[], fits: boolean } => {
             const aw = aspects.map((i, j) => full[j] > share(i) ? share(i) + f * (full[j] - share(i)) : full[j])
-            const fw = distribute(avail - sum(aw), flex.map(i => B[i].width))
-            if (H == null) {
-                const tied = flex.filter(i => B[i].aspect != null)
-                if (tied.length > 1) {
-                    const h = tied_height(tied.map(i => B[i]), sum(tied.map(i => fw[flex.indexOf(i)])))
-                    tied.forEach(i => { fw[flex.indexOf(i)] = tie_width(B[i], h) })
-                }
-            }
+            const fw = H == null ? flex.map(share) : distribute(avail - sum(aw), flex.map(i => B[i].width))
             const ws = range(n).map(i => fixed[i] ?? (aspects.includes(i) ? aw[aspects.indexOf(i)] : fw[flex.indexOf(i)]))
             const out = items.map((k, i) => offer(k, { width: ws[i], height: H, fill: flex.includes(i) || F[i] != null }))
             const fits = flex.every(i => out[i].em.height <= H! + EPS) && sum(aw) <= avail + EPS
@@ -497,9 +499,12 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
     }
 
     // the row's height is its content's (a height offered is a budget the
-    // children were sized by, not the row's box); growable children stretch
-    // to it when no height was offered
-    let height = n > 0 ? max(laid.map(l => l.em.height)) : 0
+    // children were sized by, not the row's box). with no height offered the
+    // growable children stretch to the other children's height (a bare
+    // stretch beside text is as tall as the text); their own laid height, a
+    // square on the width, counts only in a row of nothing but stretches
+    const others = range(n).filter(i => !grow[i])
+    let height = n == 0 ? 0 : (H == null && others.length > 0) ? max(others.map(i => laid[i].em.height)) : max(laid.map(l => l.em.height))
     if (H == null) range(n).filter(i => grow[i]).forEach(i => { laid[i] = offer(items[i], { width: laid[i].em.width, height }) })
 
     // align across: by valign, or a child's own; 'anchor' lines the anchors up

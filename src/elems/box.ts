@@ -37,6 +37,7 @@ interface BoxArgs extends Omit<GroupArgs, 'aspect' | 'clip' | 'mask'>, EmArgs {
     clip?: true | Element | ((g: BoxGeometry) => Element)   // clip to the frame, or to an element (in em; a function of the geometry)
     mask?: Element | ((g: BoxGeometry) => Element)          // a mask (in em; a function of the geometry)
     justify?: AlignValue         // the text alignment, and where content narrower than the box sits
+    valign?: AlignValue          // where content shorter than a box of a height of its own sits (default: center)
     width?: number               // the box's outer size in em, which it spans
     height?: number
     font_family?: string
@@ -83,7 +84,7 @@ class Box extends Group {
     aspect_box: number | undefined
 
     constructor(args: BoxArgs = {}) {
-        const { children: children0, padding: padding0, margin: margin0, border, fill, shape: shape0, rounded: rounded0, aspect: aspect0, clip, mask, justify: justify0, width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'Box')
+        const { children: children0, padding: padding0, margin: margin0, border, fill, shape: shape0, rounded: rounded0, aspect: aspect0, clip, mask, justify: justify0, valign = 'center', width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'Box')
         const [ border_attr, fill_attr, font_attr0, text_attr, attr1 ] = prefix_split([ 'border', 'fill', 'font', 'text' ], attr0)
         const font_attr = prefix_join('font', font_attr0)
         const [ spec, attr ] = spec_split(attr1)
@@ -134,7 +135,7 @@ class Box extends Group {
         const area: Rect = [ ml + pl, mt + pt, ml + pl + box_w - pl - pr, mt + pt + box_h - pt - pb ]
         const rest = content.slice(1).map(c => lay(c, area[2] - area[0], area[3] - area[1]))
         const laid = first != null ? [ first, ...rest ] : []
-        const placed = laid.map(l => fixed ? { child: l.elem.clone({ rect: area, align: justify }), anchor: 0.5 * total_h } : place_in_box(l, total_w, total_h, [ justify, 'center' ], [ ml + pl, mt + pt, mr + pr, mb + pb ]))
+        const placed = laid.map(l => fixed ? { child: l.elem.clone({ rect: area, align: justify }), anchor: 0.5 * total_h } : place_in_box(l, total_w, total_h, [ justify, valign ], [ ml + pl, mt + pt, mr + pr, mb + pb ]))
         const anchor = placed.length > 0 ? placed[0].anchor : 0.5 * total_h
 
         // the background and the frame at the framed box; the children of
