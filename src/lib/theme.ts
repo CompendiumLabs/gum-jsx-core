@@ -23,8 +23,8 @@ const BOOLEANS: ThemeLayer = {
 
     TextBox: {
         border: 1,
-        padding: 0.4,
-        margin: 0.4,
+        padding: 0.5,
+        margin: 0.5,
         rounded: D.rounded,
     },
 
@@ -71,11 +71,11 @@ const BOOLEANS: ThemeLayer = {
 
 const THEME_LIGHT: ThemeLayer = {
     TextBox: {
-        padding: 0.4,
+        padding: 0.5,
     },
 
     TextFrame: {
-        padding: 0.4,
+        padding: 0.5,
     },
 
     Svg: {
@@ -94,11 +94,11 @@ const THEME_LIGHT: ThemeLayer = {
 
 const THEME_DARK: ThemeLayer = {
     TextBox: {
-        padding: 0.4,
+        padding: 0.5,
     },
 
     TextFrame: {
-        padding: 0.4,
+        padding: 0.5,
     },
 
     Svg: {

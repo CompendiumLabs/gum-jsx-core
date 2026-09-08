@@ -3,9 +3,9 @@
 import { THEME } from '../lib/theme'
 import { DEFAULTS as D, none, blue, white } from '../lib/const'
 import { sign, abs, linspace, invert_orient, join_limits, split_limits, ensure_vector, is_scalar, is_string, is_object, ensure_singleton, check_singleton, rounder, enumerate, aspect_invariant, pad_rect, rect_aspect, merge_rects, expand_limits, flip_rect, resolve_limits, smoothstep, prefix_split, prefix_join } from '../lib/utils'
-import { Span } from './text'
+import { Span, Text } from './text'
 
-import { Element, Group, Spacer, Rectangle, spec_split, is_element, ensure_children, size_by_em } from './core'
+import { Element, Group, Rectangle, spec_split, is_element, ensure_children, size_by_em } from './core'
 import { Attach, HStack, VStack, Anchor } from './layout'
 import { Frame } from './box'
 import { RoundedRect, UnitLine, HLine, Arc, ArrowHead } from './geometry'
@@ -486,7 +486,7 @@ function ensure_legendbadge(c: any, attr: Attrs = {}): Element {
 function ensure_legendlabel(label: any, attr: Attrs = {}): Element {
     if (is_element(label)) return label
     if (is_string(label)) {
-        return new Span({ children: [ label ], ...attr })
+        return new Text({ children: [ label ] as any, ...attr })
     } else {
         throw new Error(`Unrecognized legend label specification: ${label}`)
     }
@@ -501,14 +501,16 @@ class Legend extends Frame {
         // construct legend badges and labels
         const badges = children.map((b: any) => ensure_legendbadge(b, { env, ...badge_attr }))
 
-        // construct legend grid
+        // construct legend grid: a row is a badge one em tall at its aspect,
+        // then the label at its own size, `hspacing` em apart; the rows keep
+        // their natural widths, so a column offering its width to a short
+        // row does not stretch its badge
         const rows = badges.map((b: any) => {
             const { label } = b.attr
             const { aspect } = b.spec
-            const b1 = b.clone({ aspect: aspect ?? 1, label: null })
-            const spacer = new Spacer({ aspect: hspacing, env })
+            const b1 = b.clone({ aspect: aspect ?? 1, height: 1, label: null })
             const text = ensure_legendlabel(label, { env, ...text_attr })
-            return new HStack({ children: [ b1, spacer, text ], debug, env })
+            return new HStack({ children: [ b1, text ], gap: hspacing, debug, env })
         })
         const vs = new VStack({ children: rows, spacing: vspacing, justify, even: true, env })
 

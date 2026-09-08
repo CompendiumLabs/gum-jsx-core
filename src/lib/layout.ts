@@ -221,6 +221,13 @@ function tied_width(B: Bounds[], height: number): number {
     return (height - sum(B.map(b => off(b)[1])) + sum(B.map(b => off(b)[0] / b.aspect!))) / sum(B.map(b => 1 / b.aspect!))
 }
 
+// the one height at which tied children side by side spend a width:
+// sum(ox_i + a_i (h - oy_i)) = width
+function tied_height(B: Bounds[], width: number): number {
+    const off = (b: Bounds) => b.offset ?? [ 0, 0 ]
+    return (width - sum(B.map(b => off(b)[0])) + sum(B.map(b => off(b)[1] * b.aspect!))) / sum(B.map(b => b.aspect!))
+}
+
 function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
     const [ ox, oy ] = child.offset ?? [ 0, 0 ]
     const tie = child.aspect != null ? { aspect: child.aspect, offset: [ ox + ix, oy + iy ] as [ number, number ] } : {}
@@ -390,7 +397,9 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
 
 // a row gives fixed children their width, shared ones their fraction of it,
 // and splits the rest evenly among the flexible ones, clamped to their
-// ranges. given a height too, tied children are sized by it (their tie), and
+// ranges; with no height, the tied children among those pool their shares
+// and split them at one common height (a wide shape and a tall one come out
+// the same height). given a height too, tied children are sized by it (their tie), and
 // give way toward their fair share of the width until the other children fit
 // the height and they fit the width themselves (a bisection, since content
 // heights depend on the tied children's widths). with no width every unshared child is at its natural
@@ -433,6 +442,13 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
         const layAt = (f: number): { laid: Laid<T>[], ws: number[], fits: boolean } => {
             const aw = aspects.map((i, j) => full[j] > share(i) ? share(i) + f * (full[j] - share(i)) : full[j])
             const fw = distribute(avail - sum(aw), flex.map(i => B[i].width))
+            if (H == null) {
+                const tied = flex.filter(i => B[i].aspect != null)
+                if (tied.length > 1) {
+                    const h = tied_height(tied.map(i => B[i]), sum(tied.map(i => fw[flex.indexOf(i)])))
+                    tied.forEach(i => { fw[flex.indexOf(i)] = tie_width(B[i], h) })
+                }
+            }
             const ws = range(n).map(i => fixed[i] ?? (aspects.includes(i) ? aw[aspects.indexOf(i)] : fw[flex.indexOf(i)]))
             const out = items.map((k, i) => offer(k, { width: ws[i], height: H, fill: flex.includes(i) || F[i] != null }))
             const fits = flex.every(i => out[i].em.height <= H! + EPS) && sum(aw) <= avail + EPS
