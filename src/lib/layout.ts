@@ -418,6 +418,19 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
     return { placed, width, height: y, anchor }
 }
 
+function binary_search(test: (x: number) => boolean, limit: [ number, number ], iters: number = 40): number {
+    let [ lo, hi ] = limit
+    for (let k = 0; k < iters; k++) {
+        const mid = (lo + hi) / 2
+        if (test(mid)) {
+            lo = mid
+        } else {
+            hi = mid
+        }
+    }
+    return (lo + hi) / 2
+}
+
 // a row gives fixed children their width, shared ones their fraction of it,
 // and splits the rest evenly among the flexible ones, clamped to their
 // ranges, where the tied children pool their shares and split them at one
@@ -482,24 +495,12 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
             return { laid: out, ws, fits }
         }
         const seek = aspects.some((i, j) => full[j] > share(i))
-        let at: { laid: Laid<T>[], ws: number[], fits: boolean }
-        if (!seek) {
-            at = layAt(1)
-        } else {
-            at = layAt(1)
-            if (!at.fits) {
-                const at0 = layAt(0)
-                if (!at0.fits) {
-                    at = at0
-                } else {
-                    at = at0
-                    let lo = 0, hi = 1
-                    for (let i = 0; i < 40; i++) {
-                        const mid = (lo + hi) / 2
-                        const mid_at = layAt(mid)
-                        if (mid_at.fits) { lo = mid; at = mid_at } else hi = mid
-                    }
-                }
+        let at = layAt(1)
+        if (seek && !at.fits) {
+            at = layAt(0)
+            if (at.fits) {
+                const mid = binary_search(f => layAt(f).fits, [ 0, 1 ], 40)
+                at = layAt(mid)
             }
         }
         laid = at.laid
