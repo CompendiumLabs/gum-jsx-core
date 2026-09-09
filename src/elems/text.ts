@@ -1,23 +1,22 @@
 // text elements
 
-import type { Attrs, AlignValue, Rect, Limit, Padding, Rounded, Orient } from '../lib/types'
+import type { Attrs, AlignValue, Rect, Limit } from '../lib/types'
 import { resolveEnv } from '../lib/default'
 import type { Env } from '../env'
 import { THEME } from '../lib/theme'
 import { none, bold, mono, vtext, maxis } from '../lib/const'
-import { RoundedRect } from './geometry'
-import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, rect_box, check_singleton, prefix_split, prefix_join, sum, max, pad_rect } from '../lib/utils'
+import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, rect_box, check_singleton, prefix_split, prefix_join, sum, max } from '../lib/utils'
 import { textMetrics, splitWords } from '../lib/text'
 import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
 import { make_em, em_bounds, em_hink, scale_em_spec } from '../lib/em'
 import type { EmArgs, EmSpec } from '../lib/em'
-import { INF, EPS, point, box_bounds, scale_bounds } from '../lib/layout'
+import { EPS, point } from '../lib/layout'
 
-import { Context, Element, Group, Spacer, Rectangle, spec_split, ensure_children, escape_text, is_element, align_frac, place_in_box, fit_laid } from './core'
+import { Context, Element, Group, Spacer, spec_split, ensure_children, escape_text, is_element, align_frac, fit_laid } from './core'
 import { place_laid, child_align, row_offsets, box_aspect } from './em'
 import type { WithEm, RowAlign } from './em'
-import type { ElementArgs, GroupArgs, MaybeEm, Bounds, Offer, Laid } from './core'
+import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
 import { Stack } from './layout'
 import type { StackArgs } from './layout'
 
@@ -136,7 +135,7 @@ class ElemSpan extends Group {
 
         // HStack centers arbitrary embedded elements in the line box, while
         // an element with em metrics is aligned to the surrounding text by them
-        const [ child, aspect ] = (child0 as MaybeEm).em != null ?
+        const [ child, aspect ] = child0.em != null ?
             place_inline_em(child0 as WithEm, spacing) :
             [ child0.clone({ align: 'left' }), (child0.spec.aspect ?? 1) + spacing ]
 
@@ -189,7 +188,7 @@ function compress_spans(children: any[], font_args: Attrs = {}): Element[] {
                 return split_span(s, text, font_args)
             })
             return last_child ? spans : [ ...spans, new Span({ children: [ ' ' ], ...font_args }) ]
-        } else if (child instanceof Span && (child as MaybeEm).em == null) {
+        } else if (child instanceof Span && child.em == null) {
             const spans = split_span(child, child.text.trim(), font_args)
             return last_child ? spans : [ ...spans, new Span({ children: [ ' ' ], ...font_args }) ]
         } else if (child instanceof ElemSpan) {
@@ -631,7 +630,7 @@ class Bullets extends Stack {
             // text items wrap to the body width; a formula keeps its size and
             // sits on the marker's anchor; anything else takes the body
             const body: Element = child instanceof Text ? child.clone({ width: item_width(child, width_body), justify, ...font_attr, ...text_attr }) : child
-            const valign = (body as MaybeEm).em != null ? 'anchor' : 'top'
+            const valign = body.em != null ? 'anchor' : 'top'
             return new Stack({ direc: 'h', children: [ make_mark(), body ], valign, justify: 'left', env })
         })
 

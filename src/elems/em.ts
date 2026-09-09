@@ -10,7 +10,7 @@ import type { TextMetrics } from '../lib/text'
 import type { Attrs, Rect, Limit, Align, AlignValue, Orient } from '../lib/types'
 
 import { Context, Element, Group, align_frac } from './core'
-import type { Laid, MaybeEm } from './core'
+import type { Laid } from './core'
 import { layout_stack, stack_bounds } from '../lib/layout'
 import type { Bounds, StackOptions, RowAlign } from '../lib/layout'
 
@@ -71,7 +71,7 @@ function with_em<E extends Element>(element: E, patch: Partial<EmSpec> = {}, arg
 }
 
 function ensure_em<E extends Element>(element: E): WithEm<E> {
-    if ((element as WithEm<E>).em != null) return element as WithEm<E>
+    if (element.em != null) return element as WithEm<E>
     return with_em(element)
 }
 
@@ -188,8 +188,8 @@ function layout_em_stack(direc: Orient, children: Element[], options: EmStackOpt
     const elems = placed.map(({ laid }, i) => {
         // the placed child carries the box it was laid to (a fitted or
         // shrunk one differs from its own)
-        const out = laid.elem.clone({ rect: rects[i] }) as MaybeEm
-        if ((laid.elem as MaybeEm).em != null) out.em = laid.em
+        const out = laid.elem.clone({ rect: rects[i] })
+        if (laid.elem.em != null) out.em = laid.em
         return out
     })
     const { hink, vink, coord } = hull_overhang(rects, width, [ 0, height ])

@@ -59,7 +59,7 @@ class Node extends Group {
         const [ text_attr, attr1 ] = prefix_split([ 'text' ], attr0)
         const [ spec, attr ] = spec_split(attr1)
         const child = check_singleton(children0)
-        const sized = em != null && (is_string(child) || (child as WithEm).em != null)
+        const sized = em != null && (is_string(child) || child.em != null)
 
         // the box: hugging the label in em, or a frame the label is fit into
         let box: Element

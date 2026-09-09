@@ -96,7 +96,9 @@ class Stack extends Group {
     place(offer: Offer = {}): Laid {
         const { width, height, fill, justify, attr = {} } = offer
         const justify_attr = justify != null && this.args.justify == null ? { justify } : {}
-        const size = (fill && width != null && this.args.width == null) ? { width: width / this.scale, offer: { height } } : { offer: { width, height } }
+        const size = (fill && width != null && this.args.width == null) ?
+            { width: width / this.scale, offer: { height } } :
+            { offer: { width, height } }
         const elem = this.clone({ ...attr, ...justify_attr, ...size }) as Stack
         return { elem, em: elem.em }
     }

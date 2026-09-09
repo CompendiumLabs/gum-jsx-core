@@ -5,10 +5,10 @@ import { none } from '../lib/const'
 import { prefix_split, prefix_join, pad_rect } from '../lib/utils'
 import { make_em, scale_em_spec } from '../lib/em'
 import type { EmArgs, EmSpec } from '../lib/em'
-import { INF, FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
+import { FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
 
 import { Group, Rectangle, spec_split, ensure_children, is_element, is_unsized_em, place_in_box } from './core'
-import type { Element, GroupArgs, MaybeEm, Bounds, Offer, Laid } from './core'
+import type { Element, GroupArgs, Bounds, Offer, Laid } from './core'
 import { RoundedRect } from './geometry'
 import { box_aspect } from './em'
 import { Text } from './text'
@@ -150,7 +150,7 @@ class Box extends Group {
         const em_rect = (c: Element): Rect => {
             if (is_unsized_em(c)) {
                 const [ px, py ] = c.args.pos as [ number, number ]
-                const { width: w, height: h } = (c as MaybeEm).em!
+                const { width: w, height: h } = c.em
                 const [ cx, cy ] = [ ax + px * aw, ay + py * ah ]
                 return [ cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2 ]
             }
@@ -180,7 +180,7 @@ class Box extends Group {
         const s = this.em.scale
         if (this.aspect_box != null) {
             const [ mx, my ] = this.margins
-            return { width: [ 0, INF ], height: [ 0, INF ], aspect: this.aspect_box, offset: [ mx * s, my * s ] }
+            return { ...FREE_BOUNDS, aspect: this.aspect_box, offset: [ mx * s, my * s ] }
         }
         if (this.args.flex === true) return FREE_BOUNDS
         if (this.content.length == 0) return super.natural()
@@ -197,14 +197,19 @@ class Box extends Group {
         if (width == null && height == null) return super.place(offer)
         if (this.spec.rotate) {
             const [ w, h ] = fit_offer(this.spec.aspect ?? 1, offer)
-            return { elem: this, em: make_em({ width: w, height: h, anchor: 0.5 * h }) }
+            return {
+                elem: this,
+                em: make_em({ width: w, height: h, anchor: 0.5 * h }),
+            }
         }
         const s = this.em.scale
         const fixed = this.aspect_box != null || this.args.flex === true
         let size: Offer = { width, height }
         if (this.aspect_box != null) {
             const [ mx, my ] = this.margins
-            const [ bw, bh ] = fit_offer(this.aspect_box, { width: width != null ? width - mx * s : undefined, height: height != null ? height - my * s : undefined })
+            const width1 = width != null ? width - mx * s : undefined
+            const height1 = height != null ? height - my * s : undefined
+            const [ bw, bh ] = fit_offer(this.aspect_box, { width: width1, height: height1 })
             size = { width: bw + mx * s, height: bh + my * s }
         } else if (fixed) {
             size = { width: width ?? height, height: height ?? width }

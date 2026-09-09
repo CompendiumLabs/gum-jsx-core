@@ -8,6 +8,7 @@ import { make_em, scale_em_spec, em_rect } from '../lib/em'
 import type { EmSpec } from '../lib/em'
 import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height } from '../lib/layout'
 import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
+import type { WithEm } from './em'
 import type { Env } from '../env'
 
 import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint, Spec, Limit } from '../lib/types'
@@ -343,10 +344,6 @@ interface ElementArgs extends SpecArgs {
     [key: string]: any
 }
 
-// an element that may carry em metrics (see lib/em.ts): text, math, the text
-// stacks and anything adapted with with_em
-type MaybeEm = Element & { em?: EmSpec }
-
 // the layout protocol (see lib/layout.ts): what a container asks of a child.
 // a Laid is the element to place and its box in the container's em
 type Laid = LaidItem<Element>
@@ -523,14 +520,17 @@ class Element {
             aspect: fit.width / fit.height
         } : this.natural()
         const [ w, h ] = this.own_size()
-        if (w == null && h == null) return b
-        if (w != null && h != null) return { width: point(w), height: point(h) }
-        if (w != null) {
+        if (w != null && h != null) {
+            return { width: point(w), height: point(h) }
+        } else if (w != null) {
             const hh = b.aspect != null ? point(tie_height(b, w)) : b.height[1] < INF ? point(this.place({ width: w }).em.height) : b.height
             return { ...b, width: point(w), height: hh }
+        } else if (h != null) {
+            const ww = b.aspect != null ? point(tie_width(b, h!)) : b.width
+            return { ...b, width: ww, height: point(h!) }
+        } else {
+            return b
         }
-        const ww = b.aspect != null ? point(tie_width(b, h!)) : b.width
-        return { ...b, width: ww, height: point(h!) }
     }
 
     // the element laid out for an offer of a width and/or height: the element
@@ -540,25 +540,44 @@ class Element {
     // a square on it)
     place(offer: Offer = {}): Laid {
         const { width, height } = offer
-        const em0 = this.em
-        if (em0 != null) {
-            const f = (width != null && em0.width > width + EPS) ? width / em0.width : 1
-            return { elem: this, em: make_em(scale_em_spec(em0, f)) }
+        if (this.em != null) {
+            const { width: width0 } = this.em
+            const f = (width != null && width0 > width + EPS) ? width / width0 : 1
+            return {
+                elem: this,
+                em: make_em(scale_em_spec(this.em, f)),
+            }
         }
-        const aspect = this.spec.aspect
+        const { aspect } = this.spec
         let w: number, h: number
         if (aspect != null && aspect > 0) {
-            if (width != null && height != null) { w = Math.min(width, height * aspect); h = w / aspect }
-            else if (width != null) { w = width; h = w / aspect }
-            else if (height != null) { h = height; w = h * aspect }
-            else { h = 1; w = aspect }
+            // embed aspected content into the offer dimensions
+            if (width != null && height != null) {
+                w = Math.min(width, height * aspect)
+                h = w / aspect
+            }
+            else if (width != null) {
+                w = width
+                h = w / aspect
+            }
+            else if (height != null) {
+                h = height
+                w = h * aspect
+            }
+            else {
+                h = 1
+                w = aspect
+            }
         } else {
             // a stretch fills what it is offered; offered one side it is
             // square, offered nothing one em square
             w = width ?? height ?? 1
             h = height ?? w
         }
-        return { elem: this, em: make_em({ width: w, height: h, anchor: 0.5 * h }) }
+        return {
+            elem: this,
+            em: make_em({ width: w, height: h, anchor: 0.5 * h }),
+        }
     }
 
     // lay applies a size of the element's own over the offer, and makes the
@@ -567,7 +586,11 @@ class Element {
     lay(offer: Offer = {}): Laid {
         const [ w, h ] = this.own_size()
         const fit_em = this.fitted()
-        const laid = fit_em != null ? fit_laid(this, fit_em, { width: w ?? offer.width, height: h ?? offer.height }) : this.place({ ...offer, width: w ?? offer.width, height: h ?? offer.height })
+        const width = w ?? offer.width
+        const height = h ?? offer.height
+        const laid = fit_em != null ?
+            fit_laid(this, fit_em, { width, height }) :
+            this.place({ ...offer, width, height })
         const fill = offer.fill && offer.width != null && w == null ? offer.width : undefined
         if (w == null && h == null && fill == null) return laid
         return box_laid(laid, w ?? fill ?? laid.em.width, h ?? laid.em.height, this.spec.align)
@@ -685,9 +708,9 @@ function makeUID(prefix: string, env?: Env): string {
 
 // an element with em metrics (text, math, the text containers) placed by
 // `pos` with no size of its own
-function is_unsized_em(c: Element): boolean {
+function is_unsized_em(c: Element): c is WithEm {
     const { pos, size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect } = c.args ?? {}
-    return (c as MaybeEm).em != null && pos != null && [ size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect ].every(v => v == null)
+    return c.em != null && pos != null && [ size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect ].every(v => v == null)
 }
 
 // what a group's `em` (coordinate units per em) does to its children: one
@@ -696,7 +719,7 @@ function is_unsized_em(c: Element): boolean {
 // applies to direct children only, a nested group's coordinates being its own
 function size_by_em(children: Element[], em: number | undefined): Element[] {
     if (em == null) return children
-    return children.map(c => is_unsized_em(c) ? c.clone({ ysize: em * (c as MaybeEm).em!.height }) : c)
+    return children.map(c => is_unsized_em(c) ? c.clone({ ysize: em * c.em!.height }) : c)
 }
 
 interface GroupArgs extends ElementArgs {
@@ -812,7 +835,7 @@ function box_laid(laid: Laid, width: number, height: number, align?: Align): Lai
     const { elem, em } = laid
     if (Math.abs(em.width - width) < EPS && Math.abs(em.height - height) < EPS) return laid
     const { child, anchor } = place_in_box(laid, width, height, align)
-    const group = new Group({ children: [ child ], coord: [ 0, 0, width, height ], aspect: height > 0 ? width / height : undefined, upright: true, env: elem.env }) as MaybeEm
+    const group = new Group({ children: [ child ], coord: [ 0, 0, width, height ], aspect: height > 0 ? width / height : undefined, upright: true, env: elem.env })
     const boxed = make_em({ width, height, anchor, scale: em.scale })
     group.em = boxed
     return { elem: group, em: boxed }
@@ -1078,4 +1101,4 @@ class Spacer extends Element {
 //
 
 export { Context, Element, Group, Svg, Rectangle, Spacer, Mask, ClipPath, Style, Metadata, is_element, ensure_children, size_by_em, spec_split, align_frac, escape_text, box_laid, place_in_box, fit_laid, is_unsized_em }
-export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, MaybeEm, Bounds, Offer, Laid }
+export type { SpecArgs, ElementArgs, GroupArgs, ContextArgs, SvgArgs, RectArgs, Bounds, Offer, Laid }
