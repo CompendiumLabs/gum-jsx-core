@@ -17,6 +17,11 @@ import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint
 // rect embedding
 //
 
+// an align as [ horizontal, vertical ]
+function align_pair(align?: Align): [ AlignValue, AlignValue ] | undefined {
+    return align != null ? ensure_pair(align) as [ AlignValue, AlignValue ] : undefined
+}
+
 function align_frac(align: AlignValue): number {
     if (is_scalar(align)) {
         return align as number
@@ -364,6 +369,8 @@ class Element {
     attr: Attrs
     declare em?: EmSpec // em metrics, set by measured content (never initialized, so `'em' in x` stays honest)
     declare scale: number  // its em over its parent's, from the record (see set_em)
+    declare own_size: [ number | undefined, number | undefined ]  // a size of its own (spec width, height), in the parent's em (see set_em)
+    declare align?: [ AlignValue | undefined, AlignValue | undefined ]  // where it sits in its slot, in place of the container's justify or valign
 
     constructor(args: ElementArgs = {}) {
         const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, metrics, scale, env: _env, ...attr0 } = args
@@ -417,6 +424,7 @@ class Element {
         // adjust aspect for rotation
         this.spec.aspect0 ??= this.spec.aspect
         this.spec.aspect = this.spec.rotate_invar ? this.spec.aspect0 : rotate_aspect(this.spec.aspect0, this.spec.rotate)
+        this.align = align_pair(this.spec.align)
 
         // warn if children are passed
         if (children != null) console.error(`Got children in ${this.constructor.name}`)
@@ -452,6 +460,7 @@ class Element {
             if (args[k] != null) target[k] = args[k]
             else delete target[k]
         }
+        copy.align = align_pair(copy.spec.align)
         return copy
     }
 
@@ -474,27 +483,13 @@ class Element {
     set_em(em?: EmSpec): void {
         if (em != null) this.em = em
         this.scale = this.em?.scale ?? this.args.scale ?? 1
+        const { width: width0, height: height0 } = this.spec
+        const width = width0 != null ? width0 * this.scale : undefined
+        const height = height0 != null ? height0 * this.scale : undefined
+        this.own_size = [ width, height ]
     }
 
     // its fraction of a stack's length along the axis, if any
-    get share(): number | undefined {
-        return this.spec.share
-    }
-
-    // where it sits in its slot, as [ horizontal, vertical ], in place of the
-    // container's justify or valign
-    get align(): [ AlignValue | undefined, AlignValue | undefined ] | undefined {
-        const align = this.spec.align
-        return align != null ? ensure_pair(align) as [ AlignValue, AlignValue ] : undefined
-    }
-
-    // a size of its own, in the parent's em
-    private own_size(): [ number | undefined, number | undefined ] {
-        const s = this.scale
-        const { width, height } = this.spec
-        return [ width != null ? width * s : undefined, height != null ? height * s : undefined ]
-    }
-
     // the sizes it can come out at with nothing said: a formula is its box, a
     // shape any size at its aspect, anything else any size at all. content
     // (text) overrides this with the range it can be laid out in
@@ -530,7 +525,7 @@ class Element {
             ...FREE_BOUNDS,
             aspect: fit.width / fit.height
         } : this.natural()
-        const [ w, h ] = this.own_size()
+        const [ w, h ] = this.own_size
         if (w != null && h != null) {
             return { width: point(w), height: point(h) }
         } else if (w != null) {
@@ -595,7 +590,7 @@ class Element {
     // box that size whatever the content did (the content sits in it by the
     // element's align); subclasses override place
     lay(offer: Offer = {}): Laid {
-        const [ w, h ] = this.own_size()
+        const [ w, h ] = this.own_size
         const fit_em = this.fitted()
         const width = w ?? offer.width
         const height = h ?? offer.height

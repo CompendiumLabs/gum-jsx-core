@@ -63,7 +63,7 @@ class Stack extends Group {
 
         // an even stack gives every child the same share of what the spacing leaves
         const n = children.length
-        const items = even ? children.map(c => c.share != null ? c : c.clone({ share: (1 - spacing * Math.max(n - 1, 0)) / n })) : children
+        const items = even ? children.map(c => c.spec.share != null ? c : c.clone({ share: (1 - spacing * Math.max(n - 1, 0)) / n })) : children
 
         // the size laid out for: its own, or the offer (in the stack's em);
         // with neither (a stack placed by rect in a group, which has no em to

@@ -58,7 +58,7 @@ interface Laid<T = unknown> {
 interface LayoutItem<T> {
     bounds(): Bounds
     lay(offer?: Offer): Laid<T>
-    readonly share?: number
+    readonly spec: { share?: number }   // its fraction of the stack's length along the axis, if any
     readonly align?: [ AlignValue | undefined, AlignValue | undefined ]
 }
 
@@ -160,7 +160,7 @@ function distribute(total: number, ranges: Range[]): number[] {
 // what is left of a stack's length for the children without a share, once
 // the shares and the fractional spacing come off the top
 function stack_rest<T>(items: LayoutItem<T>[], spacing: number): number {
-    return 1 - sum(items.map(k => k.share ?? 0)) - spacing * Math.max(items.length - 1, 0)
+    return 1 - sum(items.map(k => k.spec.share ?? 0)) - spacing * Math.max(items.length - 1, 0)
 }
 
 // the bounds of a stack from its children's: across the stack, the max over
@@ -173,7 +173,7 @@ function stack_rest<T>(items: LayoutItem<T>[], spacing: number): number {
 function stack_bounds<T>(direc: Orient, items: LayoutItem<T>[], { gap = 0, spacing = 0 }: StackOptions = {}): Bounds {
     const n = items.length
     const B = items.map(k => k.bounds())
-    const F = items.map(k => k.share)
+    const F = items.map(k => k.spec.share)
     const emgaps = gap * Math.max(n - 1, 0)
     const D = stack_rest(items, spacing)
     const unshared = range(n).filter(i => F[i] == null)
@@ -262,7 +262,7 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
     const offer = (k: LayoutItem<T>, size: { width?: number, height?: number }): Laid<T> => k.lay({ ...size, justify, attr })
     const n = items.length
     const B = items.map(k => k.bounds())
-    const F = items.map(k => k.share)
+    const F = items.map(k => k.spec.share)
     const D = stack_rest(items, spacing)
     const emgaps = gap * Math.max(n - 1, 0)
     const unshared = range(n).filter(i => F[i] == null)
@@ -412,7 +412,7 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
     const offer = (k: LayoutItem<T>, size: { width?: number, height?: number, fill?: boolean }): Laid<T> => k.lay({ ...size, justify, attr })
     const n = items.length
     const B = items.map(k => k.bounds())
-    const F = items.map(k => k.share)
+    const F = items.map(k => k.spec.share)
     const D = stack_rest(items, spacing)
     const emgaps = gap * Math.max(n - 1, 0)
     const unshared = range(n).filter(i => F[i] == null)
