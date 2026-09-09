@@ -478,6 +478,6 @@ Convenience keys (these map into the above keys):
 
 The LaTeX elements (`Latex`, `Tex`, `MathArray`, `MathStretch`, …) are in `@gum-jsx/math`; see
 that package's `CLAUDE.md` for how the katex parse tree is converted. What core provides for
-them: `Span` measurement (`raw_text_metrics`, `text_has_glyphs` in `src/lib/text.ts`), the stroke
+them: `Span` with its ink frame (`frame: 'ink'`; `text_has_glyphs` in `src/lib/text.ts`), the stroke
 unit on `Context` (a math shape rebases it to its box's pixels per em), the `Latex`/`MathShape`
 theme entries in `src/lib/theme.ts`, and the strict-mode kinds in `src/lib/strict.ts`.

@@ -33,22 +33,25 @@ The result is a `TextMetrics`:
 - `raw_vrange` — where the **ink** sits: `[baseline - ymax * font_height, baseline - ymin * font_height]`
 - `italic` — the italic correction (how far the last glyph overhangs its advance), for math
 
-`raw_text_metrics` is the inverse, recovering the measured ink in em from the normalized
-metrics; `@gum-jsx/math` uses it for tight ink boxes (`MathText`).
+A `Span` with `frame: 'ink'` inverts this in its constructor, recovering the measured ink in
+em from the normalized metrics and framing the run by it about the math axis; that is what
+`@gum-jsx/math` builds its glyph atoms on (`MathSpan`).
 
 ### The vertical shift
 
 Baseline-at-the-bottom leaves text looking low in its box, so `Span` shifts the metrics by
-`vshift` (default `TEXT_AXIS = -0.15`, `src/lib/const.ts`): both ranges move up by 0.15 and the
-baseline lands at `0.85` of the line box. This is the one number that decides where text sits
-in a line, and it is shared with the math placement below.
+`TEXT_AXIS` (`-0.15`, `src/lib/const.ts`): both ranges move up by 0.15 and the baseline lands
+at `0.85` of the line box. This is the one number that decides where text sits in a line, and
+it is shared with the math placement below. It is a constant, not a per-span argument.
 
 ### Rendering a Span
 
-`Span.props()` is the only consumer of `vrange`. It maps the unshifted em square
-`[0, ymin - vshift, 1, ymax - vshift]` through the context to pixels, takes its pixel height as
-`font-size`, and emits the baseline at `y = y0 + (1 + vshift) * h`. That is the whole
-mechanism: `vrange` tells a Span what `font-size` and `y` to write, and nothing else reads it.
+`Span.props()` is the only consumer of `vrange` (on the span's `glyphs`). It maps the
+unshifted em square `[0, ymin - TEXT_AXIS, 1, ymax - TEXT_AXIS]` through the context to
+pixels, takes its pixel height as `font-size`, and emits the baseline at
+`y = y0 + (1 + TEXT_AXIS) * h`, so the shift points down on screen whatever the frame's
+orientation. That is the whole mechanism: `vrange` tells a Span what `font-size` and `y` to
+write, and nothing else reads it.
 
 ### Lines and paragraphs
 

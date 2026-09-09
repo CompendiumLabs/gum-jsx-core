@@ -223,15 +223,6 @@ function normalize_text_metrics({ advance, vrange: [ ymin, ymax ], italic = 0 }:
     }
 }
 
-// the inverse of normalize_text_metrics: the glyph's advance, ink range above the
-// baseline (y-up) and italic correction in em, as measured; null when the
-// metrics carry no ink (an empty string)
-function raw_text_metrics({ advance, vrange: [ vlo, vhi ], raw_vrange: [ rlo, rhi ] = [ vlo, vhi ], italic = 0 }: TextMetrics): TextMetrics | null {
-    const fh = vhi - vlo
-    if (fh <= 0 || rhi <= rlo) return null
-    return { advance: advance / fh, vrange: [ (vhi - rhi) / fh, (vhi - rlo) / fh ], italic: italic / fh }
-}
-
 function text_metrics(text: string, args: TextSizerArgs & { whitespace?: Whitespace } = {}): TextMetrics {
     if (text == '\n') return { advance: 0, vrange: [ 0, 1 ], raw_vrange: [ 0, 1 ], italic: 0 }
     const text1 = args.whitespace === 'pre' || args.whitespace === 'preserve' ? text : compress_whitespace(text)
@@ -297,6 +288,6 @@ function merge_strings(items: any[]): any[] {
 // exports
 //
 
-export { is_emoji, text_metrics, raw_text_metrics, text_sizer, text_vertical, text_italic, text_has_glyphs, get_breaks, split_words, wrap_widths, wrap_text, merge_strings }
+export { is_emoji, text_metrics, text_sizer, text_vertical, text_italic, text_has_glyphs, get_breaks, split_words, wrap_widths, wrap_text, merge_strings }
 export { DEFAULT_METRICS, EMPTY_METRICS, DEFAULT_VRANGE, EMPTY_VRANGE }
 export type { TextMetrics, TextSizerArgs, Whitespace }
