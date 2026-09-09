@@ -3,7 +3,7 @@
 // stacks (MathRow, MathCol) are both layout_em_stack with their own defaults;
 // math adds its spacing rules and styles, text its wrapping
 
-import { sum, max, merge_limits, ensure_pair } from '../lib/utils'
+import { max, merge_limits, ensure_pair } from '../lib/utils'
 import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_aspect, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
 import type { TextMetrics } from '../lib/text'

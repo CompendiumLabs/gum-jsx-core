@@ -5,7 +5,7 @@ import { none } from '../lib/const'
 import { prefix_split, prefix_join, pad_rect } from '../lib/utils'
 import { make_em, scale_em_spec } from '../lib/em'
 import type { EmArgs, EmSpec } from '../lib/em'
-import { INF, box_bounds, scale_bounds, free_bounds } from '../lib/layout'
+import { INF, FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
 
 import { Group, Rectangle, spec_split, ensure_children, is_element, is_unsized_em, place_in_box } from './core'
 import type { Element, GroupArgs, MaybeEm, Bounds, Offer, Laid } from './core'
@@ -182,7 +182,7 @@ class Box extends Group {
             const [ mx, my ] = this.margins
             return { width: [ 0, INF ], height: [ 0, INF ], aspect: this.aspect_box, offset: [ mx * s, my * s ] }
         }
-        if (this.args.flex === true) return free_bounds()
+        if (this.args.flex === true) return FREE_BOUNDS
         if (this.content.length == 0) return super.natural()
         return scale_bounds(box_bounds(this.content[0].bounds(), this.insets), s)
     }

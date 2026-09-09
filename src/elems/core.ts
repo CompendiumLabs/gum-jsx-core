@@ -6,7 +6,7 @@ import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_r
 import { resolveEnv } from '../lib/default'
 import { make_em, scale_em_spec, em_rect } from '../lib/em'
 import type { EmSpec } from '../lib/em'
-import { INF, EPS, point, free_bounds, tie_width, tie_height } from '../lib/layout'
+import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height } from '../lib/layout'
 import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
 import type { Env } from '../env'
 
@@ -465,7 +465,7 @@ class Element {
 
     // the element's em over its parent's
     get scale(): number {
-        return this.em?.scale ?? this.args?.scale ?? 1
+        return this.em?.scale ?? this.args.scale ?? 1
     }
 
     // its fraction of a stack's length along the axis, if any
@@ -491,18 +491,26 @@ class Element {
     // shape any size at its aspect, anything else any size at all. content
     // (text) overrides this with the range it can be laid out in
     natural(): Bounds {
-        const em = this.em
-        if (em != null) return { width: point(em.width), height: point(em.height) }
-        const aspect = this.spec.aspect
-        return (aspect != null && aspect > 0) ? { width: [ 0, INF ], height: [ 0, INF ], aspect } : free_bounds()
+        if (this.em == null) return {
+            ...FREE_BOUNDS,
+            aspect: this.spec.aspect,
+        }
+        return {
+            width: point(this.em.width),
+            height: point(this.em.height),
+        }
     }
 
     // an element with metrics and `fit` is scaled to its slot like a figure
     // (text in a share stack, a formula in a title's share): a ray at its box's
     // aspect
     private fitted(): EmSpec | undefined {
-        const em = this.em
-        return (this.spec.fit && em != null && em.width > 0 && em.height > 0) ? em : undefined
+        return (
+            this.spec.fit &&
+            this.em != null &&
+            this.em.width > 0 &&
+            this.em.height > 0
+        ) ? this.em : undefined
     }
 
     // the bounds a container reads: the natural ones, or pinned to a point on
@@ -510,7 +518,10 @@ class Element {
     // tie, or for content by laying it out at that width)
     bounds(): Bounds {
         const fit = this.fitted()
-        const b = fit != null ? { width: [ 0, INF ] as [ number, number ], height: [ 0, INF ] as [ number, number ], aspect: fit.width / fit.height } : this.natural()
+        const b: Bounds = fit != null ? {
+            ...FREE_BOUNDS,
+            aspect: fit.width / fit.height
+        } : this.natural()
         const [ w, h ] = this.own_size()
         if (w == null && h == null) return b
         if (w != null && h != null) return { width: point(w), height: point(h) }

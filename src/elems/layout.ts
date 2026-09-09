@@ -1,19 +1,18 @@
 // layout components
 
 import { THEME } from '../lib/theme'
-import type { Env } from '../env'
-import { DEFAULTS as D, none } from '../lib/const'
-import { is_scalar, ensure_vector, ensure_pair, log, exp, max, sum, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, aspect_invariant, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points, pad_rect } from '../lib/utils'
+import { DEFAULTS as D } from '../lib/const'
+import { ensure_vector, ensure_pair, log, exp, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points } from '../lib/utils'
 import { wrapWidths } from '../lib/wrap'
 
 import { scale_bounds } from '../lib/layout'
 
-import { Context, Group, Element, Rectangle, Spacer, spec_split, align_frac, ensure_children } from './core'
-import { RoundedRect, Dot } from './geometry'
+import { Context, Group, Element, Spacer, spec_split, align_frac, ensure_children } from './core'
+import { Dot } from './geometry'
 import { layout_em_stack, layout_em_bounds } from './em'
 import { make_em, scale_em_spec } from '../lib/em'
 
-import type { Point, Rect, Limit, AlignValue, Side, Orient, Padding, Rounded } from '../lib/types'
+import type { Point, Rect, Limit, AlignValue, Side, Orient } from '../lib/types'
 import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
 import type { EmArgs, EmSpec } from '../lib/em'
 import type { EmStackOptions, RowAlign } from './em'

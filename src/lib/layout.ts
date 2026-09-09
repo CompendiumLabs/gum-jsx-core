@@ -127,9 +127,7 @@ function tie_height(b: Bounds, w: number): number {
 const point = (x: number): Range => [ x, x ]
 
 // bounds with nothing known: any size at all
-function free_bounds(): Bounds {
-    return { width: [ 0, INF ], height: [ 0, INF ] }
-}
+const FREE_BOUNDS: Bounds = { width: [ 0, INF ], height: [ 0, INF ] }
 
 // split `total` evenly among items, each clamped to its range: the violators
 // of the sign of the total violation are frozen at their clamps and the rest
@@ -545,5 +543,5 @@ function layout_stack<T>(direc: Orient, items: LayoutItem<T>[], options: StackOp
 // exports
 //
 
-export { INF, EPS, point, free_bounds, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, scale_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
+export { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, scale_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
 export type { Range, Bounds, Offer, Laid, LayoutItem, RowAlign, StackOptions, Placement, StackLayout }
