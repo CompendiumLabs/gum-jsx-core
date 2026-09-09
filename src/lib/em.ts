@@ -28,7 +28,7 @@
 import { MATH_AXIS } from './const'
 import { merge_limits } from './utils'
 import type { Limit, Rect } from './types'
-import type { TextMetrics } from './text'
+import type { Glyphs } from './text'
 
 //
 // types
@@ -83,10 +83,11 @@ function make_em<T extends Partial<EmSpec>>(spec: T): T & EmSpec {
     }
 }
 
-// the box a Span's text metrics describe: its text box, with the anchor MATH_AXIS
-// below the top of the box (a line box with the axis at MATH_AXIS)
-function text_em({ advance, vrange: [ ylo, yhi ] }: TextMetrics): EmMetrics {
-    return { width: advance, height: yhi - ylo, anchor: MATH_AXIS - ylo }
+// the box of a span framed as a line (its coordinate frame): the 1em line it
+// draws in, as wide as its advance, with the math axis a quarter of the font
+// above the baseline
+function text_em(advance: number, { size, baseline }: Glyphs): EmMetrics {
+    return { width: advance, height: 1, anchor: baseline - MATH_AXIS * size }
 }
 
 // metrics from anchor-relative bounds (a layout that placed its children about

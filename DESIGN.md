@@ -16,41 +16,51 @@ baselines automatically. No layout container ever consults a text metric.
 
 ### Metrics
 
-`text_metrics` (`src/lib/text.ts`) measures a string with opentype.js and normalizes the result
-into the line-box frame (`normalize_text_metrics`):
+`text_metrics` (`src/lib/text.ts`) measures a string with opentype.js at a 1em font and
+returns the measurement as it is, a `TextMetrics`:
 
-- `fontVertical` returns the ink extents of the string in em, y-up and baseline-relative, say
-  `[-0.2, 0.75]` for a string with descenders.
-- If the ink is taller than 1em (`ymax - ymin > 1`, as with some KaTeX glyphs) the line box
-  is taken as the ink height and the font is scaled down by `font_height = 1 / line_height`
-  to stay inside it; otherwise the font is one em and `font_height = 1`.
-- The baseline is placed at the bottom of the box, `y = 1` in the box's y-down `[0, 1]` frame.
-
-The result is a `TextMetrics`:
-
-- `advance` — width in units of the line-box height, which is the Span's aspect
-- `vrange` — where the **em square** sits: `[baseline - font_height, baseline]`
-- `raw_vrange` — where the **ink** sits: `[baseline - ymax * font_height, baseline - ymin * font_height]`
+- `advance` — the width of the run, in em
+- `ink` — the ink extents, y-up and baseline-relative, say `[-0.2, 0.75]` for a string with
+  descenders (`font_vertical`)
 - `italic` — the italic correction (how far the last glyph overhangs its advance), for math
 
-A `Span` with `frame: 'ink'` inverts this in its constructor, recovering the measured ink in
-em from the normalized metrics and framing the run by it about the math axis; that is what
-`@gum-jsx/math` builds its glyph atoms on (`MathSpan`).
+How the run is framed is the `Span`'s business, decided in its constructor. It keeps only
+what it needs to draw, its `glyphs`: the font `size` in its frame's units and the `y` of the
+`baseline`. Nothing else reads the measurement afterwards.
 
-### The vertical shift
+### The line frame
 
-Baseline-at-the-bottom leaves text looking low in its box, so `Span` shifts the metrics by
-`TEXT_AXIS` (`-0.15`, `src/lib/const.ts`): both ranges move up by 0.15 and the baseline lands
-at `0.85` of the line box. This is the one number that decides where text sits in a line, and
-it is shared with the math placement below. It is a constant, not a per-span argument.
+By default (`frame: 'line'`) a Span is the 1em line box it sits in, `[0, 1]` y-down, and its
+aspect is its advance:
+
+- If the ink is taller than 1em (as with some KaTeX glyphs) the line is taken as the ink
+  height and the font is scaled down by `size = 1 / line_height` to stay inside it, set a
+  quarter down; otherwise the font is one em and sits on the bottom.
+- Baseline-at-the-bottom leaves text looking low in its box, so the font is shifted up by
+  `TEXT_AXIS` (`-0.15`, `src/lib/const.ts`): the baseline lands at `0.85` of the line box.
+  This is the one number that decides where text sits in a line, and it is shared with the
+  math placement below. It is a constant, not a per-span argument.
+
+A line span has no em box of its own: a line places it by its advance. When something asks
+for one (an element adapted with `with_em`, or a stated `metrics`) it is the line it draws
+in: 1em tall, as wide as its advance, anchored a quarter of the font above the baseline
+(`text_em`), which is `INLINE_MATH_AXIS`, where a line places a formula beside it.
+
+### The ink frame
+
+With `frame: 'ink'` the run's ink about the math axis is both its coordinate frame and its
+em box (`bounds_em`), so an assigned rect scales the glyph with its box. `axis` puts the
+baseline a quarter em below the axis (TeX Rule 13) or centers the ink on it (large
+operators, delimiters). The font is 1em in that frame. This is what `@gum-jsx/math` builds
+its glyph atoms on (`MathSpan`). A run with no ink keeps the line frame, with the line's box.
 
 ### Rendering a Span
 
-`Span.props()` is the only consumer of `vrange` (on the span's `glyphs`). It maps the
-unshifted em square `[0, ymin - TEXT_AXIS, 1, ymax - TEXT_AXIS]` through the context to
+`Span.props()` is the only consumer of `glyphs`. It maps the font box without the text
+shift, `[0, baseline - size - TEXT_AXIS, 1, baseline - TEXT_AXIS]`, through the context to
 pixels, takes its pixel height as `font-size`, and emits the baseline at
 `y = y0 + (1 + TEXT_AXIS) * h`, so the shift points down on screen whatever the frame's
-orientation. That is the whole mechanism: `vrange` tells a Span what `font-size` and `y` to
+orientation. That is the whole mechanism: `glyphs` tells a Span what `font-size` and `y` to
 write, and nothing else reads it.
 
 ### Lines and paragraphs

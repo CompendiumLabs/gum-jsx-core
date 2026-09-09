@@ -7,7 +7,7 @@ import { THEME } from '../lib/theme'
 import { TEXT_AXIS, MATH_AXIS, none, bold, mono } from '../lib/const'
 import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, rect_box, check_singleton, prefix_split, prefix_join, sum, max } from '../lib/utils'
 import { text_metrics, split_words } from '../lib/text'
-import type { TextMetrics, Whitespace } from '../lib/text'
+import type { Glyphs, Whitespace } from '../lib/text'
 import { wrap_widths } from '../lib/wrap'
 import { em_bounds, em_hink, text_em, bounds_em } from '../lib/em'
 import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
@@ -52,7 +52,7 @@ function font_css({ font_family, font_weight, font_style }: { font_family?: stri
 
 class Span extends Element {
     text: string
-    glyphs: TextMetrics   // the run as drawn: its font box and ink, in the span's frame
+    glyphs: Glyphs   // the run as drawn: its font size and baseline in the span's frame
 
     constructor(args: SpanArgs = {}) {
         const { children: children0, color, whitespace = 'normal', stroke = none, frame = 'line', axis = 'baseline', metrics: metrics0, env, ...attr0 } = THEME(args, 'Span')
@@ -64,46 +64,38 @@ class Span extends Element {
         const preserve = whitespace === 'pre' || whitespace === 'preserve'
         const preserve_attr = preserve ? { 'xml:space': 'preserve' } : {}
 
-        // measure the run in its 1em line box (see normalize_text_metrics); the
-        // text box sits TEXT_AXIS down the line, its baseline at 1 + TEXT_AXIS
+        // measure the run at a 1em font: its advance, its ink above the
+        // baseline (y up) and its italic correction
         const text = preserve ? text0 : compress_whitespace(text0)
-        const {
-            advance,
-            vrange: [ ymin, ymax ],
-            raw_vrange: [ raw_ymin, raw_ymax ] = [ ymin, ymax ],
-            italic = 0
-        } = text_metrics(text, { ...font_attr, whitespace, env })
+        const { advance, ink: [ ymin, ymax ], italic } = text_metrics(text, { ...font_attr, whitespace, env })
 
-        // calculate the font and ink ranges
-        const [ font_lo, font_hi ] = [ ymin + TEXT_AXIS, ymax + TEXT_AXIS ]
-        const [ ink_lo, ink_hi ] = [ raw_ymin + TEXT_AXIS, raw_ymax + TEXT_AXIS ]
-        const font_height = font_hi - font_lo
-
-        // frame it: the glyphs it draws by (its 1em font box, ending at the
-        // baseline), what it tells the element, and its layout box if any
-        let glyphs: TextMetrics
+        // frame it: the glyphs it draws by (font size and baseline in its
+        // frame), what it tells the element, and its layout box if any
+        let glyphs: Glyphs
         let metrics: EmMetrics | undefined
         let spec: { coord?: Rect, aspect: number }
-        if (frame == 'ink' && font_height > 0 && ink_hi > ink_lo) {
-            // by its ink: undo the line box for the ink extents at a 1em font
-            // (y up from the baseline), take them about the math axis (TeX
-            // Rule 13), and make the ink box the coordinate frame, so an
-            // assigned rect scales the glyph with its box
-            const em_advance = advance / font_height
-            const em_italic = italic / font_height
-            const em_ink: Limit = [ (font_hi - ink_hi) / font_height, (font_hi - ink_lo) / font_height ]
-            const baseline = axis == 'center' ? 0.5 * (em_ink[1] + em_ink[0]) : MATH_AXIS
-            const ink: Limit = [ baseline - em_ink[1], baseline - em_ink[0] ]  // about the axis, y down
-            glyphs = { advance: em_advance, vrange: [ baseline - 1, baseline ], raw_vrange: ink, italic: em_italic }
-            metrics = { ...bounds_em(em_advance, ink), italic: em_italic, ...metrics0 }
-            spec = { coord: [ 0, ink[0], 1, ink[1] ], aspect: em_advance / (em_ink[1] - em_ink[0]) }
+        if (frame == 'ink' && ymax > ymin) {
+            // by its ink, about the math axis (TeX Rule 13): the ink box is the
+            // coordinate frame, so an assigned rect scales the glyph with its box
+            const baseline = axis == 'center' ? 0.5 * (ymax + ymin) : MATH_AXIS
+            const box: Limit = [ baseline - ymax, baseline - ymin ]  // the ink about the axis, y down
+            glyphs = { size: 1, baseline }
+            metrics = { ...bounds_em(advance, box), italic, ...metrics0 }
+            spec = { coord: [ 0, box[0], 1, box[1] ], aspect: advance / (ymax - ymin) }
         } else {
-            // in a line: the line box, as wide as its advance, with no box of
-            // its own (a line places it by its advance) unless it states one,
-            // or was to be framed by ink it does not have
-            glyphs = { advance, vrange: [ font_lo, font_hi ], raw_vrange: [ ink_lo, ink_hi ], italic }
-            metrics = (frame == 'ink' || metrics0 != null) ? { ...text_em(glyphs), italic, ...metrics0 } : undefined
-            spec = { aspect: advance }
+            // in a 1em line: the font fills the line, or shrinks to fit ink
+            // taller than that (set a quarter down instead of on the bottom),
+            // and sits TEXT_AXIS up from the bottom. the span is as wide as
+            // its advance, with no box of its own (a line places it by its
+            // advance) unless it states one, or was to be framed by ink it
+            // does not have
+            const line_height = Math.max(1, ymax - ymin)
+            const size = 1 / line_height
+            const top = line_height > 1 ? 0.25 : 1 - ymax
+            const baseline = top + ymax * size + TEXT_AXIS
+            glyphs = { size, baseline }
+            metrics = (frame == 'ink' || metrics0 != null) ? { ...text_em(advance / line_height, glyphs), italic: italic / line_height, ...metrics0 } : undefined
+            spec = { aspect: advance / line_height }
         }
 
         // pass to element; the font is measured by its registry name but named
@@ -124,9 +116,9 @@ class Span extends Element {
 
         // map the font box without the text shift and apply it in pixel space,
         // so it points down on screen whatever the frame's orientation
-        const { vrange: [ ymin, ymax ] } = this.glyphs
-        const glyph_rect: Rect = [ 0, ymin - TEXT_AXIS, 1, ymax - TEXT_AXIS ]
-        const rect = ctx.mapRect(glyph_rect)
+        const { size, baseline } = this.glyphs
+        const font_rect: Rect = [ 0, baseline - size - TEXT_AXIS, 1, baseline - TEXT_AXIS ]
+        const rect = ctx.mapRect(font_rect)
 
         // get position and size
         const [ x, y0, _w, h ] = rect_box(rect, true)

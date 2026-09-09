@@ -6,7 +6,7 @@
 import { max, merge_limits, ensure_pair } from '../lib/utils'
 import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
-import type { TextMetrics } from '../lib/text'
+import type { Glyphs } from '../lib/text'
 import type { Attrs, Rect, Limit, Align, AlignValue, Orient } from '../lib/types'
 
 import { Context, Element, Group, align_frac } from './core'
@@ -39,12 +39,13 @@ function rebuild_em(this: AdaptedEm, args: Attrs): Element {
     return out
 }
 
-// the metrics an element without any gets: a Span's from its text box,
-// anything else a one-em box as wide as its aspect
+// the metrics an element without any gets: a one-em box as wide as its
+// aspect, anchored on its middle, or for a span in a line (its aspect is its
+// advance) on the axis of its text
 function ensure_em_spec(element: Element): EmMetrics {
-    const glyphs = (element as { glyphs?: TextMetrics }).glyphs
-    if (glyphs != null) return text_em(glyphs)
     const { width, height, anchor } = DEFAULT_EM
+    const { glyphs } = element as { glyphs?: Glyphs }
+    if (glyphs != null) return text_em(element.spec.aspect ?? width, glyphs)
     return { width: element.spec.aspect ?? width, height, anchor }
 }
 

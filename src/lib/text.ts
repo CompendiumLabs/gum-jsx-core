@@ -187,49 +187,29 @@ function text_italic(text: string, { font_family = sans, font_weight = light, en
     return Math.max(0, (xMax - advanceWidth) / units)
 }
 
+// a glyph run as measured, at a 1em font: its advance, the ink range above
+// the baseline (y up, so a descender is negative) and the italic correction.
+// how a span frames this is the span's business (see Span)
 type TextMetrics = {
     advance: number
-    vrange: Limit
-    raw_vrange?: Limit
-    italic?: number
+    ink: Limit
+    italic: number
 }
 
-const EMPTY_VRANGE: Limit = [ 0, 0 ]
-const DEFAULT_VRANGE: Limit = [ -0.25, 0.75 ]
-
-const EMPTY_METRICS: TextMetrics = {
-    advance: 0,
-    vrange: EMPTY_VRANGE,
-    raw_vrange: EMPTY_VRANGE,
-}
-
-const DEFAULT_METRICS: TextMetrics = {
-    advance: 1,
-    vrange: DEFAULT_VRANGE,
-    raw_vrange: DEFAULT_VRANGE,
-}
-
-function normalize_text_metrics({ advance, vrange: [ ymin, ymax ], italic = 0 }: TextMetrics): TextMetrics {
-    const yrange = ymax - ymin
-    const line_height = Math.max(1, yrange)
-    const font_height = 1 / line_height
-    const glyph_top = (yrange > 1) ? 0.25 : 1 - ymax
-    const baseline = glyph_top + ymax * font_height
-    return {
-        advance: advance / line_height,
-        vrange: [ baseline - font_height, baseline ],
-        raw_vrange: [ baseline - ymax * font_height, baseline - ymin * font_height ],
-        italic: italic / line_height,
-    }
+// a run as drawn in a span's frame: the font size in frame units and the y of
+// the baseline. all a span needs to emit its text
+type Glyphs = {
+    size: number
+    baseline: number
 }
 
 function text_metrics(text: string, args: TextSizerArgs & { whitespace?: Whitespace } = {}): TextMetrics {
-    if (text == '\n') return { advance: 0, vrange: [ 0, 1 ], raw_vrange: [ 0, 1 ], italic: 0 }
+    if (text == '\n') return { advance: 0, ink: [ 0, 1 ], italic: 0 }
     const text1 = args.whitespace === 'pre' || args.whitespace === 'preserve' ? text : compress_whitespace(text)
     const advance = text_sizer(text1, args)
-    const vrange = text_vertical(text1, args)
+    const ink = text_vertical(text1, args)
     const italic = text_italic(text1, args)
-    return normalize_text_metrics({ advance, vrange, italic })
+    return { advance, ink, italic }
 }
 
 //
@@ -289,5 +269,4 @@ function merge_strings(items: any[]): any[] {
 //
 
 export { is_emoji, text_metrics, text_sizer, text_vertical, text_italic, text_has_glyphs, get_breaks, split_words, wrap_widths, wrap_text, merge_strings }
-export { DEFAULT_METRICS, EMPTY_METRICS, DEFAULT_VRANGE, EMPTY_VRANGE }
-export type { TextMetrics, TextSizerArgs, Whitespace }
+export type { TextMetrics, Glyphs, TextSizerArgs, Whitespace }
