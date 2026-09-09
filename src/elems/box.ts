@@ -115,7 +115,12 @@ class Box extends Group {
         const span_w = width != null || (fixed && outer_w != null)
         const span_h = height != null || (fixed && outer_h != null)
         const room = (outer: number | undefined, inset: number) => outer != null ? Math.max(outer - inset, 0) : undefined
-        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...(justify0 != null ? { justify: justify0 } : {}) })
+        // a box that spans its width (a width of its own, or a filled slot)
+        // fills the area with content free in width, as a column does: a
+        // column or a text box spans it and sits its content by justify;
+        // content with an align of its own keeps its width and sits by that
+        const fills = (c: Element) => span_w && !fixed && c.align?.[0] == null
+        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...(fills(c) ? { fill: true, align: justify } : {}), ...(justify0 != null ? { justify: justify0 } : {}) })
         const first = content.length > 0 ? lay(content[0], room(outer_w, insets[0]), room(outer_h, insets[1])) : null
         const [ cw, ch ] = first != null ? [ first.em.width, first.em.height ] : [ room(outer_w, insets[0]) ?? 1, room(outer_h, insets[1]) ?? 1 ]
         let box_w = span_w ? outer_w! - ml - mr : cw + pl + pr
