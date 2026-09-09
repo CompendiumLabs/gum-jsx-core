@@ -74,7 +74,7 @@ function closest_weight(weight: number): FontWeight {
 // is drawn by whatever emoji face the renderer falls back to.
 const EMOJI_ADVANCE = 1300 / 1024
 
-function emojiSizer(_text: string): number {
+function emoji_sizer(_text: string): number {
     return EMOJI_ADVANCE
 }
 
@@ -87,7 +87,7 @@ type TextSizerArgs = {
 
 type Whitespace = 'normal' | 'pre' | 'preserve'
 
-function textFont(font_family: string, font_weight: number, env?: Env): Font {
+function text_font(font_family: string, font_weight: number, env?: Env): Font {
     // get font info
     const font = resolveEnv(env).fonts.get(font_family)
     if (font == null) throw new FontNotLoadedError(font_family)
@@ -114,7 +114,7 @@ function check_glyphs(font: Font, text: string, font_family: string, env?: Env):
 // whether a face can actually draw every character of a string, so a caller
 // can pick a different one rather than emit .notdef boxes
 function text_has_glyphs(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): boolean {
-    const font = textFont(font_family, font_weight, env)
+    const font = text_font(font_family, font_weight, env)
     for (const ch of text) {
         if (ch == ' ' || ch == '\n' || ch == '\t') continue
         if (font.charToGlyphIndex(ch) == 0) return false
@@ -136,7 +136,7 @@ function text_has_glyphs(text: string, { font_family = sans, font_weight = light
 type Shaped = { glyphs: Glyph[], advance: number }
 const SHAPE_CACHE = new WeakMap<Font, Map<string, Shaped>>()
 
-function shapeText(font: Font, text: string): Shaped {
+function shape_text(font: Font, text: string): Shaped {
     let cache = SHAPE_CACHE.get(font)
     if (cache == null) SHAPE_CACHE.set(font, cache = new Map())
     let shaped = cache.get(text)
@@ -154,16 +154,16 @@ function shapeText(font: Font, text: string): Shaped {
 }
 
 function text_sizer(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
-    const font = textFont(font_family, font_weight, env)
+    const font = text_font(font_family, font_weight, env)
     const runs = split_emoji_runs(text)
     if (isStrict(env)) runs.forEach(run => { if (!run.emoji) check_glyphs(font, run.text, font_family, env) })
     return sum(runs.map(run =>
-        run.emoji ? emojiSizer(run.text) : shapeText(font, run.text).advance
+        run.emoji ? emoji_sizer(run.text) : shape_text(font, run.text).advance
     ))
 }
 
 function font_vertical(font: Font, text: string): Limit {
-    const { glyphs } = shapeText(font, text)
+    const { glyphs } = shape_text(font, text)
     const [yMins = [], yMaxs = []] = zip(...glyphs.map(g => [ g.yMin, g.yMax ]))
     const units = font.unitsPerEm ?? 1000
     const yMin = min(yMins) ?? 0
@@ -172,14 +172,14 @@ function font_vertical(font: Font, text: string): Limit {
 }
 
 function text_vertical(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): Limit {
-    const font = textFont(font_family, font_weight, env)
+    const font = text_font(font_family, font_weight, env)
     return font_vertical(font, text)
 }
 
 // italic correction: how far the final glyph's ink overhangs its advance width
 function text_italic(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
-    const font = textFont(font_family, font_weight, env)
-    const { glyphs } = shapeText(font, text)
+    const font = text_font(font_family, font_weight, env)
+    const { glyphs } = shape_text(font, text)
     const last = glyphs[glyphs.length - 1]
     if (last == null) return 0
     const { xMax = 0, advanceWidth = 0 } = last
