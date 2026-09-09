@@ -2,7 +2,7 @@
 
 import { THEME } from '../lib/theme'
 import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
-import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
+import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, check_singleton, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
 import { make_em, scale_em_spec, em_rect, em_frame } from '../lib/em'
 import type { EmSpec, EmOrigin } from '../lib/em'
@@ -529,10 +529,13 @@ class Element {
         if (w != null && h != null) {
             return { width: point(w), height: point(h) }
         } else if (w != null) {
-            const hh = b.aspect != null ? point(tie_height(b, w)) : b.height[1] < INF ? point(this.place({ width: w }).em.height) : b.height
+            const hh = b.aspect != null  ? point(tie_height(b, w)) :
+                       b.height[1] < INF ? point(this.place({ width: w }).em.height) :
+                                           b.height
             return { ...b, width: point(w), height: hh }
         } else if (h != null) {
-            const ww = b.aspect != null ? point(tie_width(b, h!)) : b.width
+            const ww = b.aspect != null ? point(tie_width(b, h!)) :
+                                          b.width
             return { ...b, width: ww, height: point(h!) }
         } else {
             return b
@@ -937,7 +940,7 @@ interface SvgArgs extends GroupArgs {
     font_weight?: number
     prec?: number
     unit_size?: number
-    em?: number       // pixels per em offered to the content (default: the size over D.svg_ems)
+    em?: number       // pixels per em offered to the content (default: the height over D.svg_ems)
     width?: number    // the offer in em, instead (the width and height the content is laid out for)
     height?: number
 }
@@ -958,19 +961,25 @@ class Svg extends Group {
 
     constructor(args: SvgArgs = {}) {
         const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em: em0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
-        const children0_1 = ensure_children(children0)
+        const child = check_singleton(children0)
         const size_base = ensure_pair(size0)
 
-        // lay a lone child out for the canvas in em
-        let children = children0_1
-        let aspect: number | undefined = aspect0 == 'auto' ? undefined : aspect0
-        const only = children.length == 1 && children[0].spec.rect == null ? children[0] : null
-        if (only != null) {
+        // lay the child out for the canvas in em (one placed by rect is left
+        // to the share world); the canvas is D.svg_ems lines tall
+        let children = [ child ]
+        let aspect = aspect0 == 'auto' ? undefined : aspect0
+        if (child.spec.rect == null) {
             const [ sw, sh ] = size_base.map(abs)
-            const em = em0 ?? Math.max(sw, sh) / D.svg_ems
-            const laid = only.lay({ width: width0 ?? sw / em, height: height0 ?? sh / em })
+            const em = em0 ?? sh / D.svg_ems
+            const w = width0 ?? sw / em
+            const h = height0 ?? sh / em
+            const laid = child.lay({ width: w, height: h })
             children = [ laid.elem ]
-            if (aspect0 == 'auto') aspect = laid.em.height > 0 && laid.em.width > 0 ? laid.em.width / laid.em.height : undefined
+            if (aspect0 == 'auto') {
+                aspect = laid.em.height > 0 && laid.em.width > 0 ?
+                         laid.em.width / laid.em.height :
+                         undefined
+            }
         }
         const [ width, height ] = embed_size(size_base, { aspect })
 

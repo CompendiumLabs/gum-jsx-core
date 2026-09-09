@@ -365,7 +365,7 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
                         laid[i] = offer(items[i], { width: s * W })
                     }
                     for (const [ j, i ] of grow.entries()) {
-                        laid[i] = offer(items[i], { width: W, height: Math.max(s * heights[j], floors[i]) })
+                        laid[i] = offer(items[i], { width: W, height: Math.max(s * heights[j], floors[j]) })
                     }
                 }
             }

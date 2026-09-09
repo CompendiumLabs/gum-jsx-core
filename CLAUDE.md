@@ -228,7 +228,7 @@ evenly with clamps (`distribute`, the flexbox loop); flexible children take thei
 as their box (`fill`). `gap` is em, `spacing` a fraction of the length, `share` on a child a
 fraction of the length (gross: half means half); a stack with no width of its own hugs its
 children. `Svg` offers its lone child the canvas in em (`em`, or `width`/`height`; default
-`D.svg_ems` across the larger side), then fits the box it comes back with to the pixel size,
+`D.svg_ems` lines tall), then fits the box it comes back with to the pixel size,
 so a figure fills it, a text column wraps to it, and a paragraph alone is as wide as its line.
 `Box` (`src/elems/box.ts`; `Frame` is border 1, `TextBox`/`TextFrame` the same with a text
 padding default, `TitleBox`/`TitleFrame`/`LabelBox` in `slide.ts`) is the one box: `padding`
