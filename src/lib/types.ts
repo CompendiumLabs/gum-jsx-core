@@ -20,7 +20,7 @@ type MPoint = [MNumber, MNumber]
 
 // alignment: named position or fractional 0-1
 type Zone = 'inner' | 'outer' | 'both' | 'none'
-type AlignValue = Side | 'center' | 'middle' | number
+type AlignValue = Side | 'center' | 'middle' | 'stretch' | number   // stretch: take the slot across a stack (a column's width, a row's height) when the element can
 type Align = AlignValue | [AlignValue, AlignValue]
 
 // direction: horizontal/vertical, cardinal, angle in degrees, or unit vector

@@ -413,13 +413,13 @@ class Text extends Group {
     // ray at the block's aspect
     natural(): Bounds {
         const s = this.em.scale
-        if (this.whitespace !== 'normal') return { width: point(this.em.width), height: point(this.em.height) }
+        if (this.whitespace !== 'normal') return { width: point(this.em.width), height: point(this.em.height), stretch: [ true, false ] }
         const widths = this.spans.map(span_width)
         const minc = max(widths) ?? 0
         const maxc = sum(widths)
         const most = wrap_widths(this.spans, span_width, minc).rows.length
         const total = (k: number) => k / (1 - this.spacing)
-        return { width: [ minc * s, maxc * s ], height: [ total(1) * s, total(most) * s ] }
+        return { width: [ minc * s, maxc * s ], height: [ total(1) * s, total(most) * s ], stretch: [ true, false ] }
     }
 
     // laid out for the slot (fit text is scaled into it by the base): set
@@ -568,7 +568,7 @@ class TextGrid extends Group {
         const row = (r: number, i: 0 | 1) => max(B.slice(r * cols, (r + 1) * cols).map(b => b.height[i])) ?? 0
         const hmin = sum(Array.from({ length: nrows }, (_, r) => row(r, 0))) + Math.max(nrows - 1, 0) * vgap
         const hmax = sum(Array.from({ length: nrows }, (_, r) => row(r, 1))) + Math.max(nrows - 1, 0) * vgap
-        return { width: [ wmin * s, wmax * s ], height: [ hmin * s, hmax * s ] }
+        return { width: [ wmin * s, wmax * s ], height: [ hmin * s, hmax * s ], stretch: [ true, false ] }
     }
 
     // laid out again for the width it is given (a filled slot as its own)
@@ -684,7 +684,7 @@ class Bullets extends Stack {
         const wmax = (max(B.map(b => b.width[1])) ?? 0) + indent
         const hmin = sum(B.map(b => b.height[0])) + gap * Math.max(n - 1, 0)
         const hmax = sum(B.map(b => b.height[1])) + gap * Math.max(n - 1, 0)
-        return { width: [ wmin * s, wmax * s ], height: [ hmin * s, hmax * s ] }
+        return { width: [ wmin * s, wmax * s ], height: [ hmin * s, hmax * s ], stretch: [ true, false ] }
     }
 }
 

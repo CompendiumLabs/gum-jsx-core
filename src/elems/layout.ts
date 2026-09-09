@@ -24,8 +24,8 @@ interface StackArgs extends GroupArgs, EmArgs {
     direc?: Orient
     gap?: number                 // between children, in em
     spacing?: boolean | number   // between children, as a fraction of the stack's length
-    justify?: AlignValue         // across a column (and along a row narrower than its width); also the text alignment handed down
-    valign?: RowAlign            // across a row: top, anchor, center, bottom
+    justify?: AlignValue         // across a column (and along a row narrower than its width); also the text alignment handed down; 'stretch' stretches every child that can across a column
+    valign?: RowAlign            // across a row: top, anchor, center, bottom, or stretch (every child that can takes the row's height)
     anchor?: 'first' | 'center'  // where the stack's anchor is
     even?: boolean               // every child an equal share
     width?: number               // the stack's size in em: what a column offers, a row divides

@@ -5,7 +5,7 @@ import { none } from '../lib/const'
 import { prefix_split, prefix_join, pad_rect } from '../lib/utils'
 import { make_em, em_frame } from '../lib/em'
 import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
-import { FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
+import { FREE_BOUNDS, box_bounds, scale_bounds, NO_STRETCH, stretches } from '../lib/layout'
 
 import { Group, Rectangle, spec_split, ensure_children, is_element, is_unsized_em, place_in_box } from './core'
 import type { Element, GroupArgs, Bounds, Offer, Laid } from './core'
@@ -35,8 +35,8 @@ interface BoxArgs extends Omit<GroupArgs, 'aspect' | 'clip' | 'mask'>, EmArgs {
     aspect?: number | boolean    // the shape of the framed box; true for square
     clip?: true | Element | ((g: BoxGeometry) => Element)   // clip to the frame, or to an element (in em; a function of the geometry)
     mask?: Element | ((g: BoxGeometry) => Element)          // a mask (in em; a function of the geometry)
-    justify?: AlignValue         // the text alignment, and where content narrower than the box sits
-    valign?: AlignValue          // where content shorter than a box of a height of its own sits (default: center)
+    justify?: AlignValue         // the text alignment, and where content narrower than the box sits; 'stretch' stretches content that can across a box that spans its width
+    valign?: AlignValue          // where content shorter than a box of a height of its own sits (default: center); 'stretch' likewise down it
     width?: number               // the box's outer size in em, which it spans
     height?: number
     font_family?: string
@@ -116,11 +116,19 @@ class Box extends Group {
         const span_h = height != null || (fixed && outer_h != null)
         const room = (outer: number | undefined, inset: number) => outer != null ? Math.max(outer - inset, 0) : undefined
         // a box that spans its width (a width of its own, or a filled slot)
-        // fills the area with content free in width, as a column does: a
-        // column or a text box spans it and sits its content by justify;
-        // content with an align of its own keeps its width and sits by that
-        const fills = (c: Element) => span_w && !fixed && c.align?.[0] == null
-        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...(fills(c) ? { fill: true, align: justify } : {}), ...(justify0 != null ? { justify: justify0 } : {}) })
+        // fills the area with content that can stretch in width and is asked
+        // to (its own align, or the box's justify, is 'stretch'), as a column
+        // does: a column or a text box spans it and sits its content by its
+        // own justify; likewise down a box that spans its height by valign.
+        // other content keeps its size and sits in the area
+        const stretch_offer = (c: Element): Partial<Offer> => {
+            if (fixed || !(span_w || span_h)) return {}
+            const b = c.bounds()
+            const fill = span_w && stretches(b, 0) && (c.align?.[0] ?? justify) == 'stretch'
+            const vfill = span_h && stretches(b, 1) && (c.align?.[1] ?? valign) == 'stretch'
+            return { ...(fill ? { fill: true, align: justify } : {}), ...(vfill ? { vfill: true } : {}) }
+        }
+        const lay = (c: Element, w: number | undefined, h: number | undefined): Laid => c.lay({ width: w, height: h, attr: { ...font_attr, ...text_attr }, fit: fixed || undefined, ...stretch_offer(c), ...(justify0 != null ? { justify: justify0 } : {}) })
         const first = content.length > 0 ? lay(content[0], room(outer_w, insets[0]), room(outer_h, insets[1])) : null
         const [ cw, ch ] = first != null ? [ first.em.width, first.em.height ] : [ room(outer_w, insets[0]) ?? 1, room(outer_h, insets[1]) ?? 1 ]
         let box_w = span_w ? outer_w! - ml - mr : cw + pl + pr
@@ -178,26 +186,28 @@ class Box extends Group {
     }
 
     // the content's bounds shifted by the insets (its tie kept), at the box's
-    // scale; a box of an aspect is any size at it, its margins outside; a flex
+    // scale, and stretched on both axes (the frame grows, the content sits in
+    // it); a box of an aspect is any size at it, its margins outside; a flex
     // box is free; one without content is its size
     natural(): Bounds {
         const s = this.em.scale
         if (this.aspect_box != null) {
             const [ mx, my ] = this.margins
-            return { ...FREE_BOUNDS, aspect: this.aspect_box, offset: [ mx * s, my * s ] }
+            return { ...FREE_BOUNDS, aspect: this.aspect_box, offset: [ mx * s, my * s ], stretch: NO_STRETCH }
         }
         if (this.args.flex === true) return FREE_BOUNDS
         if (this.content.length == 0) return super.natural()
-        return scale_bounds(box_bounds(this.content[0].bounds(), this.insets), s)
+        return { ...scale_bounds(box_bounds(this.content[0].bounds(), this.insets), s), stretch: [ true, true ] }
     }
 
     // laid out again for the offer: a box of an aspect at the size that fits
     // it (margins outside), a flex one filling it, else with its content laid
-    // out for it; a filled slot is the box's own width, so the frame spans it,
+    // out for it; a filled slot is the box's own width (or height), so the
+    // frame spans it with the content sitting inside by justify and valign,
     // and a text alignment handed down reaches a text content.
     // nothing offered: as it is. rotated: a figure, fit by its bounds
     place(offer: Offer = {}): Laid {
-        const { width, height, fill, justify, attr = {} } = offer
+        const { width, height, fill, vfill, justify, attr = {} } = offer
         if (width == null && height == null) return super.place(offer)
         if (this.spec.rotate) {
             const [ w, h ] = fit_offer(this.spec.aspect ?? 1, offer)
@@ -219,7 +229,13 @@ class Box extends Group {
             size = { width: width ?? height, height: height ?? width }
         }
         const justify_attr = (justify != null && this.args.justify == null && this.content[0] instanceof Text) ? { justify } : {}
-        const own = (fill && width != null && this.args.width == null && !fixed) ? { width: width / s, offer: { height } } : { offer: size }
+        const w_own = (fill && width != null && this.args.width == null && !fixed) ? width / s : undefined
+        const h_own = (vfill && height != null && this.args.height == null && !fixed) ? height / s : undefined
+        const own = {
+            ...(w_own != null ? { width: w_own } : {}),
+            ...(h_own != null ? { height: h_own } : {}),
+            offer: { width: w_own == null ? size.width : undefined, height: h_own == null ? size.height : undefined },
+        }
         const elem = this.clone({ ...attr, ...justify_attr, ...own }) as Box
         return { elem, em: elem.em }
     }

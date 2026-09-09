@@ -6,7 +6,7 @@ import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_r
 import { resolveEnv } from '../lib/default'
 import { make_em, scale_em_spec, em_rect, em_frame } from '../lib/em'
 import type { EmSpec, EmOrigin } from '../lib/em'
-import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height } from '../lib/layout'
+import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height, NO_STRETCH, stretches } from '../lib/layout'
 import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
 import type { WithEm } from './em'
 import type { Env } from '../env'
@@ -25,8 +25,8 @@ function align_pair(align?: Align): [ AlignValue, AlignValue ] | undefined {
 function align_frac(align: AlignValue): number {
     if (is_scalar(align)) {
         return align as number
-    } else if (align == 'left' || align == 'top') {
-        return 0
+    } else if (align == 'left' || align == 'top' || align == 'stretch') {
+        return 0   // a stretched element spans its slot; one that cannot sits at the start
     } else if (align == 'center' || align == 'middle') {
         return 0.5
     } else if (align == 'right' || align == 'bottom') {
@@ -489,15 +489,16 @@ class Element {
         this.own_size = [ width, height ]
     }
 
-    // its fraction of a stack's length along the axis, if any
     // the sizes it can come out at with nothing said: a formula is its box, a
-    // shape any size at its aspect, anything else any size at all. content
-    // (text) overrides this with the range it can be laid out in
+    // shape any size at its aspect, anything else any size at all (and
+    // stretched to it). content (text) overrides this with the range it can
+    // be laid out in
     natural(): Bounds {
-        if (this.em == null) return {
+        if (this.em == null) return this.spec.aspect != null ? {
             ...FREE_BOUNDS,
             aspect: this.spec.aspect,
-        }
+            stretch: NO_STRETCH,
+        } : FREE_BOUNDS
         return {
             width: point(this.em.width),
             height: point(this.em.height),
@@ -518,25 +519,28 @@ class Element {
 
     // the bounds a container reads: the natural ones, or pinned to a point on
     // an axis by a size of the element's own (and on the other through the
-    // tie, or for content by laying it out at that width)
+    // tie, or for content by laying it out at that width); a size of its own
+    // is not stretched
     bounds(): Bounds {
         const fit = this.fitted()
         const b: Bounds = fit != null ? {
             ...FREE_BOUNDS,
-            aspect: fit.width / fit.height
+            aspect: fit.width / fit.height,
+            stretch: NO_STRETCH,
         } : this.natural()
         const [ w, h ] = this.own_size
+        const stretch: [ boolean, boolean ] = [ w == null && stretches(b, 0), h == null && stretches(b, 1) ]
         if (w != null && h != null) {
             return { width: point(w), height: point(h) }
         } else if (w != null) {
             const hh = b.aspect != null  ? point(tie_height(b, w)) :
                        b.height[1] < INF ? point(this.place({ width: w }).em.height) :
                                            b.height
-            return { ...b, width: point(w), height: hh }
+            return { ...b, width: point(w), height: hh, stretch }
         } else if (h != null) {
             const ww = b.aspect != null ? point(tie_width(b, h!)) :
                                           b.width
-            return { ...b, width: ww, height: point(h!) }
+            return { ...b, width: ww, height: point(h!), stretch }
         } else {
             return b
         }
@@ -600,14 +604,15 @@ class Element {
         const laid = fit_em != null ?
             fit_laid(this, fit_em, { width, height }) :
             this.place({ ...offer, width, height })
-        // a filled slot is the box (never narrower than the content came to,
+        // a filled slot is the box (never smaller than the content came to,
         // so an overflowing row still reports its width)
         const fill = offer.fill && offer.width != null && w == null ? Math.max(offer.width, laid.em.width) : undefined
-        if (w == null && h == null && fill == null) return laid
+        const vfill = offer.vfill && offer.height != null && h == null ? Math.max(offer.height, laid.em.height) : undefined
+        if (w == null && h == null && fill == null && vfill == null) return laid
         // content filling a slot sits in it by the offer's align (a formula at
         // the left of a left column) unless it has an align of its own
         const align = this.spec.align ?? (fill != null && offer.align != null ? [ offer.align, 'center' ] as Align : undefined)
-        return box_laid(laid, w ?? fill ?? laid.em.width, h ?? laid.em.height, align)
+        return box_laid(laid, w ?? fill ?? laid.em.width, h ?? vfill ?? laid.em.height, align)
     }
 
     rect(ctx: Context): Rect {

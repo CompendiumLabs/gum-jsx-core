@@ -14,7 +14,17 @@
 //   flexible in height   max height == Inf   takes a height budget
 //   growable             flexible, no aspect takes slack (a bare stretch)
 //   content-sized        max height finite   height follows from width
+//   stretchable          stretch[axis]       its box may be larger than its
+//                                            content, the drawing following
 //
+// the range is the content's: the widest a text is its line, the widest a
+// box of it is that line plus the padding. whether the element may be made
+// larger than that on an axis, its frame or block growing while the content
+// sits inside, is `stretch`: a box, a text block and a stack say yes, a
+// formula and a shape say no. a stack stretches such a child across it (the
+// column's width, the row's height) when asked, by the child's `align` or the
+// stack's `justify` (a column) or `valign` (a row) being 'stretch'; never
+// along it, where the range rules
 // a child with a `share` is that fraction of the stack's length; `spacing` is
 // the fraction between children. both resolve once the length is known, and
 // when it is not the stack solves for it
@@ -34,6 +44,7 @@ interface Bounds {
     height: Range
     aspect?: number
     offset?: [ number, number ]   // [ox, oy] of the tie; the origin when absent
+    stretch?: [ boolean, boolean ]  // whether the box may be larger than the content on each axis, the drawing following (see above); neither when absent
 }
 
 // what a child is offered: a width and/or height in the stack's em, the text
@@ -43,6 +54,7 @@ interface Offer {
     width?: number
     height?: number
     fill?: boolean        // the width offered is the child's box (a row's flexible child takes its allocation)
+    vfill?: boolean       // the height offered is the child's box (a row's child that stretches takes the row's height)
     fit?: boolean         // the child is fit into the slot afterwards (a box's content): text that does not fit scales rather than overflows
     align?: AlignValue    // where content narrower than a filled slot sits across it (a column's justify; a row centers)
     justify?: AlignValue
@@ -66,7 +78,7 @@ interface LayoutItem<T> {
 // how a row's children align across it: their tops, their anchors (the math
 // axis of a text block's first line or of a formula), their middles, or their
 // bottoms
-type RowAlign = 'top' | 'anchor' | 'center' | 'bottom' | number
+type RowAlign = 'top' | 'anchor' | 'center' | 'bottom' | 'stretch' | number
 
 interface StackOptions {
     width?: number
@@ -108,7 +120,7 @@ const clamp = (x: number, [ lo, hi ]: Range) => Math.min(Math.max(x, lo), hi)
 function frac(a: AlignValue | 'anchor' | undefined, fallback: number = 0): number {
     if (a == null) return fallback
     if (typeof a == 'number') return a
-    if (a == 'left' || a == 'top') return 0
+    if (a == 'left' || a == 'top' || a == 'stretch') return 0
     if (a == 'center' || a == 'middle') return 0.5
     if (a == 'right' || a == 'bottom') return 1
     return fallback
@@ -127,8 +139,10 @@ function tie_height(b: Bounds, w: number): number {
 
 const point = (x: number): Range => [ x, x ]
 
-// bounds with nothing known: any size at all
-const FREE_BOUNDS: Bounds = { width: [ 0, INF ], height: [ 0, INF ] }
+// bounds with nothing known: any size at all, and stretched to it
+const FREE_BOUNDS: Bounds = { width: [ 0, INF ], height: [ 0, INF ], stretch: [ true, true ] }
+const NO_STRETCH: [ boolean, boolean ] = [ false, false ]
+const stretches = (b: Bounds, axis: 0 | 1): boolean => b.stretch?.[axis] ?? false
 
 // split `total` evenly among items, each clamped to its range: the violators
 // of the sign of the total violation are frozen at their clamps and the rest
@@ -206,9 +220,12 @@ function stack_bounds<T>(direc: Orient, items: LayoutItem<T>[], { gap = 0, spaci
         const [ ox, oy ] = off(B[j])
         tie = vertical ? { aspect: key(j), offset: [ ox, oy / F[j]! ] } : { aspect: key(j), offset: [ ox / F[j]!, oy ] }
     }
+    // a stack may be wider than its children (a column spans a width, a row
+    // packs into one), never taller of itself; a tied stack is its shape
+    const stretch: [ boolean, boolean ] = tie.aspect != null ? NO_STRETCH : [ true, false ]
     return vertical
-        ? { width: across(b => b.width), height: along(b => b.height), ...tie }
-        : { width: along(b => b.width), height: across(b => b.height), ...tie }
+        ? { width: across(b => b.width), height: along(b => b.height), stretch, ...tie }
+        : { width: along(b => b.width), height: across(b => b.height), stretch, ...tie }
 }
 
 // the bounds of a box around one child: the child's shifted by the insets
@@ -230,7 +247,7 @@ function tied_height(B: Bounds[], width: number): number {
 function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
     const [ ox, oy ] = child.offset ?? [ 0, 0 ]
     const tie = child.aspect != null ? { aspect: child.aspect, offset: [ ox + ix, oy + iy ] as [ number, number ] } : {}
-    return { width: [ child.width[0] + ix, child.width[1] + ix ], height: [ child.height[0] + iy, child.height[1] + iy ], ...tie }
+    return { width: [ child.width[0] + ix, child.width[1] + ix ], height: [ child.height[0] + iy, child.height[1] + iy ], stretch: child.stretch, ...tie }
 }
 
 // bounds in a child's em scaled into its parent's, by a factor per axis (a
@@ -238,7 +255,7 @@ function box_bounds(child: Bounds, [ ix, iy ]: [ number, number ]): Bounds {
 function scale_bounds(b: Bounds, sx: number, sy: number = sx): Bounds {
     const sc = ([ lo, hi ]: Range, s: number): Range => [ lo * s, hi * s ]
     const offset = b.offset != null ? [ b.offset[0] * sx, b.offset[1] * sy ] as [ number, number ] : undefined
-    return { width: sc(b.width, sx), height: sc(b.height, sy), aspect: b.aspect != null ? b.aspect * sx / sy : undefined, offset }
+    return { width: sc(b.width, sx), height: sc(b.height, sy), aspect: b.aspect != null ? b.aspect * sx / sy : undefined, offset, stretch: b.stretch }
 }
 
 //
@@ -263,17 +280,17 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
     const n = items.length
     const B = items.map(k => k.bounds())
     const F = items.map(k => k.spec.share)
-    // a child free in width (unshared, untied, no align of its own) takes
-    // the column's width as its box, as a row's flexible child takes its
-    // allocation: a box of text spans the column, and sits its content by
-    // justify; a formula sits in the width by justify. across the column a
-    // child's own extent does not matter (a one-word box spans like any
-    // other), only a tie or a size of its own. a child with an align of its
-    // own keeps its width and sits in the slot by it (a badge at the left).
-    // in a column that spans its width the free children take it as they
-    // are laid; a hugging column lays every child at its own width first,
-    // and the free ones then span the widest (below)
-    const free = (i: number) => F[i] == null && B[i].aspect == null && items[i].align?.[0] == null
+    // an unshared child that can stretch in width, and is asked to (its own
+    // align, or the column's justify, is 'stretch') takes the column's width
+    // as its box, as a row's flexible child takes its allocation: a box of
+    // text spans the column, and sits its content by its own justify. across
+    // the column a child's own extent does not matter (a one-word box spans
+    // like any other), only whether it stretches. any other child keeps its
+    // width and sits in the slot by its align or the justify. in a column
+    // that spans its width the stretched children take it as they are laid;
+    // a hugging column lays every child at its own width first, and the
+    // stretched ones then span the widest (below)
+    const free = (i: number) => F[i] == null && stretches(B[i], 0) && (items[i].align?.[0] ?? justify) == 'stretch'
     const spans = (i: number) => !hug && free(i)
     const offer = (k: LayoutItem<T>, size: { width?: number, height?: number }): Laid<T> => {
         const fill = size.width != null && spans(items.indexOf(k))
@@ -413,8 +430,8 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
         }
     }
 
-    // a hugging column is as wide as its widest child, and the free children
-    // span that width (a growable one keeping the height it was given)
+    // a hugging column is as wide as its widest child, and the stretched
+    // children span that width (a growable one keeping the height it was given)
     if (hug && n > 0) {
         const widest = max(laid.map(l => l.em.width))
         for (const i of range(n)) {
@@ -474,10 +491,14 @@ function binary_search(test: (x: number) => boolean, limit: [ number, number ], 
 // by justify
 function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayout<T> {
     const { width: W0, height: H, hug = false, gap = 0, spacing = 0, justify = 'left', valign = 'top', anchor: anchor0 = 'first', attr } = options
-    const offer = (k: LayoutItem<T>, size: { width?: number, height?: number, fill?: boolean }): Laid<T> => k.lay({ ...size, justify, attr })
     const n = items.length
     const B = items.map(k => k.bounds())
     const F = items.map(k => k.spec.share)
+    const last: Offer[] = items.map(() => ({}))   // the offer each child was last laid out for
+    const offer = (k: LayoutItem<T>, size: { width?: number, height?: number, fill?: boolean, vfill?: boolean }): Laid<T> => {
+        last[items.indexOf(k)] = size
+        return k.lay({ ...size, justify, attr })
+    }
     const D = stack_rest(items, spacing)
     const emgaps = gap * Math.max(n - 1, 0)
     const unshared = range(n).filter(i => F[i] == null)
@@ -569,6 +590,16 @@ function layout_row<T>(items: LayoutItem<T>[], options: StackOptions): StackLayo
         }
     }
 
+    // a child that can stretch in height (a box, not a text or a formula),
+    // and is asked to (its own align, or the row's valign, is 'stretch'),
+    // takes the row's height as its box, its content sitting inside by its
+    // own valign
+    for (const i of range(n)) {
+        const a = items[i].align?.[1] ?? valign
+        if (a != 'stretch' || !stretches(B[i], 1) || laid[i].em.height >= height - EPS) continue
+        laid[i] = offer(items[i], { ...last[i], width: last[i].width ?? laid[i].em.width, height, vfill: true })
+    }
+
     // align across: by valign, or a child's own; 'anchor' lines the anchors up
     const anchor_line = n > 0 ? max(laid.map(l => l.em.anchor)) : 0
     const ys = laid.map((l, i) => {
@@ -607,5 +638,5 @@ function layout_stack<T>(direc: Orient, items: LayoutItem<T>[], options: StackOp
 // exports
 //
 
-export { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, scale_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
+export { INF, EPS, FREE_BOUNDS, NO_STRETCH, stretches, point, tie_width, tie_height, distribute, stack_rest, stack_bounds, box_bounds, scale_bounds, layout_stack, layout_column, layout_row, frac as align_fraction, make_em }
 export type { Range, Bounds, Offer, Laid, LayoutItem, RowAlign, StackOptions, Placement, StackLayout }
