@@ -3,14 +3,13 @@
 import { THEME } from '../lib/theme'
 import { none } from '../lib/const'
 import { prefix_split, prefix_join, pad_rect } from '../lib/utils'
-import { make_em, scale_em_spec } from '../lib/em'
-import type { EmArgs, EmSpec } from '../lib/em'
+import { make_em, em_frame, scale_em_spec } from '../lib/em'
+import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
 import { FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
 
 import { Group, Rectangle, spec_split, ensure_children, is_element, is_unsized_em, place_in_box } from './core'
 import type { Element, GroupArgs, Bounds, Offer, Laid } from './core'
 import { RoundedRect } from './geometry'
-import { box_aspect } from './em'
 import { Text } from './text'
 
 import type { Rect, Padding, Rounded, AlignValue } from '../lib/types'
@@ -145,7 +144,7 @@ class Box extends Group {
         const shape_rect: Rect = [ ml, mt, ml + box_w, mt + box_h ]
         const shape = shape0 ?? (rounded != null ? new RoundedRect({ rounded, env }) : new Rectangle({ env }))
         const background = fill != null ? shape.clone({ rect: shape_rect, fill, stroke: none, ...fill_attr }) : null
-        const frame = (border != null && border !== false) ? shape.clone({ rect: shape_rect, stroke_width: border === true ? 1 : border, fill: none, ...border_attr }) : null
+        const border_elem = (border != null && border !== false) ? shape.clone({ rect: shape_rect, stroke_width: border === true ? 1 : border, fill: none, ...border_attr }) : null
         const [ ax, ay, aw, ah ] = [ area[0], area[1], area[2] - area[0], area[3] - area[1] ]
         const em_rect = (c: Element): Rect => {
             if (is_unsized_em(c)) {
@@ -158,15 +157,16 @@ class Box extends Group {
             return [ ax + x0 * aw, ay + y0 * ah, ax + x1 * aw, ay + y1 * ah ]
         }
         const others = decor.map(c => c.clone({ rect: em_rect(c) }))
-        const em_coord: Rect = [ 0, 0, total_w, total_h ]
-        const in_em = (e: Element): Element => (e instanceof Group && e.spec.coord == null) ? e.clone({ coord: em_coord }) : new Group({ children: [ e ], coord: em_coord, env })
+        const metrics: EmMetrics = { width: total_w, height: total_h, anchor }
+        const frame = em_frame(metrics)
+        const in_em = (e: Element): Element => (e instanceof Group && e.spec.coord == null) ? e.clone({ coord: frame.coord }) : new Group({ children: [ e ], coord: frame.coord, env })
         const clip_elem = clip == null ? undefined : in_em(clip === true ? shape.clone({ rect: shape_rect }) : typeof clip == 'function' ? clip(geometry) : clip)
         const mask_elem = mask == null ? undefined : in_em(typeof mask == 'function' ? mask(geometry) : mask)
 
         // pass to Group
-        super({ children: [ background, ...placed.map(p => p.child), frame, ...others ], coord: [ 0, 0, total_w, total_h ], aspect: box_aspect(total_w, total_h), clip: clip_elem, mask: mask_elem, upright: true, env, ...attr, ...spec, width, height })
+        super({ children: [ background, ...placed.map(p => p.child), border_elem, ...others ], ...frame, clip: clip_elem, mask: mask_elem, upright: true, env, ...attr, ...spec, width, height })
         this.args = args
-        this.em = make_em(scale_em_spec({ width: total_w, height: total_h, anchor, scale: 1 }, scale))
+        this.em = make_em(scale_em_spec(make_em(metrics), scale))
         this.content = content
         this.insets = insets
         this.margins = [ ml + mr, mt + mb ]

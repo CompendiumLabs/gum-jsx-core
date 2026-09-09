@@ -4,7 +4,7 @@
 // math adds its spacing rules and styles, text its wrapping
 
 import { max, merge_limits, ensure_pair } from '../lib/utils'
-import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_aspect, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
+import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_rect, em_frame, hull_overhang, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
 import type { TextMetrics } from '../lib/text'
 import type { Attrs, Rect, Limit, Align, AlignValue, Orient } from '../lib/types'
@@ -125,9 +125,9 @@ function place_items(placed: Placed[], pad: Limit = [ 0, 0 ], width0?: number): 
     const bounds: Limit = [ ylo0 - pad[0], yhi0 + pad[1] ]
 
     // the group draws the ink hull, which the layout box may not cover
-    const { hink, vink, coord } = hull_overhang(rects, width, bounds)
+    const { hink, vink } = hull_overhang(rects, width, bounds)
     const metrics = bounds_em(width, bounds, { hink, vink })
-    const group = new Group({ children, coord, aspect: em_aspect(metrics), env: placed[0]?.item.env })
+    const group = new Group({ children, ...em_frame(metrics, 'anchor'), env: placed[0]?.item.env })
     return with_em(group, metrics)
 }
 
@@ -159,10 +159,6 @@ function row_offsets(laid: Laid[], valign: RowAlign): number[] {
     })
 }
 
-function box_aspect(width: number, height: number): number | undefined {
-    return (width > 0 && height > 0) ? width / height : undefined
-}
-
 // the options of a stack in em (see lib/layout.ts): a width and/or height,
 // the gap in em and the spacing as a fraction of the length, how children
 // sit across the stack (justify for a column, valign for a row) and where
@@ -192,9 +188,9 @@ function layout_em_stack(direc: Orient, children: Element[], options: EmStackOpt
         if (laid.elem.em != null) out.em = laid.em
         return out
     })
-    const { hink, vink, coord } = hull_overhang(rects, width, [ 0, height ])
+    const { hink, vink } = hull_overhang(rects, width, [ 0, height ])
     const metrics: EmMetrics = { width, height, anchor, hink, vink }
-    return { children: elems, coord, aspect: em_aspect(metrics), metrics }
+    return { children: elems, ...em_frame(metrics), metrics }
 }
 
 // the bounds of a stack in em from its children's (see lib/layout.ts)
@@ -206,5 +202,5 @@ function layout_em_bounds(direc: Orient, children: Element[], options: EmStackOp
 // exports
 //
 
-export { ensure_em_spec, with_em, ensure_em, scale_em, em_context, place_items, place_laid, child_align, row_offsets, box_aspect, layout_em_stack, layout_em_bounds }
+export { ensure_em_spec, with_em, ensure_em, scale_em, em_context, place_items, place_laid, child_align, row_offsets, layout_em_stack, layout_em_bounds }
 export type { WithEm, Placed, RowAlign, EmStackOptions, EmLayout }

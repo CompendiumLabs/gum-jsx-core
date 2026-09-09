@@ -9,12 +9,12 @@ import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, re
 import { textMetrics, splitWords } from '../lib/text'
 import type { TextMetrics, Whitespace } from '../lib/text'
 import { wrapWidths } from '../lib/wrap'
-import { make_em, em_bounds, em_hink, scale_em_spec } from '../lib/em'
-import type { EmArgs, EmSpec } from '../lib/em'
+import { make_em, em_bounds, em_hink, em_frame, scale_em_spec } from '../lib/em'
+import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
 import { EPS, point } from '../lib/layout'
 
 import { Context, Element, Group, Spacer, spec_split, ensure_children, escape_text, is_element, align_frac, fit_laid } from './core'
-import { place_laid, child_align, row_offsets, box_aspect } from './em'
+import { place_laid, child_align, row_offsets } from './em'
 import type { WithEm, RowAlign } from './em'
 import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
 import { Stack } from './layout'
@@ -277,11 +277,11 @@ class TextLine extends Group {
             x += widths[i]
             return s.clone({ rect })
         })
-        super({ children: placed, coord: [ 0, 0, w || 1, 1 ], aspect: w > 0 ? w : undefined, upright: true, debug, env, ...attr })
-        this.args = args
-
         // one line: as wide as its width (or its content), one em tall
-        this.em = make_em({ width: w, height: 1, anchor: TEXT_ANCHOR })
+        const metrics: EmMetrics = { width: w, height: 1, anchor: TEXT_ANCHOR }
+        super({ children: placed, ...em_frame(metrics), upright: true, debug, env, ...attr })
+        this.args = args
+        this.em = make_em(metrics)
     }
 }
 
@@ -367,7 +367,8 @@ class Text extends Group {
         const placed = lines.map((l, i) => l.clone({ rect: [ 0, i * pitch, line_width, i * pitch + 1 ] }))
 
         // pass to Group; content text keeps its width as a size of its own
-        super({ children: placed, coord: [ 0, 0, line_width || 1, total || 1 ], aspect: box_aspect(line_width, total), upright: true, env, ...spec, fit, width: fit ? undefined : width })
+        const metrics: EmMetrics = { width: line_width, height: total, anchor: TEXT_ANCHOR }
+        super({ children: placed, ...em_frame(metrics), upright: true, env, ...spec, fit, width: fit ? undefined : width })
         this.args = args
 
         // additional props
@@ -375,7 +376,7 @@ class Text extends Group {
         this.whitespace = whitespace
         this.fit = fit
         this.spacing = spacing
-        this.em = make_em(scale_em_spec({ width: line_width, height: total, anchor: TEXT_ANCHOR, scale: 1 }, scale))
+        this.em = make_em(scale_em_spec(make_em(metrics), scale))
     }
 
     // as content: from its longest word to its one line wide, one line to
@@ -519,12 +520,13 @@ class TextGrid extends Group {
         const height = y
 
         // pass to Group
-        super({ children: placed, coord: [ 0, 0, grid_width, height ], aspect: box_aspect(grid_width, height), upright: true, env, ...attr, ...spec, width: width0 })
+        const metrics: EmMetrics = { width: grid_width, height, anchor }
+        super({ children: placed, ...em_frame(metrics), upright: true, env, ...attr, ...spec, width: width0 })
         this.args = args
         this.cells = children
         this.cols = cols
         this.gaps = [ hgap, vgap ]
-        this.em = make_em(scale_em_spec({ width: grid_width, height, anchor, scale: 1 }, scale))
+        this.em = make_em(scale_em_spec(make_em(metrics), scale))
     }
 
     // the columns' worth of the widest cell's range, and the rows' heights

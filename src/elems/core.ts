@@ -4,7 +4,7 @@ import { THEME } from '../lib/theme'
 import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
 import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
-import { make_em, scale_em_spec, em_rect } from '../lib/em'
+import { make_em, scale_em_spec, em_rect, em_frame } from '../lib/em'
 import type { EmSpec } from '../lib/em'
 import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height } from '../lib/layout'
 import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
@@ -835,8 +835,8 @@ function box_laid(laid: Laid, width: number, height: number, align?: Align): Lai
     const { elem, em } = laid
     if (Math.abs(em.width - width) < EPS && Math.abs(em.height - height) < EPS) return laid
     const { child, anchor } = place_in_box(laid, width, height, align)
-    const group = new Group({ children: [ child ], coord: [ 0, 0, width, height ], aspect: height > 0 ? width / height : undefined, upright: true, env: elem.env })
     const boxed = make_em({ width, height, anchor, scale: em.scale })
+    const group = new Group({ children: [ child ], ...em_frame(boxed), upright: true, env: elem.env })
     group.em = boxed
     return { elem: group, em: boxed }
 }

@@ -48,6 +48,10 @@ type EmSpec = {
 // what an element needs to state; the rest have defaults (see make_em)
 type EmMetrics = Pick<EmSpec, 'width' | 'height' | 'anchor'> & Partial<Pick<EmSpec, 'scale' | 'hink' | 'vink'>>
 
+// where a group's em frame puts y = 0: at the top of its layout box, or at
+// its anchor (see em_frame)
+type EmOrigin = 'top' | 'anchor'
+
 //
 // constants
 //
@@ -114,14 +118,6 @@ function em_vink({ height, anchor, vink }: EmMetrics): Limit {
     return vink != null ? [ vink[0] - anchor, vink[1] - anchor ] : [ 0 - anchor, height - anchor ]
 }
 
-// the ink box aspect
-function em_aspect(em: EmMetrics): number | undefined {
-    const [ xlo, xhi ] = em_hink(em)
-    const [ ylo, yhi ] = em_vink(em)
-    const height = yhi - ylo
-    return height > 0 ? (xhi - xlo) / height : undefined
-}
-
 // the rect an item draws into when its anchor sits at (x, y): the ink box
 function em_rect(em: EmMetrics, x: number = 0, y: number = 0): Rect {
     const [ xlo, xhi ] = em_hink(em)
@@ -129,15 +125,31 @@ function em_rect(em: EmMetrics, x: number = 0, y: number = 0): Rect {
     return [ x + xlo, y + ylo, x + xhi, y + yhi ]
 }
 
-// the ink hull of placed rects (in the anchor frame) against the layout box:
-// hink and vink are only set when the ink actually overhangs, and vink is in
-// the anchor frame like the bounds (see bounds_em)
-function hull_overhang(rects: Rect[], width: number, bounds: Limit): { hink?: Limit, vink?: Limit, coord: Rect } {
+// the frame a group with these metrics draws in, for its `coord` and
+// `aspect`: its ink box in its own em (before any `scale` reports the metrics
+// in its parent's), so what a parent maps the group's ink rect onto is the
+// same box its children were placed in. y = 0 sits at the top of the layout
+// box, or with `origin: 'anchor'` at the anchor (a layout that placed its
+// children about the anchor). an axis without extent (an empty line) is made
+// one em long so the frame still maps, and the aspect is left open
+function em_frame(em: EmMetrics, origin: EmOrigin = 'top'): { coord: Rect, aspect: number | undefined } {
+    const [ x1, x2 ] = em_hink(em)
+    const [ y1, y2 ] = origin == 'anchor' ? em_vink(em) : em.vink ?? [ 0, em.height ]
+    const [ w, h ] = [ x2 - x1, y2 - y1 ]
+    const coord: Rect = [ x1, y1, w > 0 ? x2 : x1 + 1, h > 0 ? y2 : y1 + 1 ]
+    const aspect = (w > 0 && h > 0) ? w / h : undefined
+    return { coord, aspect }
+}
+
+// the ink hull of placed rects against the layout box, in whichever frame the
+// rects and bounds share: hink and vink are only set when the ink actually
+// overhangs (vink in that frame, see bounds_em for the anchor frame)
+function hull_overhang(rects: Rect[], width: number, bounds: Limit): { hink?: Limit, vink?: Limit } {
     const [ xlo, xhi ] = merge_limits([ [ 0, width ], ...rects.map(([ x1, , x2 ]) => [ x1, x2 ] as Limit) ])
     const [ ylo, yhi ] = merge_limits([ bounds, ...rects.map(([ , y1, , y2 ]) => [ y1, y2 ] as Limit) ])
     const hink: Limit | undefined = (xlo == 0 && xhi == width) ? undefined : [ xlo, xhi ]
     const vink: Limit | undefined = (ylo == bounds[0] && yhi == bounds[1]) ? undefined : [ ylo, yhi ]
-    return { hink, vink, coord: [ xlo, ylo, xhi, yhi ] }
+    return { hink, vink }
 }
 
 // height above and depth below the baseline of an item in a given scale (its
@@ -170,5 +182,5 @@ function scale_em_spec({ width, height, anchor, scale: scale0, hink, vink }: EmS
 // exports
 //
 
-export { EMPTY_EM, DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_hink, em_vink, em_aspect, em_rect, hull_overhang, baseline_extents, scale_em_spec }
-export type { EmArgs, EmSpec, EmMetrics }
+export { EMPTY_EM, DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_hink, em_vink, em_rect, em_frame, hull_overhang, baseline_extents, scale_em_spec }
+export type { EmArgs, EmSpec, EmMetrics, EmOrigin }

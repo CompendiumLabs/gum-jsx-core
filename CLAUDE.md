@@ -375,7 +375,7 @@ Key functions for rect manipulation:
 **Library modules (`src/lib/`):**
 - `utils.ts` - Math utilities, array/vector ops, rect manipulation, color handling
 - `text.ts` - Text measurement and wrapping using opentype.js
-- `em.ts` - The em metrics record and its queries (bounds, ink, hull, scaling)
+- `em.ts` - The em metrics record and its queries (bounds, ink, hull, the frame a group draws in, scaling)
 - `layout.ts` - The layout engine: bounds, offers, the column and row algorithms, `distribute`
 - `parse.ts` - JSX transform (Acorn, line preserving) and the code runner
 - `errors.ts` - `ErrorSyntax`/`ErrorRuntime` with source positions, stack parsing
