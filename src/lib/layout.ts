@@ -44,6 +44,7 @@ interface Offer {
     height?: number
     fill?: boolean        // the width offered is the child's box (a row's flexible child takes its allocation)
     fit?: boolean         // the child is fit into the slot afterwards (a box's content): text that does not fit scales rather than overflows
+    align?: AlignValue    // where content narrower than a filled slot sits across it (a column's justify; a row centers)
     justify?: AlignValue
     attr?: Attrs
 }
@@ -259,10 +260,25 @@ function scale_bounds(b: Bounds, sx: number, sy: number = sx): Bounds {
 // child out for that
 function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackLayout<T> {
     const { width: W0, height: H0, hug = false, gap = 0, spacing = 0, justify = 'left', anchor: anchor0 = 'first', attr } = options
-    const offer = (k: LayoutItem<T>, size: { width?: number, height?: number }): Laid<T> => k.lay({ ...size, justify, attr })
     const n = items.length
     const B = items.map(k => k.bounds())
     const F = items.map(k => k.spec.share)
+    // a child free in width (unshared, untied, no align of its own) takes
+    // the column's width as its box, as a row's flexible child takes its
+    // allocation: a box of text spans the column, and sits its content by
+    // justify; a formula sits in the width by justify. across the column a
+    // child's own extent does not matter (a one-word box spans like any
+    // other), only a tie or a size of its own. a child with an align of its
+    // own keeps its width and sits in the slot by it (a badge at the left).
+    // in a column that spans its width the free children take it as they
+    // are laid; a hugging column lays every child at its own width first,
+    // and the free ones then span the widest (below)
+    const free = (i: number) => F[i] == null && B[i].aspect == null && items[i].align?.[0] == null
+    const spans = (i: number) => !hug && free(i)
+    const offer = (k: LayoutItem<T>, size: { width?: number, height?: number }): Laid<T> => {
+        const fill = size.width != null && spans(items.indexOf(k))
+        return k.lay({ ...size, fill, align: fill ? justify : undefined, justify, attr })
+    }
     const D = stack_rest(items, spacing)
     const emgaps = gap * Math.max(n - 1, 0)
     const unshared = range(n).filter(i => F[i] == null)
@@ -394,6 +410,17 @@ function layout_column<T>(items: LayoutItem<T>[], options: StackOptions): StackL
         W = n > 0 ? max(laid.map(l => l.em.width)) : 0
         for (const i of grow) {
             laid[i] = offer(items[i], { width: W, height: laid[i].em.height })
+        }
+    }
+
+    // a hugging column is as wide as its widest child, and the free children
+    // span that width (a growable one keeping the height it was given)
+    if (hug && n > 0) {
+        const widest = max(laid.map(l => l.em.width))
+        for (const i of range(n)) {
+            if (!free(i) || laid[i].em.width >= widest - EPS) continue
+            const height = B[i].height[1] == INF ? laid[i].em.height : undefined
+            laid[i] = items[i].lay({ width: widest, height, fill: true, align: justify, justify, attr })
         }
     }
 

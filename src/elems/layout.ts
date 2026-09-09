@@ -30,6 +30,7 @@ interface StackArgs extends GroupArgs, EmArgs {
     even?: boolean               // every child an equal share
     width?: number               // the stack's size in em: what a column offers, a row divides
     height?: number
+    hug?: boolean                // whether a stack with no width of its own hugs its children across the axis (default: yes, unless it fills a slot); false spans the width offered
     font_family?: string
     font_weight?: number
     font_style?: string
@@ -54,7 +55,7 @@ class Stack extends Group {
     options: EmStackOptions
 
     constructor(args: StackArgs = {}) {
-        const { children: children0, direc = 'v', gap = 0, spacing: spacing0 = 0, justify = 'center', valign = 'center', anchor = 'first', even = false, width, height, scale = 1, offer, env, ...attr0 } = THEME(args, 'Stack')
+        const { children: children0, direc = 'v', gap = 0, spacing: spacing0 = 0, justify = 'center', valign = 'center', anchor = 'first', even = false, width, height, hug: hug0, scale = 1, offer, env, ...attr0 } = THEME(args, 'Stack')
         const [ font_attr0, text_attr, attr1 ] = prefix_split([ 'font', 'text' ], attr0)
         const font_attr = prefix_join('font', font_attr0)
         const [ spec, attr ] = spec_split(attr1)
@@ -72,8 +73,11 @@ class Stack extends Group {
         const W = width ?? (offer?.width != null ? offer.width / scale : undefined)
         const H = height ?? (offer?.height != null ? offer.height / scale : undefined)
         // a stack with no width of its own hugs its children across the axis:
-        // the width offered is what they may take, not what the stack is
-        const options: EmStackOptions = { gap, spacing, justify, valign, anchor, hug: width == null, attr: { ...font_attr, ...text_attr } }
+        // the width offered is what they may take, not what the stack is,
+        // unless the offer is a filled slot (a column's width, a row's
+        // allocation), which the stack spans; `hug` says so outright
+        const hug = hug0 ?? (width == null && !offer?.fill)
+        const options: EmStackOptions = { gap, spacing, justify, valign, anchor, hug, attr: { ...font_attr, ...text_attr } }
         const layout = layout_em_stack(direc, items, { ...options, width: W, height: H })
 
         // pass to Group
@@ -90,13 +94,13 @@ class Stack extends Group {
     }
 
     // laid out again for the offer, with the text alignment and settings
-    // handed down to a stack that has none of its own
+    // handed down to a stack that has none of its own. a filled slot is
+    // spanned through the offer rather than taken as a width of the stack's
+    // own, which a subclass may mean otherwise (a TextFigure's sizes its figure)
     place(offer: Offer = {}): Laid {
         const { width, height, fill, justify, attr = {} } = offer
         const justify_attr = justify != null && this.args.justify == null ? { justify } : {}
-        const size = (fill && width != null && this.args.width == null) ?
-            { width: width / this.scale, offer: { height } } :
-            { offer: { width, height } }
+        const size = { offer: { width, height, fill: fill && width != null && this.args.width == null } }
         const elem = this.clone({ ...attr, ...justify_attr, ...size }) as Stack
         return { elem, em: elem.em }
     }

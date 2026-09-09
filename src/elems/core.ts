@@ -600,9 +600,14 @@ class Element {
         const laid = fit_em != null ?
             fit_laid(this, fit_em, { width, height }) :
             this.place({ ...offer, width, height })
-        const fill = offer.fill && offer.width != null && w == null ? offer.width : undefined
+        // a filled slot is the box (never narrower than the content came to,
+        // so an overflowing row still reports its width)
+        const fill = offer.fill && offer.width != null && w == null ? Math.max(offer.width, laid.em.width) : undefined
         if (w == null && h == null && fill == null) return laid
-        return box_laid(laid, w ?? fill ?? laid.em.width, h ?? laid.em.height, this.spec.align)
+        // content filling a slot sits in it by the offer's align (a formula at
+        // the left of a left column) unless it has an align of its own
+        const align = this.spec.align ?? (fill != null && offer.align != null ? [ offer.align, 'center' ] as Align : undefined)
+        return box_laid(laid, w ?? fill ?? laid.em.width, h ?? laid.em.height, align)
     }
 
     rect(ctx: Context): Rect {

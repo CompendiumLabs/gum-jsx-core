@@ -666,7 +666,7 @@ class Bullets extends Stack {
 
         // pass to Stack: the list's own width is the one it was given; the
         // default is only what it is laid out at
-        super({ direc: 'v', children: rows, gap, width: width0, scale, justify, anchor: 'first', env, ...attr, offer: width0 == null ? { width: width * scale, height: offer?.height } : undefined })
+        super({ direc: 'v', children: rows, gap, width: width0, scale, justify, anchor: 'first', env, ...attr, offer: width0 == null ? { width: width * scale, height: offer?.height, fill: offer?.fill } : undefined })
         this.args = args
         this.entries = children.filter(is_element)
         this.indent = indent
