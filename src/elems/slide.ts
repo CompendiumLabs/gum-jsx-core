@@ -129,9 +129,10 @@ interface SlideArgs extends Omit<TitleFrameArgs, 'aspect'> {
 // TextCol of the children in the frame's padded area. its text size is set by
 // `em`, the em as a fraction of the slide height (so 0.05 fits twenty lines),
 // or else by `width`, the content width in em; either way the column spans the
-// content width. content taller than the area is shrunk to fit it, clipped,
-// or an error, by `overflow`; the `overflow` property is the ratio of content
-// height to the area's, so more than 1 means it did not fit
+// content width. content taller than the area, or wider than the em asks for,
+// is shrunk to fit it, clipped, or an error, by `overflow`; the `overflow`
+// property is the ratio of content height to the area's, so more than 1 means
+// it did not fit
 class Slide extends Group {
     // ratio of content height to the available height (> 1 means it was shrunk)
     overflow: number
@@ -165,20 +166,33 @@ class Slide extends Group {
         const canvas_aspect = aspect ?? (col_width / Math.max(col_height, 1e-9)) * area_height + ml + mr + pl + pr
         const area_width = area_width0 ?? canvas_aspect - ml - mr - pl - pr
 
-        // the column spans the area's width, so this many slide heights make an
-        // em; the ratio of its height to the area's is the overflow
-        const em_size = area_width / col_width
+        // the column is laid out for `width` em and comes out wider when a
+        // child cannot fit it (a row of figures at their own size). with a
+        // fixed aspect that is an overflow like a tall one, and `overflow`
+        // says what becomes of it: shrunk, so the em comes out smaller than
+        // asked and the whole slide with it; clipped; or refused. an auto
+        // canvas has no width to overflow, since it grows to the content.
+        // the column then spans what it is given, so this many slide heights
+        // make an em, and the ratio of its height to the area's is the
+        // overflow
+        const span = (area_width0 != null && mode != 'shrink') ? width : col_width
+        const em_size = area_width / span
+        const wide = col_width / span
         const ratio = col_height * em_size / area_height
-        if (mode == 'error' && ratio > 1) throw new Error(`Slide content overflows its frame by ${Math.round((ratio - 1) * 100)}%`)
+        if (mode == 'error') {
+            if (wide > 1 + 1e-9) throw new Error(`Slide content overflows its frame by ${Math.round((wide - 1) * 100)}% in width`)
+            if (ratio > 1) throw new Error(`Slide content overflows its frame by ${Math.round((ratio - 1) * 100)}%`)
+        }
 
         // place the column in the area: at its size, aligned, unless it must
         // shrink to fit the height
         const shrink = mode == 'shrink' && ratio > 1
         const v = align_frac(valign)
         const u = align_frac(align)
+        const w = shrink ? wide / ratio : wide
         const rect: Rect = shrink
-            ? [ u * (1 - 1 / ratio), 0, u * (1 - 1 / ratio) + 1 / ratio, 1 ]
-            : [ 0, v * (1 - ratio), 1, v * (1 - ratio) + ratio ]
+            ? [ u * (1 - w), 0, u * (1 - w) + w, 1 ]
+            : [ u * (1 - w), v * (1 - ratio), u * (1 - w) + w, v * (1 - ratio) + ratio ]
         const area = new Group({ children: [ col.clone({ rect }) ], aspect: area_width / area_height, clip: mode == 'clip' ? true : undefined, env })
 
         // the frame fills the canvas inside the margin, laid out in the

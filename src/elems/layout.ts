@@ -62,16 +62,22 @@ class Stack extends Group {
         const children = ensure_children(children0)
         const spacing = spacing0 === true ? 0.1 : spacing0 === false ? 0 : spacing0
 
-        // an even stack gives every child the same share of what the spacing leaves
-        const n = children.length
-        const items = even ? children.map(c => c.spec.share != null ? c : c.clone({ share: (1 - spacing * Math.max(n - 1, 0)) / n })) : children
-
         // the size laid out for: its own, or the offer (in the stack's em);
         // with neither (a stack placed by rect in a group, which has no em to
         // offer) it hugs its children at their natural sizes and is fit to
         // its rect, as in the share world
         const W = width ?? (offer?.width != null ? offer.width / scale : undefined)
         const H = height ?? (offer?.height != null ? offer.height / scale : undefined)
+
+        // an even stack gives every child the same share of what the spacing
+        // and the em gaps leave: shares are fractions of the stack's length,
+        // so a gap in em is that many over the length, which the stack knows
+        // unless it is hugging (then the gaps are simply on top, as before)
+        const n = children.length
+        const length = direc == 'v' ? H : W
+        const gaps = Math.max(n - 1, 0)
+        const taken = spacing * gaps + (length != null && length > 0 ? gap * gaps / length : 0)
+        const items = even ? children.map(c => c.spec.share != null ? c : c.clone({ share: Math.max(1 - taken, 0) / n })) : children
         // a stack with no width of its own hugs its children across the axis:
         // the width offered is what they may take, not what the stack is,
         // unless the offer is a filled slot (a column's width, a row's
