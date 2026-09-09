@@ -18,8 +18,8 @@ const regular = 400
 const bold = 700
 
 // font metrics
-const vtext = -0.15   // text box shift relative to the line box
-const maxis = 0.25   // math axis height above the baseline (in em)
+const TEXT_AXIS = -0.15  // text box shift relative to the line box (in em)
+const MATH_AXIS = 0.25   // math axis height above the baseline (in em)
 
 // colors
 const none = 'none'
@@ -60,4 +60,4 @@ const DEFAULTS = {
     calc_size: 16,
 }
 
-export { DEFAULTS, svgns, htmlns, sans, mono, moji, cmoji, light, regular, bold, vtext, maxis, none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate, e, pi, phi, r2d, d2r }
+export { DEFAULTS, TEXT_AXIS, MATH_AXIS, svgns, htmlns, sans, mono, moji, cmoji, light, regular, bold, none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate, e, pi, phi, r2d, d2r }

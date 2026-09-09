@@ -159,6 +159,8 @@ The library is built around a class hierarchy split across element modules:
 - Stores `args` (constructor arguments) as a dictionary for easy cloning; `env` (a getter over `args.env`) is the Env it was built against
 - Has a `spec` object containing layout parameters (rect, coord, aspect, aspect0, expand, align, upright, offset, rotate, rotate_adjust, rotate_invar, and the protocol's width, height, share, fit)
 - Has an `attr` object containing SVG attributes (stroke, fill, etc.)
+- Takes `metrics` (what it states about its layout box, in its own em, the record of `src/lib/em.ts`; an element that measures fills in the rest, and a subtype's extra fields ride along unchanged) and `scale` (its em over its parent's), and keeps the scaled record as `em`; only content with a box has one, so `'em' in x` says whether it takes part in em layout. `Group` derives its `coord` and `aspect` from `metrics` through `em_frame` (`origin` puts y = 0 at the top of the box or at its anchor) unless they are given
+- Every em record goes in through `set_em`, which also resolves what follows from it (the `scale` field): the constructor calls it, and so do the cheap clones that swap a record in place (`with_em`, a stack placing a child by the box it was laid to), so derived values never go stale and nothing reads them through a getter
 - Renders to SVG via the `svg(ctx)` method that takes a Context object
 
 `clone` keeps placement changes shallow: it copies `args`, `spec`, and `attr`,
@@ -261,6 +263,11 @@ measured as whole `Span` runs and placed at one common width, without wrapping.
 `width` may widen that box but cannot make it narrower than the source.
 `Verbatim` supplies monospace and preserved whitespace as defaults. `Span`
 passes the whitespace policy to measurement and emits `xml:space="preserve"`.
+A `Span` is framed as the 1em line it sits in by default (`frame: 'line'`, no
+box of its own: a line places it by its advance) or by its ink (`frame: 'ink'`:
+the glyph run's ink about the math axis is its coordinate frame and its layout
+box, with `axis` putting the baseline a quarter em below the axis or centering
+the ink on it); math's `MathSpan` is the ink frame plus atom classes.
 JSX formatting-only whitespace is discarded at parse time; explicit string
 expressions survive unchanged. `TextBox` lays a preserved text child out as a
 block, rather than flattening it back into ordinary text spans.
@@ -471,6 +478,6 @@ Convenience keys (these map into the above keys):
 
 The LaTeX elements (`Latex`, `Tex`, `MathArray`, `MathStretch`, …) are in `@gum-jsx/math`; see
 that package's `CLAUDE.md` for how the katex parse tree is converted. What core provides for
-them: `Span` measurement (`rawTextMetrics`, `textHasGlyphs` in `src/lib/text.ts`), the stroke
+them: `Span` measurement (`raw_text_metrics`, `text_has_glyphs` in `src/lib/text.ts`), the stroke
 unit on `Context` (a math shape rebases it to its box's pixels per em), the `Latex`/`MathShape`
 theme entries in `src/lib/theme.ts`, and the strict-mode kinds in `src/lib/strict.ts`.

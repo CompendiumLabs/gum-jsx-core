@@ -4,7 +4,7 @@
 // math adds its spacing rules and styles, text its wrapping
 
 import { max, merge_limits, ensure_pair } from '../lib/utils'
-import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_rect, em_frame, hull_overhang, scale_em_spec } from '../lib/em'
+import { DEFAULT_EM, make_em, text_em, bounds_em, em_bounds, em_rect, hull_overhang, scale_em_spec } from '../lib/em'
 import type { EmSpec, EmMetrics } from '../lib/em'
 import type { TextMetrics } from '../lib/text'
 import type { Attrs, Rect, Limit, Align, AlignValue, Orient } from '../lib/types'
@@ -33,7 +33,7 @@ function rebuild_em(this: AdaptedEm, args: Attrs): Element {
     const adaptation = this[EM_ADAPTATION]!
     const out = adaptation.rebuild.call(this, args) as AdaptedEm
     const em = out.em ?? ensure_em_spec(out)
-    out.em = adaptation.normalize({ ...em, ...adaptation.patch })
+    out.set_em(adaptation.normalize({ ...em, ...adaptation.patch }))
     out[EM_ADAPTATION] = adaptation
     out.rebuild = rebuild_em
     return out
@@ -42,8 +42,8 @@ function rebuild_em(this: AdaptedEm, args: Attrs): Element {
 // the metrics an element without any gets: a Span's from its text box,
 // anything else a one-em box as wide as its aspect
 function ensure_em_spec(element: Element): EmMetrics {
-    const metrics = (element as { metrics?: TextMetrics }).metrics
-    if (metrics != null) return text_em(metrics)
+    const glyphs = (element as { glyphs?: TextMetrics }).glyphs
+    if (glyphs != null) return text_em(glyphs)
     const { width, height, anchor } = DEFAULT_EM
     return { width: element.spec.aspect ?? width, height, anchor }
 }
@@ -56,7 +56,7 @@ function with_em<E extends Element>(element: E, patch: Partial<EmSpec> = {}, arg
     const em0 = out.em
     const em = em0 ?? ensure_em_spec(out)
     const make = normalize ?? adaptation?.normalize ?? make_em
-    out.em = make({ ...em, ...patch })
+    out.set_em(make({ ...em, ...patch }))
 
     const patched = Object.keys(patch).length > 0
     if (patched || em0 == null || (normalize != null && normalize !== adaptation?.normalize)) {
@@ -127,8 +127,7 @@ function place_items(placed: Placed[], pad: Limit = [ 0, 0 ], width0?: number): 
     // the group draws the ink hull, which the layout box may not cover
     const { hink, vink } = hull_overhang(rects, width, bounds)
     const metrics = bounds_em(width, bounds, { hink, vink })
-    const group = new Group({ children, ...em_frame(metrics, 'anchor'), env: placed[0]?.item.env })
-    return with_em(group, metrics)
+    return new Group({ children, metrics, origin: 'anchor', env: placed[0]?.item.env }) as WithEm<Group>
 }
 
 //
@@ -168,16 +167,14 @@ type EmStackOptions = StackOptions
 
 type EmLayout = {
     children: Element[]
-    coord: Rect
-    aspect: number | undefined
     metrics: EmMetrics
 }
 
 // a stack laid out in em by the engine: every child is laid for its slot
 // (see Element.lay), packed along the axis and aligned across it, and the
-// placements become rects in the stack's em frame. the stack draws the ink
-// hull of its children (a formula with overhang), while the metrics keep the
-// box, so stacks nest
+// placements become rects in the stack's em frame. the metrics keep the box
+// and note the ink hull of the children (a formula with overhang), which is
+// what the stack draws (see em_frame), so stacks nest
 function layout_em_stack(direc: Orient, children: Element[], options: EmStackOptions = {}): EmLayout {
     const { placed, width, height, anchor } = layout_stack<Element>(direc, children, options)
     const rects = placed.map(({ laid, x, y }) => em_rect(laid.em, x, y + laid.em.anchor))
@@ -185,12 +182,12 @@ function layout_em_stack(direc: Orient, children: Element[], options: EmStackOpt
         // the placed child carries the box it was laid to (a fitted or
         // shrunk one differs from its own)
         const out = laid.elem.clone({ rect: rects[i] })
-        if (laid.elem.em != null) out.em = laid.em
+        if (laid.elem.em != null) out.set_em(laid.em)
         return out
     })
     const { hink, vink } = hull_overhang(rects, width, [ 0, height ])
     const metrics: EmMetrics = { width, height, anchor, hink, vink }
-    return { children: elems, ...em_frame(metrics), metrics }
+    return { children: elems, metrics }
 }
 
 // the bounds of a stack in em from its children's (see lib/layout.ts)

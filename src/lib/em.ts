@@ -12,9 +12,11 @@
 //            the axis of its first line
 //   scale    the em of the content relative to the em these are stated in (a
 //            script is laid out in its own em and reports metrics scaled to its
-//            parent's); the content's baseline sits maxis * scale below the anchor
+//            parent's); the content's baseline sits MATH_AXIS * scale below the anchor
 //   hink     horizontal ink range when it overhangs [0, width] (\rlap, strikes)
 //   vink     vertical ink range when it overhangs [0, height] (\smash)
+//   italic   italic correction: the last glyph's ink past the advance, which
+//            a superscript is shifted by
 //
 // Containers align children by their anchors, so most layout code works in
 // anchor-relative bounds: `em_bounds` is the layout box about the anchor
@@ -23,7 +25,7 @@
 // keeps that anchor frame as its `coord` (the anchor at y = 0) and records its
 // own box with `bounds_em`.
 
-import { maxis } from './const'
+import { MATH_AXIS } from './const'
 import { merge_limits } from './utils'
 import type { Limit, Rect } from './types'
 import type { TextMetrics } from './text'
@@ -43,10 +45,11 @@ type EmSpec = {
     scale: number
     hink?: Limit
     vink?: Limit
+    italic?: number
 }
 
 // what an element needs to state; the rest have defaults (see make_em)
-type EmMetrics = Pick<EmSpec, 'width' | 'height' | 'anchor'> & Partial<Pick<EmSpec, 'scale' | 'hink' | 'vink'>>
+type EmMetrics = Pick<EmSpec, 'width' | 'height' | 'anchor'> & Partial<Pick<EmSpec, 'scale' | 'hink' | 'vink' | 'italic'>>
 
 // where a group's em frame puts y = 0: at the top of its layout box, or at
 // its anchor (see em_frame)
@@ -80,10 +83,10 @@ function make_em<T extends Partial<EmSpec>>(spec: T): T & EmSpec {
     }
 }
 
-// the box a Span's text metrics describe: its text box, with the anchor maxis
-// below the top of the box (a line box with the axis at maxis)
+// the box a Span's text metrics describe: its text box, with the anchor MATH_AXIS
+// below the top of the box (a line box with the axis at MATH_AXIS)
 function text_em({ advance, vrange: [ ylo, yhi ] }: TextMetrics): EmMetrics {
-    return { width: advance, height: yhi - ylo, anchor: maxis - ylo }
+    return { width: advance, height: yhi - ylo, anchor: MATH_AXIS - ylo }
 }
 
 // metrics from anchor-relative bounds (a layout that placed its children about
@@ -153,11 +156,11 @@ function hull_overhang(rects: Rect[], width: number, bounds: Limit): { hink?: Li
 }
 
 // height above and depth below the baseline of an item in a given scale (its
-// baseline sits maxis * scale below its anchor); defaults to the scale the
+// baseline sits MATH_AXIS * scale below its anchor); defaults to the scale the
 // item carries
 function baseline_extents(em: EmSpec, scale: number = em.scale): [ number, number ] {
     const [ lo, hi ] = em_bounds(em)
-    const baseline = maxis * scale
+    const baseline = MATH_AXIS * scale
     return [ baseline - lo, hi - baseline ]
 }
 
@@ -166,15 +169,20 @@ function baseline_extents(em: EmSpec, scale: number = em.scale): [ number, numbe
 //
 
 // the box scaled uniformly, for content laid out in a smaller em and reported
-// in its parent's; `scale` compounds
-function scale_em_spec({ width, height, anchor, scale: scale0, hink, vink }: EmSpec, scale: number): Pick<EmSpec, 'width' | 'height' | 'anchor' | 'scale' | 'hink' | 'vink'> {
+// in its parent's; `scale` compounds. a subtype's extra fields pass through
+// unchanged, so they stay in the element's own em (a reader that needs one in
+// the parent's multiplies by `scale`)
+function scale_em_spec<T extends EmSpec>(em: T, scale: number): T {
+    const { width, height, anchor, scale: scale0, hink, vink, italic } = em
     return {
+        ...em,
         width: scale * width,
         height: scale * height,
         anchor: scale * anchor,
         scale: scale * scale0,
         hink: hink != null ? [ scale * hink[0], scale * hink[1] ] : undefined,
         vink: vink != null ? [ scale * vink[0], scale * vink[1] ] : undefined,
+        italic: italic != null ? scale * italic : undefined,
     }
 }
 

@@ -8,7 +8,7 @@ import type { Font, Glyph } from 'opentype.js'
 
 import { sans, light, regular } from './const'
 import { is_string, compress_whitespace, sum, zip, max, min } from './utils'
-import { wrapWidths } from './wrap'
+import { wrap_widths } from './wrap'
 import { isStrict, strictError } from './strict'
 import { resolveEnv } from './default'
 import { FontNotLoadedError, type FontSet, type FontEntry, type FontWeight } from '../fonts/fonts'
@@ -35,7 +35,7 @@ type TextRun = {
 
 const EMOJI_GLOBAL_REGEX = new RegExp(EMOJI_REGEX.source, EMOJI_REGEX.flags.includes('g') ? EMOJI_REGEX.flags : `${EMOJI_REGEX.flags}g`)
 
-function splitEmojiRuns(text: string): TextRun[] {
+function split_emoji_runs(text: string): TextRun[] {
     const runs: TextRun[] = []
     let last = 0
     EMOJI_GLOBAL_REGEX.lastIndex = 0
@@ -101,7 +101,7 @@ function textFont(font_family: string, font_weight: number, env?: Env): Font {
 // a character the resolved face has no glyph for measures as .notdef (a
 // quarter em) while the renderer draws it from whatever face it substitutes,
 // so the text silently comes out mis-spaced; only checked in strict mode
-function checkGlyphs(font: Font, text: string, font_family: string, env?: Env): void {
+function check_glyphs(font: Font, text: string, font_family: string, env?: Env): void {
     for (const ch of text) {
         if (ch == ' ' || ch == '\n' || ch == '\t') continue
         if (font.charToGlyphIndex(ch) == 0) {
@@ -113,7 +113,7 @@ function checkGlyphs(font: Font, text: string, font_family: string, env?: Env): 
 
 // whether a face can actually draw every character of a string, so a caller
 // can pick a different one rather than emit .notdef boxes
-function textHasGlyphs(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): boolean {
+function text_has_glyphs(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): boolean {
     const font = textFont(font_family, font_weight, env)
     for (const ch of text) {
         if (ch == ' ' || ch == '\n' || ch == '\t') continue
@@ -153,16 +153,16 @@ function shapeText(font: Font, text: string): Shaped {
     return shaped
 }
 
-function textSizer(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
+function text_sizer(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
     const font = textFont(font_family, font_weight, env)
-    const runs = splitEmojiRuns(text)
-    if (isStrict(env)) runs.forEach(run => { if (!run.emoji) checkGlyphs(font, run.text, font_family, env) })
+    const runs = split_emoji_runs(text)
+    if (isStrict(env)) runs.forEach(run => { if (!run.emoji) check_glyphs(font, run.text, font_family, env) })
     return sum(runs.map(run =>
         run.emoji ? emojiSizer(run.text) : shapeText(font, run.text).advance
     ))
 }
 
-function fontVertical(font: Font, text: string): Limit {
+function font_vertical(font: Font, text: string): Limit {
     const { glyphs } = shapeText(font, text)
     const [yMins = [], yMaxs = []] = zip(...glyphs.map(g => [ g.yMin, g.yMax ]))
     const units = font.unitsPerEm ?? 1000
@@ -171,13 +171,13 @@ function fontVertical(font: Font, text: string): Limit {
     return [ yMin / units, yMax / units ]
 }
 
-function textVertical(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): Limit {
+function text_vertical(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): Limit {
     const font = textFont(font_family, font_weight, env)
-    return fontVertical(font, text)
+    return font_vertical(font, text)
 }
 
 // italic correction: how far the final glyph's ink overhangs its advance width
-function textItalic(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
+function text_italic(text: string, { font_family = sans, font_weight = light, env }: TextSizerArgs = {}): number {
     const font = textFont(font_family, font_weight, env)
     const { glyphs } = shapeText(font, text)
     const last = glyphs[glyphs.length - 1]
@@ -209,7 +209,7 @@ const DEFAULT_METRICS: TextMetrics = {
     raw_vrange: DEFAULT_VRANGE,
 }
 
-function normalizeTextMetrics({ advance, vrange: [ ymin, ymax ], italic = 0 }: TextMetrics): TextMetrics {
+function normalize_text_metrics({ advance, vrange: [ ymin, ymax ], italic = 0 }: TextMetrics): TextMetrics {
     const yrange = ymax - ymin
     const line_height = Math.max(1, yrange)
     const font_height = 1 / line_height
@@ -223,29 +223,29 @@ function normalizeTextMetrics({ advance, vrange: [ ymin, ymax ], italic = 0 }: T
     }
 }
 
-// the inverse of normalizeTextMetrics: the glyph's advance, ink range above the
+// the inverse of normalize_text_metrics: the glyph's advance, ink range above the
 // baseline (y-up) and italic correction in em, as measured; null when the
 // metrics carry no ink (an empty string)
-function rawTextMetrics({ advance, vrange: [ vlo, vhi ], raw_vrange: [ rlo, rhi ] = [ vlo, vhi ], italic = 0 }: TextMetrics): TextMetrics | null {
+function raw_text_metrics({ advance, vrange: [ vlo, vhi ], raw_vrange: [ rlo, rhi ] = [ vlo, vhi ], italic = 0 }: TextMetrics): TextMetrics | null {
     const fh = vhi - vlo
     if (fh <= 0 || rhi <= rlo) return null
     return { advance: advance / fh, vrange: [ (vhi - rhi) / fh, (vhi - rlo) / fh ], italic: italic / fh }
 }
 
-function textMetrics(text: string, args: TextSizerArgs & { whitespace?: Whitespace } = {}): TextMetrics {
+function text_metrics(text: string, args: TextSizerArgs & { whitespace?: Whitespace } = {}): TextMetrics {
     if (text == '\n') return { advance: 0, vrange: [ 0, 1 ], raw_vrange: [ 0, 1 ], italic: 0 }
     const text1 = args.whitespace === 'pre' || args.whitespace === 'preserve' ? text : compress_whitespace(text)
-    const advance = textSizer(text1, args)
-    const vrange = textVertical(text1, args)
-    const italic = textItalic(text1, args)
-    return normalizeTextMetrics({ advance, vrange, italic })
+    const advance = text_sizer(text1, args)
+    const vrange = text_vertical(text1, args)
+    const italic = text_italic(text1, args)
+    return normalize_text_metrics({ advance, vrange, italic })
 }
 
 //
 // text wrapping
 //
 
-function getBreaks(text: string): number[] {
+function get_breaks(text: string): number[] {
     const breaker = new LineBreaker(text)
     const breaks = [0]
     for (let bk: any; (bk = breaker.nextBreak()); ) {
@@ -257,8 +257,8 @@ function getBreaks(text: string): number[] {
     return breaks
 }
 
-function splitWords(text: string): string[] {
-    const breaks = getBreaks(text)
+function split_words(text: string): string[] {
+    const breaks = get_breaks(text)
     const words = breaks.slice(1).map((_b, i) => text.slice(breaks[i], breaks[i+1]))
     return words.map(w =>
         w.length > 1 && w.endsWith('\n') ?
@@ -267,13 +267,13 @@ function splitWords(text: string): string[] {
 }
 
 // compress whitespace, since that's what SVG does
-function wrapText(text: string, maxWidth: number | undefined, args: TextSizerArgs = {}): { rows: string[][], widths: number[] } {
-    const chunks = splitWords(compress_whitespace(text))
-    const measure = (c: string) => textSizer(c, args)
-    return wrapWidths(chunks, measure, maxWidth)
+function wrap_text(text: string, maxWidth: number | undefined, args: TextSizerArgs = {}): { rows: string[][], widths: number[] } {
+    const chunks = split_words(compress_whitespace(text))
+    const measure = (c: string) => text_sizer(c, args)
+    return wrap_widths(chunks, measure, maxWidth)
 }
 
-function mergeStrings(items: any[]): any[] {
+function merge_strings(items: any[]): any[] {
     const lines: any[] = []
     let buffer = ''
     for (const item of items) {
@@ -297,6 +297,6 @@ function mergeStrings(items: any[]): any[] {
 // exports
 //
 
-export { is_emoji, textMetrics, rawTextMetrics, textSizer, textVertical, textItalic, textHasGlyphs, getBreaks, splitWords, wrapWidths, wrapText, mergeStrings }
+export { is_emoji, text_metrics, raw_text_metrics, text_sizer, text_vertical, text_italic, text_has_glyphs, get_breaks, split_words, wrap_widths, wrap_text, merge_strings }
 export { DEFAULT_METRICS, EMPTY_METRICS, DEFAULT_VRANGE, EMPTY_VRANGE }
 export type { TextMetrics, TextSizerArgs, Whitespace }

@@ -3,7 +3,7 @@
 import { THEME } from '../lib/theme'
 import { none } from '../lib/const'
 import { prefix_split, prefix_join, pad_rect } from '../lib/utils'
-import { make_em, em_frame, scale_em_spec } from '../lib/em'
+import { make_em, em_frame } from '../lib/em'
 import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
 import { FREE_BOUNDS, box_bounds, scale_bounds } from '../lib/layout'
 
@@ -76,7 +76,7 @@ function box_insets(p: Padding | undefined, dflt: number): Rect {
 // is), or grown around the content when nothing is; `flex` fills the offer.
 // the border and corner radii are in stroke units
 class Box extends Group {
-    em: EmSpec
+    declare em: EmSpec
     content: Element[]
     insets: [ number, number ]
     margins: [ number, number ]
@@ -158,15 +158,14 @@ class Box extends Group {
         }
         const others = decor.map(c => c.clone({ rect: em_rect(c) }))
         const metrics: EmMetrics = { width: total_w, height: total_h, anchor }
-        const frame = em_frame(metrics)
-        const in_em = (e: Element): Element => (e instanceof Group && e.spec.coord == null) ? e.clone({ coord: frame.coord }) : new Group({ children: [ e ], coord: frame.coord, env })
+        const { coord: em_coord } = em_frame(metrics)
+        const in_em = (e: Element): Element => (e instanceof Group && e.spec.coord == null) ? e.clone({ coord: em_coord }) : new Group({ children: [ e ], coord: em_coord, env })
         const clip_elem = clip == null ? undefined : in_em(clip === true ? shape.clone({ rect: shape_rect }) : typeof clip == 'function' ? clip(geometry) : clip)
         const mask_elem = mask == null ? undefined : in_em(typeof mask == 'function' ? mask(geometry) : mask)
 
         // pass to Group
-        super({ children: [ background, ...placed.map(p => p.child), border_elem, ...others ], ...frame, clip: clip_elem, mask: mask_elem, upright: true, env, ...attr, ...spec, width, height })
+        super({ children: [ background, ...placed.map(p => p.child), border_elem, ...others ], metrics, scale, clip: clip_elem, mask: mask_elem, upright: true, env, ...attr, ...spec, width, height })
         this.args = args
-        this.em = make_em(scale_em_spec(make_em(metrics), scale))
         this.content = content
         this.insets = insets
         this.margins = [ ml + mr, mt + mb ]

@@ -16,8 +16,8 @@ baselines automatically. No layout container ever consults a text metric.
 
 ### Metrics
 
-`textMetrics` (`src/lib/text.ts`) measures a string with opentype.js and normalizes the result
-into the line-box frame (`normalizeTextMetrics`):
+`text_metrics` (`src/lib/text.ts`) measures a string with opentype.js and normalizes the result
+into the line-box frame (`normalize_text_metrics`):
 
 - `fontVertical` returns the ink extents of the string in em, y-up and baseline-relative, say
   `[-0.2, 0.75]` for a string with descenders.
@@ -33,13 +33,13 @@ The result is a `TextMetrics`:
 - `raw_vrange` — where the **ink** sits: `[baseline - ymax * font_height, baseline - ymin * font_height]`
 - `italic` — the italic correction (how far the last glyph overhangs its advance), for math
 
-`rawTextMetrics` is the inverse, recovering the measured ink in em from the normalized
+`raw_text_metrics` is the inverse, recovering the measured ink in em from the normalized
 metrics; `@gum-jsx/math` uses it for tight ink boxes (`MathText`).
 
 ### The vertical shift
 
 Baseline-at-the-bottom leaves text looking low in its box, so `Span` shifts the metrics by
-`vshift` (default `vtext = -0.15`, `src/lib/const.ts`): both ranges move up by 0.15 and the
+`vshift` (default `TEXT_AXIS = -0.15`, `src/lib/const.ts`): both ranges move up by 0.15 and the
 baseline lands at `0.85` of the line box. This is the one number that decides where text sits
 in a line, and it is shared with the math placement below.
 
@@ -66,8 +66,8 @@ Non-text children of a `Text` are wrapped in an `ElemSpan`, which is also a 1em 
 arbitrary element is centered in it (the `HStack` default), while an element carrying em
 metrics (`lib/em.ts`: a `width`, `height` and `anchor` in em, the anchor being the math axis;
 the math elements carry them as their `MathSpec`) is placed by them (`place_inline_em`). One em
-of its content is one line height, its anchor is pinned to `INLINE_MATH_AXIS = 1 + vtext - maxis`
-(`0.6` of the line box, `maxis = 0.25` being the axis height above the baseline), and a tall
+of its content is one line height, its anchor is pinned to `INLINE_MATH_AXIS = 1 + TEXT_AXIS - MATH_AXIS`
+(`0.6` of the line box, `MATH_AXIS = 0.25` being the axis height above the baseline), and a tall
 formula overflows the line rather than shrinking, as in TeX. This is the only place vertical
 alignment is done from metrics, and the metrics involved are the em record's, not the Span's.
 

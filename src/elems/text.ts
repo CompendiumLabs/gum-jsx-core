@@ -4,12 +4,12 @@ import type { Attrs, AlignValue, Rect, Limit } from '../lib/types'
 import { resolveEnv } from '../lib/default'
 import type { Env } from '../env'
 import { THEME } from '../lib/theme'
-import { none, bold, mono, vtext, maxis } from '../lib/const'
+import { TEXT_AXIS, MATH_AXIS, none, bold, mono } from '../lib/const'
 import { check_string, is_scalar, is_string, is_boolean, compress_whitespace, rect_box, check_singleton, prefix_split, prefix_join, sum, max } from '../lib/utils'
-import { textMetrics, splitWords } from '../lib/text'
+import { text_metrics, raw_text_metrics, split_words } from '../lib/text'
 import type { TextMetrics, Whitespace } from '../lib/text'
-import { wrapWidths } from '../lib/wrap'
-import { make_em, em_bounds, em_hink, em_frame, scale_em_spec } from '../lib/em'
+import { wrap_widths } from '../lib/wrap'
+import { em_bounds, em_hink, text_em, bounds_em } from '../lib/em'
 import type { EmArgs, EmSpec, EmMetrics } from '../lib/em'
 import { EPS, point } from '../lib/layout'
 
@@ -24,15 +24,44 @@ import type { StackArgs } from './layout'
 // span class
 //
 
+// frame: as the 1em line it sits in, or by its ink
+// axis: where the math axis crosses an ink-framed span
+type SpanFrame = 'line' | 'ink'
+type SpanAxis = 'baseline' | 'center'
+
 interface SpanArgs extends ElementArgs {
-    whitespace?: Whitespace
     children?: string[]
     color?: string
     stroke?: string
-    vshift?: number
     font_family?: string
     font_weight?: number
     font_style?: string
+    whitespace?: Whitespace
+    frame?: SpanFrame
+    axis?: SpanAxis
+}
+
+// a span's frame from its line metrics (as Span measures them): the glyphs
+// it draws by (its 1em font box, ending at the baseline, in its frame), what
+// it tells the element, and its layout box if it has one. in a line it is the line box, as
+// wide as its advance, with no box of its own (a line places it by its
+// advance). framed by its ink, the glyph run's ink extents at a 1em font are
+// taken about the math axis (TeX Rule 13), and the ink box is the coordinate
+// frame, so an assigned rect scales the glyph with its box; a run with no ink
+// keeps the line frame, with the line's box
+type SpanFraming = { glyphs: TextMetrics, spec: { coord?: Rect, aspect: number }, box?: EmMetrics }
+
+function frame_span(line: TextMetrics, frame: SpanFrame, axis: SpanAxis): SpanFraming {
+    const raw = frame == 'ink' ? raw_text_metrics(line) : null
+    if (raw == null) return { glyphs: line, spec: { aspect: line.advance }, box: frame == 'ink' ? { ...text_em(line), italic: line.italic } : undefined }
+    const { advance, vrange: [ ymin, ymax ], italic = 0 } = raw
+    const baseline = axis == 'center' ? 0.5 * (ymax + ymin) : MATH_AXIS
+    const vrange: Limit = [ baseline - ymax, baseline - ymin ]  // the ink about the axis, y down
+    return {
+        glyphs: { advance, vrange: [ baseline - 1, baseline ], raw_vrange: vrange, italic },
+        spec: { coord: [ 0, vrange[0], 1, vrange[1] ], aspect: advance / (ymax - ymin) },
+        box: { ...bounds_em(advance, vrange), italic },
+    }
 }
 
 // the output attributes for a font: the bold and italic KaTeX faces are
@@ -46,35 +75,40 @@ function font_css({ font_family, font_weight, font_style }: { font_family?: stri
 
 class Span extends Element {
     text: string
-    metrics: TextMetrics
-    vshift: number
+    glyphs: TextMetrics   // the run as drawn: its font box and ink in the span's frame (see frame_span)
 
     constructor(args: SpanArgs = {}) {
-        const { children: children0, color, whitespace = 'normal', vshift = vtext, stroke = none, env, ...attr0 } = THEME(args, 'Span')
+        const { children: children0, color, whitespace = 'normal', stroke = none, frame = 'line', axis = 'baseline', metrics: metrics0, env, ...attr0 } = THEME(args, 'Span')
         const text0 = check_string(children0)
         const [ font_attr0, attr ] = prefix_split([ 'font' ], attr0)
         const font_attr = prefix_join('font', font_attr0)
 
         const preserve = whitespace === 'pre' || whitespace === 'preserve'
         const text = preserve ? text0 : compress_whitespace(text0)
-        const { advance, vrange, raw_vrange = vrange, italic = 0 } = textMetrics(text, { ...font_attr, whitespace, env })
+        const { advance, vrange, raw_vrange = vrange, italic = 0 } = text_metrics(text, { ...font_attr, whitespace, env })
 
-        // adjust metrics for vertical shift
+        // the text box sits `TEXT_AXIS` down the line box, its baseline at 1 + TEXT_AXIS
         const [ ymin, ymax ] = vrange
         const [ raw_ymin, raw_ymax ] = raw_vrange
-        const vrange_shift: Limit = [ ymin + vshift, ymax + vshift ]
-        const raw_vrange_shift: Limit = [ raw_ymin + vshift, raw_ymax + vshift ]
-        const metrics = { advance, vrange: vrange_shift, raw_vrange: raw_vrange_shift, italic }
+        const vrange_shift: Limit = [ ymin + TEXT_AXIS, ymax + TEXT_AXIS ]
+        const raw_vrange_shift: Limit = [ raw_ymin + TEXT_AXIS, raw_ymax + TEXT_AXIS ]
+        const line: TextMetrics = { advance, vrange: vrange_shift, raw_vrange: raw_vrange_shift, italic }
+
+        // frame it (see frame_span); a box it states (`metrics`) goes over the
+        // measured one, and gives a line span a box of its own
+        const { glyphs, spec, box: box0 } = frame_span(line, frame, axis)
+        const box = box0 ?? (metrics0 != null ? { ...text_em(line), italic } : undefined)
+        const metrics1 = box != null ? { ...box, ...metrics0 } : undefined
 
         // pass to element; the font is measured by its registry name but named
         // in the output by its css face (family plus weight and style)
-        super({ tag: 'text', unary: false, aspect: advance, fill: color, stroke, ...font_attr, ...font_css(font_attr, env), ...attr, ...(preserve ? { 'xml:space': 'preserve' } : {}) })
+        const preserve_attr = preserve ? { 'xml:space': 'preserve' } : {}
+        super({ tag: 'text', unary: false, ...spec, metrics: metrics1, fill: color, stroke, ...font_attr, ...font_css(font_attr, env), ...attr, ...preserve_attr })
         this.args = args
 
         // additional props
         this.text = text
-        this.metrics = metrics
-        this.vshift = vshift
+        this.glyphs = glyphs
     }
 
     // because text will always be displayed upright,
@@ -83,15 +117,15 @@ class Span extends Element {
     props(ctx: Context): Attrs {
         const attr = super.props(ctx)
 
-        // compute glyph rect without vshift (apply vshift in pixel space)
-        const { vrange: [ ymin, ymax ] } = this.metrics
-        const vshift = this.vshift
-        const glyph_rect: Rect = [ 0, ymin - vshift, 1, ymax - vshift ]
+        // map the font box without the text shift and apply it in pixel space,
+        // so it points down on screen whatever the frame's orientation
+        const { vrange: [ ymin, ymax ] } = this.glyphs
+        const glyph_rect: Rect = [ 0, ymin - TEXT_AXIS, 1, ymax - TEXT_AXIS ]
         const rect = ctx.mapRect(glyph_rect)
 
         // get position and size
         const [ x, y0, _w, h ] = rect_box(rect, true)
-        const y = y0 + (1 + vshift) * h
+        const y = y0 + (1 + TEXT_AXIS) * h
 
         // get adjusted size
         return { x, y, font_size: `${h}px`, ...attr }
@@ -107,9 +141,9 @@ interface ElemSpanArgs extends GroupArgs {
 }
 
 // elements with em metrics (math, see lib/em.ts) are placed in the line by
-// them; the line box is 1em tall with the text baseline at 1 + vtext, so the
-// math axis sits maxis above that
-const INLINE_MATH_AXIS = 1 + vtext - maxis
+// them; the line box is 1em tall with the text baseline at 1 + TEXT_AXIS, so the
+// math axis sits MATH_AXIS above that
+const INLINE_MATH_AXIS = 1 + TEXT_AXIS - MATH_AXIS
 
 // place an element with em metrics in a 1em line box: 1em of its content is 1
 // line height, its anchor is pinned to the line's axis, and a tall formula
@@ -153,7 +187,7 @@ function ensure_tail(text: string): string {
 }
 
 function split_span(child: Span, text: string, font_args: Attrs = {}): Element[] {
-    return splitWords(text).map((w: string) =>
+    return split_words(text).map((w: string) =>
         child.clone({ children: [ w ], ...font_args })
     )
 }
@@ -176,7 +210,7 @@ function compress_spans(children: any[], font_args: Attrs = {}): Element[] {
             let text = compress_whitespace(child).trimStart()
             if (!last_child) text = ensure_tail(text)
             if (last_child) text = text.trimEnd()
-            return splitWords(text).map((w: string) =>
+            return split_words(text).map((w: string) =>
                 new Span({ children: [ w ], ...font_args })
             )
         } else if (child instanceof Text && child.em.scale == 1) {
@@ -224,7 +258,7 @@ function normalize_line(children: Element[]): Element[] {
 //
 
 // a text block's anchor is the math axis of its first line: the line box is
-// 1em tall with the baseline at 1 + vtext, and the axis maxis above that
+// 1em tall with the baseline at 1 + TEXT_AXIS, and the axis MATH_AXIS above that
 const TEXT_ANCHOR = INLINE_MATH_AXIS
 
 // the advance of a span in line units
@@ -238,7 +272,7 @@ function narrowest_width(spans: Element[], lines: number): number {
     const widths = spans.map(span_width)
     const minc = max(widths) ?? 0
     const maxc = sum(widths)
-    const count = (w: number) => wrapWidths(spans, span_width, w).rows.length
+    const count = (w: number) => wrap_widths(spans, span_width, w).rows.length
     const n = Math.max(1, lines)
     if (count(minc) <= n) return minc
     if (count(maxc) > n) return maxc
@@ -263,7 +297,7 @@ interface TextLineArgs extends GroupArgs {
 // one line of spans, packed left to right in a box `width` wide (or as wide
 // as they come to) and one em tall, placed along it by justify
 class TextLine extends Group {
-    em: EmSpec
+    declare em: EmSpec
 
     constructor(args: TextLineArgs = {}) {
         const { children: children0, justify = 'left', width, debug, env, ...attr } = THEME(args, 'TextLine')
@@ -279,9 +313,8 @@ class TextLine extends Group {
         })
         // one line: as wide as its width (or its content), one em tall
         const metrics: EmMetrics = { width: w, height: 1, anchor: TEXT_ANCHOR }
-        super({ children: placed, ...em_frame(metrics), upright: true, debug, env, ...attr })
+        super({ children: placed, metrics, upright: true, debug, env, ...attr })
         this.args = args
-        this.em = make_em(metrics)
     }
 }
 
@@ -323,7 +356,7 @@ function preserve_spans(children: any[], tab_size: number, attr: Attrs): Span[] 
 // title in a figure does. `scale` is its em over the surrounding em
 class Text extends Group {
     spans: Element[]
-    em: EmSpec
+    declare em: EmSpec
     whitespace: Whitespace
     fit: boolean
     spacing: number
@@ -348,7 +381,7 @@ class Text extends Group {
         }
 
         // wrap text to lines: literal lines are kept whole
-        const rows = preserve ? spans.map(span => (span as Span).text.length ? [ span ] : []) : wrapWidths(spans, span_width, wrap_at).rows.map(normalize_line)
+        const rows = preserve ? spans.map(span => (span as Span).text.length ? [ span ] : []) : wrap_widths(spans, span_width, wrap_at).rows.map(normalize_line)
         const widths = rows.map(row => sum(row.map(span_width)))
 
         // the block's width: its own; a preserved block's widest line; else
@@ -368,7 +401,7 @@ class Text extends Group {
 
         // pass to Group; content text keeps its width as a size of its own
         const metrics: EmMetrics = { width: line_width, height: total, anchor: TEXT_ANCHOR }
-        super({ children: placed, ...em_frame(metrics), upright: true, env, ...spec, fit, width: fit ? undefined : width })
+        super({ children: placed, metrics, scale, upright: true, env, ...spec, fit, width: fit ? undefined : width })
         this.args = args
 
         // additional props
@@ -376,7 +409,6 @@ class Text extends Group {
         this.whitespace = whitespace
         this.fit = fit
         this.spacing = spacing
-        this.em = make_em(scale_em_spec(make_em(metrics), scale))
     }
 
     // as content: from its longest word to its one line wide, one line to
@@ -388,7 +420,7 @@ class Text extends Group {
         const widths = this.spans.map(span_width)
         const minc = max(widths) ?? 0
         const maxc = sum(widths)
-        const most = wrapWidths(this.spans, span_width, minc).rows.length
+        const most = wrap_widths(this.spans, span_width, minc).rows.length
         const total = (k: number) => k / (1 - this.spacing)
         return { width: [ minc * s, maxc * s ], height: [ total(1) * s, total(most) * s ] }
     }
@@ -477,7 +509,7 @@ interface TextGridArgs extends GroupArgs, EmArgs {
 // cell gets the column width, a row is as tall as its tallest cell, and the
 // gaps (horizontal and vertical) are in em
 class TextGrid extends Group {
-    em: EmSpec
+    declare em: EmSpec
     cells: Element[]
     cols: number
     gaps: [ number, number ]
@@ -521,12 +553,11 @@ class TextGrid extends Group {
 
         // pass to Group
         const metrics: EmMetrics = { width: grid_width, height, anchor }
-        super({ children: placed, ...em_frame(metrics), upright: true, env, ...attr, ...spec, width: width0 })
+        super({ children: placed, metrics, scale, upright: true, env, ...attr, ...spec, width: width0 })
         this.args = args
         this.cells = children
         this.cols = cols
         this.gaps = [ hgap, vgap ]
-        this.em = make_em(scale_em_spec(make_em(metrics), scale))
     }
 
     // the columns' worth of the widest cell's range, and the rows' heights
@@ -683,4 +714,4 @@ class Italic extends Text {
 //
 
 export { Span, ElemSpan, TextLine, Text, Verbatim, TextStack, TextCol, TextRow, TextGrid, TextFigure, Bullets, Bold, Italic, TEXT_ANCHOR }
-export type { SpanArgs, ElemSpanArgs, TextLineArgs, TextArgs, TextStackArgs, TextColArgs, TextRowArgs, TextGridArgs, TextFigureArgs, BulletsArgs }
+export type { SpanArgs, SpanFrame, SpanAxis, ElemSpanArgs, TextLineArgs, TextArgs, TextStackArgs, TextColArgs, TextRowArgs, TextGridArgs, TextFigureArgs, BulletsArgs }

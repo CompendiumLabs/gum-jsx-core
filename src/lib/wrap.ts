@@ -1,7 +1,7 @@
 // wrapping utilities that avoid text/font dependencies
 
 // when measure is null, that means mandatory line break (but zero width)
-function wrapWidths<T>(objects: T[], measure: (obj: T) => number | undefined, maxWidth?: number): { rows: T[][], widths: number[] } {
+function wrap_widths<T>(objects: T[], measure: (obj: T) => number | undefined, maxWidth?: number): { rows: T[][], widths: number[] } {
     // return values
     const rows: T[][] = []
     const widths: number[] = []
@@ -45,4 +45,4 @@ function wrapWidths<T>(objects: T[], measure: (obj: T) => number | undefined, ma
     return { rows, widths }
 }
 
-export { wrapWidths }
+export { wrap_widths }

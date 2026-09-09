@@ -3,14 +3,13 @@
 import { THEME } from '../lib/theme'
 import { DEFAULTS as D } from '../lib/const'
 import { ensure_vector, ensure_pair, log, exp, zip, div2, cumsum, reshape, repeat, meshgrid, padvec, normalize, mean, check_singleton, check_array, rect_center, rect_radius, join_limits, radial_rect, norm_side, prefix_split, prefix_join, merge_points } from '../lib/utils'
-import { wrapWidths } from '../lib/wrap'
+import { wrap_widths } from '../lib/wrap'
 
 import { scale_bounds } from '../lib/layout'
 
 import { Context, Group, Element, Spacer, spec_split, align_frac, ensure_children } from './core'
 import { Dot } from './geometry'
 import { layout_em_stack, layout_em_bounds } from './em'
-import { make_em, scale_em_spec } from '../lib/em'
 
 import type { Point, Rect, Limit, AlignValue, Side, Orient } from '../lib/types'
 import type { ElementArgs, GroupArgs, Bounds, Offer, Laid } from './core'
@@ -49,7 +48,7 @@ interface StackArgs extends GroupArgs, EmArgs {
 // its slot in place of the stack's justify or valign. font and text settings
 // (`font-*`, `text-*`) are handed to the text children
 class Stack extends Group {
-    em: EmSpec
+    declare em: EmSpec
     items: Element[]
     direc: Orient
     options: EmStackOptions
@@ -75,15 +74,14 @@ class Stack extends Group {
         // a stack with no width of its own hugs its children across the axis:
         // the width offered is what they may take, not what the stack is
         const options: EmStackOptions = { gap, spacing, justify, valign, anchor, hug: width == null, attr: { ...font_attr, ...text_attr } }
-        const { metrics, ...layout } = layout_em_stack(direc, items, { ...options, width: W, height: H })
+        const layout = layout_em_stack(direc, items, { ...options, width: W, height: H })
 
         // pass to Group
-        super({ env, ...layout, upright: true, ...attr, ...spec, width, height })
+        super({ env, ...layout, scale, upright: true, ...attr, ...spec, width, height })
         this.args = args
         this.items = items
         this.direc = direc
         this.options = options
-        this.em = make_em(scale_em_spec(make_em(metrics), scale))
     }
 
     // composed from the children's bounds, in the parent's em
@@ -134,7 +132,7 @@ class HWrap extends Stack {
 
         // wrap by the widths the items come out at one em tall
         const measure = (c: Element) => c.lay({ height: 1 }).em.width + hgap
-        const { rows } = wrapWidths(children, measure, width != null ? width + hgap : undefined)
+        const { rows } = wrap_widths(children, measure, width != null ? width + hgap : undefined)
         const lines = rows.map(row => new Stack({ direc: 'h', children: row, gap: hgap, justify, valign: 'top', env }))
 
         // pass to Stack

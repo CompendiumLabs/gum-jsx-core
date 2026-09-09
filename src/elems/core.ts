@@ -5,7 +5,7 @@ import { DEFAULTS as D, svgns, sans, light, blue, red, d2r } from '../lib/const'
 import { is_scalar, abs, cos, sin, tan, cot, mul2, div2, filter_object, expand_rect, rect_box, cbox_rect, rect_cbox, merge_points, merge_rects, join_limits, ensure_pair, rounder, heavisign, abs_min, abs_max, rect_radial, rotate_aspect, remap_rect, rescaler, resizer, rect_size, vector_angle, polard, upright_rect } from '../lib/utils'
 import { resolveEnv } from '../lib/default'
 import { make_em, scale_em_spec, em_rect, em_frame } from '../lib/em'
-import type { EmSpec } from '../lib/em'
+import type { EmSpec, EmOrigin } from '../lib/em'
 import { INF, EPS, FREE_BOUNDS, point, tie_width, tie_height } from '../lib/layout'
 import type { Bounds, Offer, Laid as LaidItem } from '../lib/layout'
 import type { WithEm } from './em'
@@ -341,6 +341,8 @@ interface ElementArgs extends SpecArgs {
     orient?: number
     debug?: boolean
     env?: Env
+    metrics?: Partial<EmSpec> & Record<string, unknown>  // what it states about its layout box, in its own em (see lib/em.ts): an element that measures fills in the rest, others take the defaults
+    scale?: number                                        // its em over its parent's: the box is kept in the parent's, and nested scales compound
     [key: string]: any
 }
 
@@ -361,9 +363,10 @@ class Element {
     spec: Spec
     attr: Attrs
     declare em?: EmSpec // em metrics, set by measured content (never initialized, so `'em' in x` stays honest)
+    declare scale: number  // its em over its parent's, from the record (see set_em)
 
     constructor(args: ElementArgs = {}) {
-        const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, env: _env, ...attr0 } = args
+        const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, metrics, scale, env: _env, ...attr0 } = args
         const [ spec, attr ] = spec_split(attr0, false)
         this.args = args
 
@@ -378,6 +381,10 @@ class Element {
         // store layout params
         this.spec = spec
         this.attr = attr
+
+        // em metrics: stated in the element's own em, kept in its parent's;
+        // only content with a box has any
+        this.set_em(metrics != null ? scale_em_spec(make_em(metrics), scale ?? 1) : undefined)
 
         // handle pos/rad/xrad/yrad conveniences
         const [ x, y ] = pos ?? D.pos
@@ -460,9 +467,13 @@ class Element {
     // out in its own em and reports its box scaled
     //
 
-    // the element's em over its parent's
-    get scale(): number {
-        return this.em?.scale ?? this.args.scale ?? 1
+    // installs an em record and what follows from it (the element's em over
+    // its parent's). the constructor comes through here, and so does every
+    // clone that swaps the record in place (with_em, a stack placing a child
+    // by the box it was laid to), so nothing derived from it goes stale
+    set_em(em?: EmSpec): void {
+        if (em != null) this.em = em
+        this.scale = this.em?.scale ?? this.args.scale ?? 1
     }
 
     // its fraction of a stack's length along the axis, if any
@@ -725,6 +736,7 @@ function size_by_em(children: Element[], em: number | undefined): Element[] {
 interface GroupArgs extends ElementArgs {
     children?: (Element | null)[]
     coord?: Rect | 'auto'
+    origin?: EmOrigin   // where the frame derived from `metrics` puts y = 0 (see em_frame)
     clip?: true | Element
     mask?: Element
     em?: number
@@ -734,15 +746,17 @@ class Group extends Element {
     children: Element[]
 
     constructor(args: GroupArgs = {}) {
-        const { children: children0, aspect: aspect0, coord: coord0, clip: clip0, mask: mask0, em, debug = false, tag = 'g', env, ...attr } = args
+        const { children: children0, aspect: aspect0, coord: coord0, metrics, origin, clip: clip0, mask: mask0, em, debug = false, tag = 'g', env, ...attr } = args
         const children = size_by_em(ensure_children(children0), em)
 
         // handle boolean args
         const clip = clip0 === true ? new Rectangle({ env }) : clip0
 
-        // automatic aspect and coord detection
-        const aspect = aspect0 == 'auto' ? children_aspect(children) : aspect0
-        const coord = coord0 == 'auto' ? children_rect(children) : coord0
+        // automatic aspect and coord detection; an em group's frame follows
+        // from its metrics (see em_frame) unless it says otherwise
+        const frame = metrics != null ? em_frame(make_em(metrics), origin) : undefined
+        const aspect = aspect0 == 'auto' ? children_aspect(children) : aspect0 ?? frame?.aspect
+        const coord = coord0 == 'auto' ? children_rect(children) : coord0 ?? frame?.coord
 
         // create debug boxes
         if (debug) {
@@ -770,7 +784,7 @@ class Group extends Element {
         }
 
         // pass to Element
-        super({ tag, unary: false, aspect, coord, clip_path, mask, env, ...attr })
+        super({ tag, unary: false, aspect, coord, metrics, clip_path, mask, env, ...attr })
         this.args = args
 
         // additional props
@@ -835,10 +849,8 @@ function box_laid(laid: Laid, width: number, height: number, align?: Align): Lai
     const { elem, em } = laid
     if (Math.abs(em.width - width) < EPS && Math.abs(em.height - height) < EPS) return laid
     const { child, anchor } = place_in_box(laid, width, height, align)
-    const boxed = make_em({ width, height, anchor, scale: em.scale })
-    const group = new Group({ children: [ child ], ...em_frame(boxed), upright: true, env: elem.env })
-    group.em = boxed
-    return { elem: group, em: boxed }
+    const group = new Group({ children: [ child ], metrics: { width, height, anchor, scale: em.scale }, upright: true, env: elem.env })
+    return { elem: group, em: group.em! }
 }
 
 //
