@@ -591,6 +591,36 @@ class Element {
         }
     }
 
+    // what a filled slot means to content that spans it rather than hugging
+    // (a text block, a box): the offer's width (`fill`) or height (`vfill`)
+    // taken as a size of the element's own, in its em, on an axis it has
+    // none of
+    filled(offer: Offer): { width?: number, height?: number } {
+        const { width, height, fill, vfill } = offer
+        const s = this.scale
+        return {
+            ...(fill && width != null && this.args.width == null ? { width: width / s } : {}),
+            ...(vfill && height != null && this.args.height == null ? { height: height / s } : {}),
+        }
+    }
+
+    // the one step a container takes to relay an offer to its content: it is
+    // rebuilt with the settings handed down and the layout arguments it works
+    // out for itself (a size of its own, the internal `offer` its content is
+    // laid out for, an `em`), all reserved keys the constructor reads, and
+    // reports the box it comes back with. what is handed down (the offer's
+    // attr: font and text settings, and its justify) are defaults: one the
+    // element says itself is its own. what differs between containers is
+    // only the layout arguments; see Box, Stack and Text
+    relay(offer: Offer, args: Attrs): Laid {
+        const { justify, attr = {} } = offer
+        const handed = { ...attr, ...(justify != null ? { justify } : {}) }
+        const defaults = filter_object(handed, (k: string, v: any) => v != null && this.args[k] == null)
+        const elem = this.clone({ ...defaults, ...args })
+        if (elem.em == null) throw new Error(`${this.constructor.name} relays an offer but has no metrics`)
+        return { elem, em: elem.em }
+    }
+
     // lay applies a size of the element's own over the offer, and makes the
     // box that size whatever the content did (the content sits in it by the
     // element's align); subclasses override place
@@ -836,8 +866,9 @@ class Group extends Element {
     // box it is placed in is so many of the parent's em tall, so that many
     // coordinate units per em size the children placed by pos alone, the way
     // a box sizes them (see size_by_em). the group is rebuilt with the em so
-    // the constructor does what it does with one given; a group with no such
-    // child (or none it takes as elements: a text's strings) is left alone
+    // the constructor does what it does with one given, its box staying the
+    // one its shape gave it (a coordinate frame hands nothing else down, and
+    // one with no such child, or none it takes as elements, is left alone)
     place(offer: Offer = {}): Laid {
         const laid = super.place(offer)
         if (this.spec.em != null || !this.inherits_em()) return laid

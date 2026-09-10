@@ -104,11 +104,8 @@ class Stack extends Group {
     // spanned through the offer rather than taken as a width of the stack's
     // own, which a subclass may mean otherwise (a TextFigure's sizes its figure)
     place(offer: Offer = {}): Laid {
-        const { width, height, fill, justify, attr = {} } = offer
-        const justify_attr = justify != null && this.args.justify == null ? { justify } : {}
-        const size = { offer: { width, height, fill: fill && width != null && this.args.width == null } }
-        const elem = this.clone({ ...attr, ...justify_attr, ...size }) as Stack
-        return { elem, em: elem.em }
+        const { width, height, fill } = offer
+        return this.relay(offer, { offer: { width, height, fill: fill && width != null && this.args.width == null } })
     }
 }
 

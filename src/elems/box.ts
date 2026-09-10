@@ -105,8 +105,8 @@ class Box extends Group {
 
         // the content: the children with no rect of their own; the rest are
         // placed by their rects. content narrower than the area sits in it by
-        // justify, centered by default; a justify given is also the text
-        // alignment handed down
+        // justify, centered by default, and the justify is handed down to it
+        // as a default of its own (a text aligns its lines by it)
         const placed_by = (c: Element) => c.spec.rect != null || is_unsized_em(c)
         const content = children.filter(c => !placed_by(c))
         const decor = children.filter(placed_by)
@@ -153,7 +153,7 @@ class Box extends Group {
         const area: Rect = [ ml + pl, mt + pt, ml + pl + box_w - pl - pr, mt + pt + box_h - pt - pb ]
         const rest = content.slice(1).map(c => lay(c, area[2] - area[0], area[3] - area[1]))
         const laid = first != null ? [ first, ...rest ] : []
-        const placed = laid.map(l => fixed ? { child: l.elem.clone({ rect: area, align: justify }), anchor: 0.5 * total_h } : place_in_box(l, total_w, total_h, [ justify, valign ], [ ml + pl, mt + pt, mr + pr, mb + pb ]))
+        const placed = laid.map(l => fixed ? { child: l.elem.clone({ rect: area, align: [ justify, valign ] }), anchor: 0.5 * total_h } : place_in_box(l, total_w, total_h, [ justify, valign ], [ ml + pl, mt + pt, mr + pr, mb + pb ]))
         const anchor = placed.length > 0 ? placed[0].anchor : 0.5 * total_h
 
         // the background and the frame at the framed box; the children of
@@ -209,11 +209,10 @@ class Box extends Group {
     // laid out again for the offer: a box of an aspect at the size that fits
     // it (margins outside), a flex one filling it, else with its content laid
     // out for it; a filled slot is the box's own width (or height), so the
-    // frame spans it with the content sitting inside by justify and valign,
-    // and a text alignment handed down reaches a text content.
+    // frame spans it with the content sitting inside by justify and valign.
     // nothing offered: as it is. rotated: a figure, fit by its bounds
     place(offer: Offer = {}): Laid {
-        const { width, height, fill, vfill, justify, attr = {} } = offer
+        const { width, height } = offer
         if (width == null && height == null) return super.place(offer)
         if (this.spec.rotate) {
             const [ w, h ] = fit_offer(this.spec.aspect ?? 1, offer)
@@ -234,16 +233,13 @@ class Box extends Group {
         } else if (fixed) {
             size = { width: width ?? height, height: height ?? width }
         }
-        const justify_attr = (justify != null && this.args.justify == null && this.content[0] instanceof Text) ? { justify } : {}
-        const w_own = (fill && width != null && this.args.width == null && !fixed) ? width / s : undefined
-        const h_own = (vfill && height != null && this.args.height == null && !fixed) ? height / s : undefined
+        const { width: w_own, height: h_own } = fixed ? {} : this.filled(offer)
         const own = {
             ...(w_own != null ? { width: w_own } : {}),
             ...(h_own != null ? { height: h_own } : {}),
             offer: { width: w_own == null ? size.width : undefined, height: h_own == null ? size.height : undefined },
         }
-        const elem = this.clone({ ...attr, ...justify_attr, ...own }) as Box
-        return { elem, em: elem.em }
+        return this.relay(offer, own)
     }
 }
 

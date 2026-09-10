@@ -426,19 +426,20 @@ class Text extends Group {
     // again for the width (or height) unless it has a width of its own, with
     // the text alignment and settings handed down
     place(offer: Offer = {}): Laid {
-        const { width, height, justify, attr = {} } = offer
-        const { width: cwidth, justify: cjustify } = this.args
-        const size = cwidth != null ? {} : (offer.fill && width != null) ? { width: width / this.em.scale } : { offer: { width, height } }
-        const justify_attr = (justify != null && cjustify == null) ? { justify } : {}
-        const elem = this.clone({ ...attr, ...size, ...justify_attr }) as Text
-        if (!offer.fit) return { elem, em: elem.em }
+        const { width, height } = offer
+        const { width: cwidth } = this.args
+        const { width: w_fill } = this.filled(offer)
+        const size = w_fill != null ? { width: w_fill } : cwidth != null ? {} : { offer: { width, height } }
+        const laid = this.relay(offer, size)
+        if (!offer.fit) return laid
+        const elem = laid.elem as Text
 
         // to be fit into the slot (a box's content): text that does not fit
         // it at its em is scaled to it, as the wrapped block or as one line,
         // whichever comes out larger
         const over = (em: EmSpec) => (width != null && em.width > width + EPS) || (height != null && em.height > height + EPS)
         if (!over(elem.em)) return { elem, em: elem.em }
-        const line = cwidth != null ? elem : this.args.offer == null ? this : this.clone({ ...attr, ...justify_attr, offer: undefined }) as Text
+        const line = cwidth != null ? elem : this.args.offer == null ? this : this.relay(offer, { offer: undefined }).elem as Text
         const scale = (em: EmSpec) => Math.min(width != null ? width / em.width : Infinity, height != null ? height / em.height : Infinity)
         const best = scale(line.em) > scale(elem.em) ? line : elem
         return fit_laid(best, best.em, { width, height })
@@ -573,11 +574,9 @@ class TextGrid extends Group {
 
     // laid out again for the width it is given (a filled slot as its own)
     place(offer: Offer = {}): Laid {
-        const { width, height, fill, justify, attr = {} } = offer
-        const justify_attr = (justify != null && this.args.justify == null) ? { justify } : {}
-        const size = (fill && width != null && this.args.width == null) ? { width: width / this.em.scale } : { offer: { width, height } }
-        const elem = this.clone({ ...attr, ...justify_attr, ...size }) as TextGrid
-        return { elem, em: elem.em }
+        const { width, height } = offer
+        const { width: w_fill } = this.filled(offer)
+        return this.relay(offer, w_fill != null ? { width: w_fill } : { offer: { width, height } })
     }
 }
 

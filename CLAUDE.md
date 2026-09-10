@@ -207,12 +207,32 @@ what it is offered (one side offered: a square). Subclasses override `natural()`
 `place(offer)`; the base applies a size of the element's own (`width`/`height` in its em,
 reserved spec keys, pinning the bounds to a point and boxing the result in a `Group` when the
 content is smaller), `share` (its fraction of a stack's length), and `fit` (an element with
-metrics scaled to its slot like a figure: share-world text). `Text` is content: bounds from
-its longest word to its one line, `place` wraps for the width (or the narrowest width that
-fits an offered height); `Stack`, `TextBox`, `TextGrid` and `Bullets` rebuild themselves for
-the offer (the internal `offer` arg). `Group`, `Box`, `Frame`, `Grid` and the plots are
-shapes: children placed by rect are scaled into it, as ever (that is the share world, and it
-needs no em).
+metrics scaled to its slot like a figure: share-world text).
+
+Information flows **down** the tree only here, and always the same way, because JSX builds
+children before parents: a constructor cannot be told anything by its parent, so a container
+that needs what its parent knows (the width it gets, the em of the box it lands in) is
+**rebuilt once** in `place` with that knowledge in its args. The vocabulary is the reserved
+spec keys `offer` (the size the content is laid out for, with `fill`), `width`/`height` (a
+size taken as its own) and `em` (a group's coordinate units per em), plus the settings handed
+down (the offer's `attr`: font and text settings, and its `justify`), which are defaults: a
+value the element states itself is its own. The step is `Element.relay(offer, args)`: hand
+the settings down, clone with the args, report the box the clone comes to;
+`Element.filled(offer)` is the one rule for what a filled slot means (the offer's side as the
+element's own size, on an axis it has none of). A container's `place` supplies only the args
+that are its own: `Stack` passes the offer through, `Text` and `TextGrid` take a filled width
+or the offer, `Box` works the offer inside its margins and aspect. A box is just a box: it
+hands the same things to any content and never looks at what the content is. `Text` is content: bounds from its longest word to its one line, `place`
+wraps for the width (or the narrowest width that fits an offered height). `Group`, `Box`,
+`Frame`, `Grid` and the plots are shapes: children placed by rect are scaled into it, as ever
+(that is the share world, and it needs no em). A group with no `em` of its own takes the
+ambient one the same way (`Group.place` rebuilds with `em`): `inherits_em()` says whether
+(`Box`, `Slide` and `Svg` size their content in a frame of their own and say no) and
+`ambient_em(laid)` how the box maps to its coordinates (`Graph` and `Plot` answer in data
+units). `Svg` and `Slide` are the roots of this flow: they turn pixels (or slide heights) into
+em and `lay` their content in their constructors. Nothing else carries layout information
+downward; `Env` is document-wide and construction-time (theme, fonts, strict, `em_size`) and
+deliberately not a channel for it.
 
 **Stack** (`src/elems/layout.ts`) is the one stack: `VStack`/`HStack`, `TextStack`/`TextCol`/
 `TextRow` (text defaults) and math's `MathRow`/`MathCol` are all `layout_em_stack` in
