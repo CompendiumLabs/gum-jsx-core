@@ -800,6 +800,22 @@ class Group extends Element {
         this.children = children
     }
 
+    // a bare group laid out without an em of its own takes the ambient one:
+    // the box it is placed in is so many of the parent's em tall, so that many
+    // coordinate units per em size the children placed by pos alone, the way
+    // a box sizes them (see size_by_em). the subclasses have frames of their
+    // own (a graph's data coordinates, a slide's em) and size their children
+    // themselves
+    place(offer: Offer = {}): Laid {
+        const laid = super.place(offer)
+        if (this.constructor !== Group || this.args.em != null) return laid
+        const children = ensure_children(this.args.children)
+        if (!children.some(is_unsized_em)) return laid
+        const [ , y0, , y1 ] = this.spec.coord ?? D.coord
+        const em = (y1 - y0) / laid.em.height
+        return { ...laid, elem: this.clone({ children: size_by_em(children, em) }) }
+    }
+
     graphCoord(): Rect | undefined {
         const coord = super.graphCoord()
         if (coord != null) return coord
@@ -971,7 +987,7 @@ class Svg extends Group {
     dims: boolean
 
     constructor(args: SvgArgs = {}) {
-        const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em: em0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
+        const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em_size: em_size0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
         const child = check_singleton(children0)
         const size_max = ensure_pair(size0)
 
@@ -981,9 +997,9 @@ class Svg extends Group {
         let aspect = aspect0 == 'auto' ? undefined : aspect0
         if (child.spec.rect == null) {
             const [ sw, sh ] = size_max.map(abs)
-            const em = em0 ?? sh / D.svg_ems
-            const w = width0 ?? sw / em
-            const h = height0 ?? sh / em
+            const em_size = em_size0 ?? sh / D.svg_ems
+            const w = width0 ?? sw / em_size
+            const h = height0 ?? sh / em_size
             const laid = child.lay({ width: w, height: h })
             children = [ laid.elem ]
             if (aspect0 == 'auto') {
