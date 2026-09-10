@@ -137,6 +137,12 @@ class Slide extends Group {
     // ratio of content height to the available height (> 1 means it was shrunk)
     overflow: number
 
+    // a slide's `em` is its own (a fraction of its height, see above), so it
+    // never takes the ambient one
+    inherits_em(): boolean {
+        return false
+    }
+
     constructor(args: SlideArgs = {}) {
         const {
             children, aspect: aspect0 = 16 / 9, padding = 0.1, margin = 0.1, border = 1, rounded = D.rounded,

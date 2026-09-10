@@ -279,9 +279,9 @@ function props_repr(d: Attrs, prec: number): string {
 }
 
 // reserved keys: the placement spec, the layout protocol's (a size of the
-// element's own in em, its share of a stack, and the internal offer a
-// container is rebuilt for), and the conveniences
-const SPEC_KEYS = [ 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar', 'width', 'height', 'share', 'fit', 'offer' ]
+// element's own in em, its share of a stack, the internal offer a container
+// is rebuilt for, and a group's em), and the conveniences
+const SPEC_KEYS = [ 'rect', 'coord', 'aspect', 'aspect0', 'expand', 'align', 'upright', 'offset', 'rotate', 'rotate_adjust', 'rotate_invar', 'width', 'height', 'share', 'fit', 'offer', 'em' ]
 const HELP_KEYS = [ 'pos', 'size', 'xsize', 'ysize', 'rad', 'xrad', 'yrad', 'xrect', 'yrect', 'flex', 'spin', 'orient' ]
 const RESERVED_KEYS = [ ...SPEC_KEYS, ...HELP_KEYS ]
 
@@ -729,14 +729,14 @@ function is_unsized_em(c: Element): c is WithEm {
     return c.em != null && c.args.pos != null && c.spec.rect == null
 }
 
-// the em a bare group placed at a rect of its own inherits: the rect is in
-// the parent's coordinates, so the box is that many of the parent's em tall
-// and its own coord frame holds that many em down its height. a group with an
-// `em` of its own keeps it, and the subclasses (a box, a graph) size their
-// content themselves
+// the em a group placed at a rect of its own inherits (one that takes the
+// ambient em, see Group.inherits_em): the rect is in the parent's
+// coordinates, so the box is that many of the parent's em tall and its own
+// coord frame holds that many em down its height. a group with an `em` of
+// its own keeps it
 function inherit_em(c: Element, em: number): number | undefined {
-    const { rect, coord = D.coord } = c.spec
-    if (rect == null || c.args.em != null || c.constructor !== Group) return undefined
+    const { rect, coord = D.coord, em: own } = c.spec
+    if (rect == null || own != null || !(c instanceof Group && c.inherits_em())) return undefined
     const height = Math.abs(rect[3] - rect[1])
     if (height == 0) return undefined
     return em * Math.abs(coord[3] - coord[1]) / height
@@ -806,28 +806,45 @@ class Group extends Element {
             children.push(mask_elem)
         }
 
-        // pass to Element
-        super({ tag, unary: false, aspect, coord, metrics, clip_path, mask, env, ...attr })
+        // pass to Element (the em is kept in the spec)
+        super({ tag, unary: false, aspect, coord, metrics, clip_path, mask, em, env, ...attr })
         this.args = args
 
         // additional props
         this.children = children
     }
 
-    // a bare group laid out without an em of its own takes the ambient one:
-    // the box it is placed in is so many of the parent's em tall, so that many
+    // whether the group takes the ambient em when it has none of its own
+    // (see place). a group does, in its coordinates, whatever else it is (a
+    // network sizes its nodes by it, a graph its labels, in data units); the
+    // ones that size their content in a frame of their own (a box in its em,
+    // a slide by its `em`, the canvas) say no
+    inherits_em(): boolean {
+        return true
+    }
+
+    // the ambient em in the group's coordinates, from the box it was laid
+    // to: the box is so many em tall, and the coord frame spans its height.
+    // a subclass whose children live in another frame (a plot's data area)
+    // says where
+    ambient_em(laid: Laid): number {
+        const [ , y0, , y1 ] = this.spec.coord ?? D.coord
+        return Math.abs(y1 - y0) / laid.em.height
+    }
+
+    // a group laid out without an em of its own takes the ambient one: the
+    // box it is placed in is so many of the parent's em tall, so that many
     // coordinate units per em size the children placed by pos alone, the way
-    // a box sizes them (see size_by_em). the subclasses have frames of their
-    // own (a graph's data coordinates, a slide's em) and size their children
-    // themselves
+    // a box sizes them (see size_by_em). the group is rebuilt with the em so
+    // the constructor does what it does with one given; a group with no such
+    // child (or none it takes as elements: a text's strings) is left alone
     place(offer: Offer = {}): Laid {
         const laid = super.place(offer)
-        if (this.constructor !== Group || this.args.em != null) return laid
-        const children = ensure_children(this.args.children)
+        if (this.spec.em != null || !this.inherits_em()) return laid
+        const children0 = this.args.children
+        const children = Array.isArray(children0) ? ensure_children(children0).filter(is_element) : []
         if (!children.some(is_unsized_em)) return laid
-        const [ , y0, , y1 ] = this.spec.coord ?? D.coord
-        const em = (y1 - y0) / laid.em.height
-        return { ...laid, elem: this.clone({ children: size_by_em(children, em) }) }
+        return { ...laid, elem: this.clone({ em: this.ambient_em(laid) }) }
     }
 
     graphCoord(): Rect | undefined {
@@ -981,7 +998,7 @@ interface SvgArgs extends GroupArgs {
     font_weight?: number
     prec?: number
     unit_size?: number
-    em?: number       // pixels per em offered to the content (default: the height over D.svg_ems)
+    em_size?: number  // pixels per em offered to the content (default: the Env's em_size, or the height over D.svg_ems)
     width?: number    // the offer in em, instead (the width and height the content is laid out for)
     height?: number
 }
@@ -993,6 +1010,11 @@ interface SvgArgs extends GroupArgs {
 // pixel size, so the em the content was offered is only a starting point:
 // `em` (pixels per em) or `width`/`height` (in em) set it
 class Svg extends Group {
+    // the canvas lays its content out itself (see the constructor)
+    inherits_em(): boolean {
+        return false
+    }
+
     size: Size
     viewrect: Rect
     style: Style
@@ -1014,12 +1036,13 @@ class Svg extends Group {
             new Group({ children: children0 }) : children0[0] as Element
 
         // lay the child out for the canvas in em (one placed by rect is left
-        // to the share world); the canvas is D.svg_ems lines tall
+        // to the share world): the em is the Svg's own, the Env's document
+        // text size, or the canvas is D.svg_ems lines tall
         let children = [ child ]
         let aspect = aspect0 == 'auto' ? undefined : aspect0
         if (child.spec.rect == null) {
             const [ sw, sh ] = size_max.map(abs)
-            const em_size = em_size0 ?? sh / D.svg_ems
+            const em_size = em_size0 ?? resolveEnv(env).em_size ?? sh / D.svg_ems
             const w = width0 ?? sw / em_size
             const h = height0 ?? sh / em_size
             const laid = child.lay({ width: w, height: h })

@@ -24,7 +24,7 @@ const elem = evaluateGum(jsx, { size: 800, theme: 'light' })
 const svg = elem.svg()
 ```
 
-The code runs with every element, constant (`pi`, `blue`, `sans`, …) and utility (`linspace`, `zip`, `random`, …) in scope, so most files are a single JSX expression; a file can also declare things and `return` an element. Options: `size` (a number or `[width, height]`), `theme` (`light` or `dark`), `bindings` (extra names to bind), `prelude` (code or the bindings of code evaluated first, see `evaluatePrelude`), `seed` (for `random`/`uniform`/`normal`/`integer`), `strict` (throw on rendering fallbacks instead of drawing them), `loadFile` (how `loadTable(path)` and `<LoadImage id={path} />` in the code read files), `debug`, plus any `Svg` argument such as `padding`, `unit_size` or `bare`.
+The code runs with every element, constant (`pi`, `blue`, `sans`, …) and utility (`linspace`, `zip`, `random`, …) in scope, so most files are a single JSX expression; a file can also declare things and `return` an element. Options: `size` (a number or `[width, height]`), `theme` (`light` or `dark`), `bindings` (extra names to bind), `prelude` (code or the bindings of code evaluated first, see `evaluatePrelude`), `seed` (for `random`/`uniform`/`normal`/`integer`), `strict` (throw on rendering fallbacks instead of drawing them), `em_size` (the document's text size in pixels per em; by default the canvas is 20 lines tall), `loadFile` (how `loadTable(path)` and `<LoadImage id={path} />` in the code read files), `debug`, plus any `Svg` argument such as `padding`, `unit_size` or `bare`.
 
 `evaluateGum` is the default **Env**'s `evaluate`. An `Env` is everything code evaluates against — the elements and names in scope, the fonts, the theme, strict mode and the random streams — and every element carries the Env it was built with, so nothing about a render is global: a dark evaluation leaves no dark theme behind, and two Envs with different settings or element sets can be used side by side. The default Env is `gum`; make your own for other defaults or an isolated element set:
 
@@ -37,7 +37,7 @@ const dark = new Env({ theme: 'dark' }).use(math)
 const elem = dark.evaluate(jsx, { size: 800 })  // or gum.with({ theme: 'dark' }).evaluate(...)
 ```
 
-`new Env({ theme, strict, seed, plugins })` starts with core's elements, names and text fonts; `use(plugin)` adds an add-on's (a plugin is `{ elems, bindings, fonts }`, and `registerElements`/`registerBindings`/`registerFonts` add one kind); `with(settings)` derives an Env with other settings (its registries are copied, so `use` on either leaves the other alone); `evaluate` and `prelude` run code. The evaluation scope also binds `env` itself.
+`new Env({ theme, strict, seed, em_size, plugins })` starts with core's elements, names and text fonts; `use(plugin)` adds an add-on's (a plugin is `{ elems, bindings, fonts }`, and `registerElements`/`registerBindings`/`registerFonts` add one kind); `with(settings)` derives an Env with other settings (its registries are copied, so `use` on either leaves the other alone); `evaluate` and `prelude` run code. The evaluation scope also binds `env` itself.
 
 The elements are plain classes and can be used from JavaScript directly, with props in `snake_case`; an element built this way uses the default Env unless it is given one (`new Plot({ env, ... })`):
 

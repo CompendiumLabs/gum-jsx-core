@@ -64,6 +64,7 @@ interface EnvSettings {
     theme?: ThemeName    // light or dark (default: light)
     strict?: boolean     // throw on rendering fallbacks instead of drawing them (default: false)
     seed?: number        // seed the random streams (default: DEFAULT_SEED for random/uniform/..., ids continue)
+    em_size?: number     // the document's text size: pixels per em an Svg lays its content out at (default: its height over D.svg_ems)
 }
 
 interface EnvArgs extends EnvSettings {
@@ -228,6 +229,7 @@ class Env {
     // settings
     theme: ThemeName
     strict: boolean
+    em_size?: number
     rng: RNG    // backs random/uniform/normal/integer in evaluated code
     uids: RNG   // backs gum's own draws (clip and mask ids), so they never shift the data
 
@@ -235,13 +237,14 @@ class Env {
     private bound: Record<string, ElementConstructor> | null
 
     constructor(args: EnvArgs = {}) {
-        const { theme = 'light', strict = false, seed, plugins = [], core = true } = args
+        const { theme = 'light', strict = false, seed, em_size, plugins = [], core = true } = args
         this.elems = {}
         this.bindings = {}
         this.fonts = new FontRegistry()
         this.bound = null
         this.theme = theme
         this.strict = strict
+        this.em_size = em_size
         this.rng = new RNG(seed ?? DEFAULT_SEED)
         this.uids = new RNG(seed ?? DEFAULT_SEED)
         if (core) this.use(corePlugin)
@@ -303,8 +306,8 @@ class Env {
     // other alone) and these settings; without a seed it shares this Env's
     // random streams
     with(settings: EnvSettings = {}): Env {
-        const { theme = this.theme, strict = this.strict, seed } = settings
-        const env = new Env({ theme, strict, seed, core: false })
+        const { theme = this.theme, strict = this.strict, seed, em_size = this.em_size } = settings
+        const env = new Env({ theme, strict, seed, em_size, core: false })
         env.elems = { ...this.elems }
         env.bindings = { ...this.bindings }
         env.fonts = this.fonts.clone()
@@ -341,8 +344,8 @@ class Env {
 
     // the Env one evaluation runs against: these settings, a fresh user random
     // stream (repeatable) and, only if seeded, fresh ids
-    private forEvaluation({ theme, strict, seed }: EnvSettings): Env {
-        const env = this.with({ theme, strict })
+    private forEvaluation({ theme, strict, seed, em_size }: EnvSettings): Env {
+        const env = this.with({ theme, strict, em_size })
         env.rng = new RNG(seed ?? DEFAULT_SEED)
         if (seed != null) env.uids = new RNG(seed)
         return env
@@ -358,15 +361,15 @@ class Env {
     // bindings, which can be passed as `bindings` or `prelude` to `evaluate` so
     // that several pieces of code share definitions
     prelude(code: string, args: PreludeArgs = {}): Bindings {
-        const { theme, strict, seed, bindings = {}, debug = false, loadFile } = args
-        const env = this.forEvaluation({ theme, strict, seed })
+        const { theme, strict, seed, em_size, bindings = {}, debug = false, loadFile } = args
+        const env = this.forEvaluation({ theme, strict, seed, em_size })
         const scope = this.evalScope(env, bindings, loadFile)
         return runPrelude(code, scope, debug)
     }
 
     // evaluate gum.jsx code to its root Svg element (`.svg()` serializes it)
     evaluate(code: string, args: EvaluateArgs = {}): Svg {
-        const { theme, strict, seed, bindings = {}, prelude, debug = false, loadFile, ...svgArgs } = args
+        const { theme, strict, seed, em_size, bindings = {}, prelude, debug = false, loadFile, ...svgArgs } = args
 
         // check if code is provided
         if (code == null || code.trim() == '') {
@@ -374,7 +377,7 @@ class Env {
         }
 
         // the evaluation scope, with prelude bindings layered on top
-        const env = this.forEvaluation({ theme, strict, seed })
+        const env = this.forEvaluation({ theme, strict, seed, em_size })
         const scope0 = this.evalScope(env, bindings, loadFile)
         const preludeScope = prelude == null ? {} : is_string(prelude) ? runPrelude(prelude, scope0, debug) : prelude
         const scope = { ...scope0, ...preludeScope }

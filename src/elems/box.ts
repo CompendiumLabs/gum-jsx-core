@@ -77,6 +77,12 @@ function box_insets(p: Padding | undefined, dflt: number): Rect {
 // the border and corner radii are in stroke units
 class Box extends Group {
     declare em: EmSpec
+
+    // a box sizes a child placed by pos in its own em (see the constructor),
+    // so it has no ambient em to take
+    inherits_em(): boolean {
+        return false
+    }
     content: Element[]
     insets: [ number, number ]
     margins: [ number, number ]

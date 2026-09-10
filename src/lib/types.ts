@@ -58,6 +58,7 @@ type Spec = {
     share?: number    // its fraction of a stack's length along the axis
     fit?: boolean     // scaled to its slot like a figure (an element with metrics)
     offer?: { width?: number, height?: number }   // internal: the offer a container is rebuilt for
+    em?: number       // a group's coordinate units per em, given or from the box it is laid in (see Group.place)
 }
 
 // command line arguments

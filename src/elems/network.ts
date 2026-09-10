@@ -9,7 +9,6 @@ import { Text } from './text'
 import { Frame, TextFrame } from './box'
 
 import type { ElementArgs, GroupArgs } from './core'
-import type { WithEm } from './em'
 import type { AlignValue, Limit, Padding, Point, Rounded, Side } from '../lib/types'
 
 //
@@ -157,7 +156,8 @@ interface NetworkArgs extends GroupArgs {
 // `em`, in coordinate units, sets the text size of the whole diagram: it goes
 // to the nodes, which size their boxes from their labels, and to the Group,
 // which sizes any other child with metrics (a Text label, a formula) placed
-// by `pos` without a size of its own
+// by `pos` without a size of its own. without one the network takes the
+// ambient em of the box it is laid out in, like any Group
 class Network extends Group {
     constructor(args: NetworkArgs = {}) {
         const { children: children0, em, xlim, ylim, coord: coord0, ...attr0 } = THEME(args, 'Network')

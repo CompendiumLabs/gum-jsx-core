@@ -11,7 +11,7 @@ import { Frame } from './box'
 import { RoundedRect, UnitLine, HLine, Arc, ArrowHead } from './geometry'
 
 import type { Point, Rect, Limit, Attrs, Orient, Rounded, Zone, AlignValue, Side, Padding } from '../lib/types'
-import type { ElementArgs, GroupArgs } from './core'
+import type { ElementArgs, GroupArgs, Laid } from './core'
 import type { RoundedRectArgs } from './geometry'
 
 //
@@ -550,6 +550,8 @@ function outer_limits(children: Element[], { xlim, ylim, padding = 0 }: { xlim?:
 
 // plottable things should accept xlim/ylim and may report coords on their own
 class Graph extends Group {
+    coord?: Rect   // the data coordinates, which the children are in
+
     constructor(args: GraphArgs = {}) {
         let { children: children0, xlim, ylim, coord: coord0 = 'auto', aspect, padding = 0, flip = true, em, env, ...attr } = THEME(args, 'Graph')
         const children = size_by_em(ensure_children(children0), em)
@@ -575,8 +577,15 @@ class Graph extends Group {
         })
 
         // pass to Group
-        super({ children: items, aspect, env, ...attr })
+        super({ children: items, aspect, em, env, ...attr })
         this.args = args
+        this.coord = coord
+    }
+
+    // the children are in the data coordinates, each in a frame of its own
+    ambient_em(laid: Laid): number {
+        const [ , y0, , y1 ] = this.coord ?? D.coord
+        return Math.abs(y1 - y0) / laid.em.height
     }
 }
 
@@ -629,6 +638,9 @@ function margin_rect(margin: Padding | undefined, aspect: number | undefined): {
 }
 
 class Plot extends Group {
+    ylim: Limit   // the data limits of the plot area
+    area: Rect    // the plot area, as a rect of the box
+
     constructor(args: PlotArgs = {}) {
         let { children: children0, fill, xlim, ylim, axis = true, xaxis, yaxis, xticks = 5, yticks = 5, xanchor, yanchor, grid, xgrid, ygrid, xlabel, ylabel, title, tick_size = 0.015, label_size = 0.05, label_offset = [0.1, 0.15], title_size = 0.075, title_offset = 0.05, xlabel_size, ylabel_size, xlabel_offset, ylabel_offset, xtick_label_offset = 0.75, ytick_label_offset = 0.25, xtick_size, ytick_size, padding, margin, coord: coord0 = 'auto', aspect: aspect0 = 'auto', clip, em, debug = false, env, ...attr0
         } = THEME(args, 'Plot')
@@ -750,8 +762,18 @@ class Plot extends Group {
         const inner = new Group({ children: items, aspect, env })
         const { rect, aspect: aspect_outer } = margin_rect(margin, aspect)
         const background = fill != null ? new Rectangle({ fill, stroke: none, env }) : null
-        super({ children: [ background, inner.clone({ rect }) ], aspect: aspect_outer, env, ...attr })
+        super({ children: [ background, inner.clone({ rect }) ], aspect: aspect_outer, em, env, ...attr })
         this.args = args
+        this.ylim = ylim
+        this.area = rect
+    }
+
+    // the children are in the data coordinates of the plot area, which is
+    // the `area` part of the box
+    ambient_em(laid: Laid): number {
+        const [ ylo, yhi ] = this.ylim
+        const [ , r0, , r1 ] = this.area
+        return (yhi - ylo) / (laid.em.height * (r1 - r0))
     }
 }
 
