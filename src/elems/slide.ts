@@ -6,11 +6,11 @@ import { prefix_split, pad_rect } from '../lib/utils'
 
 import { spec_split, align_frac, is_element, ensure_children, Rectangle, Group } from './core'
 import { Attach } from './layout'
-import { Box, TextFrame, box_insets } from './box'
+import { Box, Frame, box_insets } from './box'
 import { RoundedRect } from './geometry'
 import { Span, TextCol } from './text'
 
-import type { AlignValue, Padding, Rounded, Point, Rect } from '../lib/types'
+import type { AlignValue, Padding, Rounded, Rect } from '../lib/types'
 import type { Element } from './core'
 import type { BoxArgs, BoxGeometry } from './box'
 
@@ -55,7 +55,7 @@ interface TitleBoxArgs extends BoxArgs {
 
 const TITLE_PADDING: Padding = [ 0.6, 0.3 ]
 
-// a box with a title on its top border: a TextFrame at its own size (one em,
+// a box with a title on its top border: a Frame at its own size (one em,
 // or `title-scale`) centered on the border, the frame cut behind it; the
 // box's margin makes room for its top half
 class TitleBox extends Box {
@@ -66,12 +66,12 @@ class TitleBox extends Box {
 
         // the title box, and the mask that cuts the frame behind it (in the
         // inner box's em: the frame's top edge is its y = 0)
-        let title_box: TextFrame | null = null
+        let title_box: Frame | null = null
         let title_mask: ((g: BoxGeometry) => Element) | undefined
         let half = 0
         if (title != null) {
             const title_span = is_element(title) ? title : new Span({ children: [ title ], env })
-            title_box = new TextFrame({ children: [ title_span ], pos: [ 0.5, 0 ], scale: title_scale, rounded: title_rounded, padding: title_padding, fill: title_fill, env, ...title_attr })
+            title_box = new Frame({ children: [ title_span ], pos: [ 0.5, 0 ], scale: title_scale, rounded: title_rounded, padding: title_padding, fill: title_fill, env, ...title_attr })
             const { width: tw, height: th } = title_box.em
             half = th / 2
             title_mask = ({ total_w, total_h, box_w, ml, mt }) => new Group({ children: [

@@ -17,11 +17,6 @@ import type { Point, Rect, Size, AlignValue, Align, Side, Attrs, MNumber, MPoint
 // rect embedding
 //
 
-// an align as [ horizontal, vertical ]
-function align_pair(align?: Align): [ AlignValue, AlignValue ] | undefined {
-    return align != null ? ensure_pair(align) as [ AlignValue, AlignValue ] : undefined
-}
-
 function align_frac(align: AlignValue): number {
     if (is_scalar(align)) {
         return align as number
@@ -292,7 +287,6 @@ const RESERVED_KEYS = [ ...SPEC_KEYS, ...HELP_KEYS ]
 
 // the keys a parent sets to place a child (see Element.clone)
 const PLACE_SPEC_KEYS = [ 'rect', 'align', 'expand' ]
-const PLACE_ATTR_KEYS: string[] = []
 
 function spec_split(attr: Attrs, extended: boolean = true): [Attrs, Attrs] {
     const SPLIT_KEYS = extended ? RESERVED_KEYS : SPEC_KEYS
@@ -327,7 +321,6 @@ interface SpecArgs {
     offer?: Offer
 }
 
-// TODO: children should be Element[] | string
 interface ElementArgs extends SpecArgs {
     tag?: string
     unary?: boolean
@@ -368,9 +361,6 @@ class Element {
     spec: Spec
     attr: Attrs
     declare em?: EmSpec // em metrics, set by measured content (never initialized, so `'em' in x` stays honest)
-    declare scale: number  // its em over its parent's, from the record (see set_em)
-    declare own_size: [ number | undefined, number | undefined ]  // a size of its own (spec width, height), in the parent's em (see set_em)
-    declare align?: [ AlignValue | undefined, AlignValue | undefined ]  // where it sits in its slot, in place of the container's justify or valign
 
     constructor(args: ElementArgs = {}) {
         const { tag, unary, children, pos, size: size0, xsize: xsize0, ysize: ysize0, rad, xrad, yrad, xrect, yrect, flex, spin, orient, metrics, scale, env: _env, ...attr0 } = args
@@ -424,7 +414,6 @@ class Element {
         // adjust aspect for rotation
         this.spec.aspect0 ??= this.spec.aspect
         this.spec.aspect = this.spec.rotate_invar ? this.spec.aspect0 : rotate_aspect(this.spec.aspect0, this.spec.rotate)
-        this.align = align_pair(this.spec.align)
 
         // warn if children are passed
         if (children != null) console.error(`Got children in ${this.constructor.name}`)
@@ -435,6 +424,21 @@ class Element {
     // that builds fresh args for super still reports the Env it got)
     get env(): Env {
         return resolveEnv(this.args.env)
+    }
+
+    get scale(): number {
+        return this.em?.scale ?? this.args.scale ?? 1
+    }
+
+    get scaled_size(): [ number | undefined, number | undefined ] {
+        const { width: width0, height: height0 } = this.spec
+        const width = width0 != null ? width0 * this.scale : undefined
+        const height = height0 != null ? height0 * this.scale : undefined
+        return [ width, height ]
+    }
+
+    get align(): [ AlignValue, AlignValue ] | undefined {
+        return this.spec.align != null ? ensure_pair(this.spec.align) : undefined
     }
 
     // a clone is the element rebuilt from its args with the overrides applied.
@@ -449,7 +453,7 @@ class Element {
     // the constructor may derive it from a convenience like pos and size
     clone(args: Attrs = {}): Element {
         const keys = Object.keys(args)
-        const cheap = keys.every(k => PLACE_ATTR_KEYS.includes(k) || (PLACE_SPEC_KEYS.includes(k) && args[k] != null))
+        const cheap = keys.every(k => PLACE_SPEC_KEYS.includes(k) && args[k] != null)
         if (!cheap) return this.rebuild({ ...this.args, ...args })
         const copy: Element = Object.assign(Object.create(Object.getPrototypeOf(this)), this)
         copy.args = { ...this.args, ...args }
@@ -460,7 +464,6 @@ class Element {
             if (args[k] != null) target[k] = args[k]
             else delete target[k]
         }
-        copy.align = align_pair(copy.spec.align)
         return copy
     }
 
@@ -482,11 +485,6 @@ class Element {
     // by the box it was laid to), so nothing derived from it goes stale
     set_em(em?: EmSpec): void {
         if (em != null) this.em = em
-        this.scale = this.em?.scale ?? this.args.scale ?? 1
-        const { width: width0, height: height0 } = this.spec
-        const width = width0 != null ? width0 * this.scale : undefined
-        const height = height0 != null ? height0 * this.scale : undefined
-        this.own_size = [ width, height ]
     }
 
     // the sizes it can come out at with nothing said: a formula is its box, a
@@ -528,7 +526,7 @@ class Element {
             aspect: fit.width / fit.height,
             stretch: NO_STRETCH,
         } : this.natural()
-        const [ w, h ] = this.own_size
+        const [ w, h ] = this.scaled_size
         const stretch: [ boolean, boolean ] = [ w == null && stretches(b, 0), h == null && stretches(b, 1) ]
         if (w != null && h != null) {
             return { width: point(w), height: point(h) }
@@ -597,7 +595,7 @@ class Element {
     // box that size whatever the content did (the content sits in it by the
     // element's align); subclasses override place
     lay(offer: Offer = {}): Laid {
-        const [ w, h ] = this.own_size
+        const [ w, h ] = this.scaled_size
         const fit_em = this.fitted()
         const width = w ?? offer.width
         const height = h ?? offer.height
@@ -731,15 +729,31 @@ function is_unsized_em(c: Element): c is WithEm {
     return c.em != null && c.args.pos != null && c.spec.rect == null
 }
 
+// the em a bare group placed at a rect of its own inherits: the rect is in
+// the parent's coordinates, so the box is that many of the parent's em tall
+// and its own coord frame holds that many em down its height. a group with an
+// `em` of its own keeps it, and the subclasses (a box, a graph) size their
+// content themselves
+function inherit_em(c: Element, em: number): number | undefined {
+    const { rect, coord = D.coord } = c.spec
+    if (rect == null || c.args.em != null || c.constructor !== Group) return undefined
+    const height = Math.abs(rect[3] - rect[1])
+    if (height == 0) return undefined
+    return em * Math.abs(coord[3] - coord[1]) / height
+}
+
 // what a group's `em` (coordinate units per em) does to its children: one
 // with metrics placed by `pos` alone is made its em height times `em` tall,
-// so text and formulas dropped into a coordinate frame share one size. it
-// applies to direct children only, a nested group's coordinates being its own
+// so text and formulas dropped into a coordinate frame share one size, and a
+// bare group at a rect of its own gets the em in its own coordinates (see
+// inherit_em), which sizes its children the same way on down
 function size_by_em(children: Element[], em: number | undefined): Element[] {
     if (em == null) return children
-    return children.map(c =>
-        is_unsized_em(c) ? c.clone({ ysize: em * c.em.height }) : c
-    )
+    return children.map(c => {
+        if (is_unsized_em(c)) return c.clone({ ysize: em * c.em.height })
+        const sub = inherit_em(c, em)
+        return sub != null ? c.clone({ em: sub }) : c
+    })
 }
 
 interface GroupArgs extends ElementArgs {
@@ -988,8 +1002,16 @@ class Svg extends Group {
 
     constructor(args: SvgArgs = {}) {
         const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em_size: em_size0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
-        const child = check_singleton(children0)
         const size_max = ensure_pair(size0)
+
+        // error out on empty Svg
+        if (children0 == null || children0.length == 0) {
+            throw new Error('Outer Svg cannot be empty')
+        }
+
+        // wrap multiple children in a dummy Group
+        const child = children0.length > 1 ?
+            new Group({ children: children0 }) : children0[0] as Element
 
         // lay the child out for the canvas in em (one placed by rect is left
         // to the share world); the canvas is D.svg_ems lines tall

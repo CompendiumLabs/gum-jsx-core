@@ -51,32 +51,20 @@ interface NodeArgs extends GroupArgs {
 // taller node rather than smaller text. without one it is a Frame of the
 // given `ysize`, its `padding` a fraction of the box, and the text is fit
 // into it. Rounding uses stroke units in both cases.
-class Node extends Group {
+class Node extends Frame {
     id: string | undefined
 
     constructor(args: NodeArgs = {}) {
-        const { children: children0, id, em, ysize: ysize0, rounded, padding, border = 1, fill, width, justify = 'center', env, ...attr0 } = THEME(args, 'Node')
-        const [ text_attr, attr1 ] = prefix_split([ 'text' ], attr0)
-        const [ spec, attr ] = spec_split(attr1)
-        const child = check_singleton(children0)
-        const sized = em != null && (is_string(child) || child.em != null)
+        const { children: children0, id, rounded = 10, padding = 0.5, border = 1, env, ...attr0 } = THEME(args, 'Node')
+        const [ text_attr, attr ] = prefix_split([ 'text' ], attr0)
+        const child0 = check_singleton(children0)
 
-        // the box: hugging the label in em, or a frame the label is fit into
-        let box: Element
-        let ysize = ysize0
-        if (sized) {
-            const label = is_string(child) ? new Text({ children: [ child ], env, ...text_attr }) : child
-            const frame = new TextFrame({ children: [ label ], padding: padding ?? 0.4, rounded: rounded ?? true, border, fill, width, justify, env, ...attr, ...text_attr })
-            ysize ??= em! * frame.em.height
-            box = frame
-        } else {
-            const inner = is_string(child) ? new Text({ children: [ child ], width, justify, env, ...text_attr }) : child
-            box = new Frame({ children: [ inner ], padding: padding ?? 0.3, rounded: rounded ?? true, border, fill, env, ...attr })
-            ysize ??= 0.2
-        }
+        // if we get a string, wrap it in Text first
+        const child = is_string(child0) ?
+            new Text({ children: [ child0 ], env, ...text_attr }) : child0
 
-        // pass to Group
-        super({ children: [ box ], aspect: box.spec.aspect, ysize, upright: true, env, ...spec })
+        // pass to Frame
+        super({ children: [ child ], upright: true, rounded, padding, border, env, ...attr })
         this.args = args
         this.id = id
     }

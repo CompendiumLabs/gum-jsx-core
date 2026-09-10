@@ -322,7 +322,7 @@ interface TextArgs extends GroupArgs, EmArgs {
     width?: number       // the width the text wraps at, in its em: a box that wide, or for fit text the block it scales (minimum width for preserved text)
     height?: number
     fit?: boolean        // scaled to its slot like a figure, rather than set at its em
-    spacing?: number     // extra line spacing, as a fraction of the block
+    gap?: number         // extra line spacing, in em: lines are 1 + gap apart
     justify?: AlignValue
     whitespace?: Whitespace
     tab_size?: number    // tab stops in columns for preserved text
@@ -356,10 +356,10 @@ class Text extends Group {
     declare em: EmSpec
     whitespace: Whitespace
     fit: boolean
-    spacing: number
+    gap: number
 
     constructor(args: TextArgs = {}) {
-        const { children: children0, width, fit = false, scale = 1, whitespace = 'normal', tab_size = 4, spacing = 0, justify = 'left', debug, offer, env, ...attr0 } = THEME(args, 'Text')
+        const { children: children0, width, fit = false, scale = 1, whitespace = 'normal', tab_size = 4, gap = 0, justify = 'left', debug, offer, env, ...attr0 } = THEME(args, 'Text')
         const children = ensure_children(children0)
         const [ spec, attr ] = spec_split(attr0)
         if (!['normal', 'pre', 'preserve'].includes(whitespace)) throw new Error(`Unknown whitespace mode: ${whitespace}`)
@@ -374,7 +374,7 @@ class Text extends Group {
         let wrap_at: number | undefined = width
         if (wrap_at == null && !fit && !preserve && offer != null) {
             if (offer.width != null) wrap_at = offer.width / scale
-            else if (offer.height != null) wrap_at = narrowest_width(spans, Math.floor(offer.height / scale * (1 - spacing) + 1e-9))
+            else if (offer.height != null) wrap_at = narrowest_width(spans, Math.floor((offer.height / scale + gap) / (1 + gap) + 1e-9))
         }
 
         // wrap text to lines: literal lines are kept whole
@@ -388,12 +388,12 @@ class Text extends Group {
             ? (Math.max(width ?? 0, max(widths) ?? 0) || 1)
             : width ?? ((rows.length > 1 && wrap_at != null) ? Math.max(wrap_at, max(widths) ?? 0) : (max(widths) ?? 0))
 
-        // construct text lines and place them down the block, `spacing`
-        // stretching it: n lines are n / (1 - spacing) em tall
+        // construct text lines and place them down the block, `gap` em
+        // apart: n lines are n + (n - 1) gap em tall
         const lines = rows.map(row => new TextLine({ children: row, justify, width: line_width, debug, env }))
         const n = lines.length
-        const total = n > 0 ? n / (1 - spacing) : 0
-        const pitch = n > 1 ? (total - 1) / (n - 1) : 1
+        const pitch = 1 + gap
+        const total = n > 0 ? n + (n - 1) * gap : 0
         const placed = lines.map((l, i) => l.clone({ rect: [ 0, i * pitch, line_width, i * pitch + 1 ] }))
 
         // pass to Group; content text keeps its width as a size of its own
@@ -405,7 +405,7 @@ class Text extends Group {
         this.spans = spans
         this.whitespace = whitespace
         this.fit = fit
-        this.spacing = spacing
+        this.gap = gap
     }
 
     // as content: from its longest word to its one line wide, one line to
@@ -418,7 +418,7 @@ class Text extends Group {
         const minc = max(widths) ?? 0
         const maxc = sum(widths)
         const most = wrap_widths(this.spans, span_width, minc).rows.length
-        const total = (k: number) => k / (1 - this.spacing)
+        const total = (k: number) => k + (k - 1) * this.gap
         return { width: [ minc * s, maxc * s ], height: [ total(1) * s, total(most) * s ], stretch: [ true, false ] }
     }
 
