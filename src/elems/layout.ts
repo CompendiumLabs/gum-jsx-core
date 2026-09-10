@@ -160,7 +160,7 @@ h_i = \frac{v_i}{\sum_{k=1}^M v_k}
 \log(a) = \log(\mu) - \frac{1}{N} \sum_{j=1}^N \log(w_j) + \frac{1}{M} \sum_{i=1}^M \log(h_i)
 */
 
-function computeGridLayout(children: Element[][], rows: number, cols: number, { widths: widths0, heights: heights0, spacing = 0 }: { widths?: number[], heights?: number[], spacing?: number | [number, number] } = {}): { cranges: Limit[], rranges: Limit[], aspect: number } {
+function compute_grid_layout(children: Element[][], rows: number, cols: number, { widths: widths0, heights: heights0, spacing = 0 }: { widths?: number[], heights?: number[], spacing?: number | [number, number] } = {}): { cranges: Limit[], rranges: Limit[], aspect: number } {
     // aggregate aspect ratios along rows and columns (assuming null goes to 1)
     const aspect_grid = children.map(row => row.map(e => e.spec.aspect ?? 1))
     const log_aspect = aspect_grid.map(row => row.map(log))
@@ -191,7 +191,7 @@ function computeGridLayout(children: Element[][], rows: number, cols: number, { 
     return { cranges, rranges, aspect }
 }
 
-function computeGridSize(num: number, rows: number | undefined, cols: number | undefined): { rows: number, cols: number } {
+function compute_grid_size(num: number, rows: number | undefined, cols: number | undefined): { rows: number, cols: number } {
     if (rows == null && cols != null) {
         rows = Math.ceil(num / cols)
     } else if (cols == null && rows != null) {
@@ -216,7 +216,7 @@ class Grid extends Group {
         const children = ensure_children(children0)
 
         // reshape children to grid
-        const { rows, cols } = computeGridSize(children.length, rows0, cols0)
+        const { rows, cols } = compute_grid_size(children.length, rows0, cols0)
         let grid = reshape(children, [rows, cols])
 
         // fill in missing rows and columns
@@ -226,7 +226,7 @@ class Grid extends Group {
         grid = padvec(grid, rows, filler)
 
         // compute layout
-        const { cranges, rranges, aspect: aspect_ideal } = computeGridLayout(grid, rows, cols, { widths, heights, spacing })
+        const { cranges, rranges, aspect: aspect_ideal } = compute_grid_layout(grid, rows, cols, { widths, heights, spacing })
         const aspect = aspect0 ?? aspect_ideal
 
         // make grid

@@ -728,8 +728,7 @@ function makeUID(prefix: string, env?: Env): string {
 // an element with em metrics (text, math, the text containers) placed by
 // `pos` with no size of its own
 function is_unsized_em(c: Element): c is WithEm {
-    const { pos, size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect } = c.args ?? {}
-    return c.em != null && pos != null && [ size, xsize, ysize, rad, xrad, yrad, rect, xrect, yrect ].every(v => v == null)
+    return c.em != null && c.args.pos != null && c.spec.rect == null
 }
 
 // what a group's `em` (coordinate units per em) does to its children: one
@@ -738,7 +737,9 @@ function is_unsized_em(c: Element): c is WithEm {
 // applies to direct children only, a nested group's coordinates being its own
 function size_by_em(children: Element[], em: number | undefined): Element[] {
     if (em == null) return children
-    return children.map(c => is_unsized_em(c) ? c.clone({ ysize: em * c.em!.height }) : c)
+    return children.map(c =>
+        is_unsized_em(c) ? c.clone({ ysize: em * c.em.height }) : c
+    )
 }
 
 interface GroupArgs extends ElementArgs {
@@ -972,14 +973,14 @@ class Svg extends Group {
     constructor(args: SvgArgs = {}) {
         const { children: children0, size : size0 = D.svg_size, padding = 1, bare = false, dims = true, filters, aspect: aspect0 = 'auto', view: view0, style, xmlns = svgns, font_family = sans, font_weight = light, stroke_width = 1, prec = D.prec, unit_size = D.unit_size, em: em0, width: width0, height: height0, env, ...attr } = THEME(args, 'Svg')
         const child = check_singleton(children0)
-        const size_base = ensure_pair(size0)
+        const size_max = ensure_pair(size0)
 
         // lay the child out for the canvas in em (one placed by rect is left
         // to the share world); the canvas is D.svg_ems lines tall
         let children = [ child ]
         let aspect = aspect0 == 'auto' ? undefined : aspect0
         if (child.spec.rect == null) {
-            const [ sw, sh ] = size_base.map(abs)
+            const [ sw, sh ] = size_max.map(abs)
             const em = em0 ?? sh / D.svg_ems
             const w = width0 ?? sw / em
             const h = height0 ?? sh / em
@@ -987,11 +988,13 @@ class Svg extends Group {
             children = [ laid.elem ]
             if (aspect0 == 'auto') {
                 aspect = laid.em.height > 0 && laid.em.width > 0 ?
-                         laid.em.width / laid.em.height :
-                         undefined
+                         laid.em.width / laid.em.height : undefined
             }
         }
-        const [ width, height ] = embed_size(size_base, { aspect })
+
+        // embed aspect in the max size
+        const size = embed_size(size_max, { aspect })
+        const [ width, height ] = size
 
         // compute outer viewBox
         const viewrect0 = view0 ?? [ 0, 0, width, height ]
@@ -1001,32 +1004,33 @@ class Svg extends Group {
         const style_elem = new Style({ children: style ?? '', env })
 
         // pass to Group
-        // the root carries the default stroke width as an inherited presentation
-        // attribute (like stroke and fill), so strokes with no explicit width
-        // still scale with the image instead of staying a fixed pixel hairline
         super({ tag: 'svg', children, aspect, xmlns, font_family, font_weight, stroke_width, env, ...attr })
         this.args = args
 
         // additional props
-        this.size = [ width, height ]
+        this.size = size
         this.viewrect = viewrect
         this.style = style_elem
-        this.prec = prec
         this.unit_size = unit_size
+        this.prec = prec
         this.dims = dims
     }
 
     props(ctx: Context): Attrs {
         const attr = super.props(ctx)
-        const { viewrect, size: [ width, height ], dims } = this
+        const { viewrect, size, dims } = this
         const { prec } = ctx
 
         // construct viewBox
         const [ x, y, w, h ] = rect_box(viewrect)
         const viewBox = `${rounder(x, prec)} ${rounder(y, prec)} ${rounder(w, prec)} ${rounder(h, prec)}`
 
+        // get the outer dimensions
+        const [ width, height ] = size
+        const dims_attr = dims ? { width, height } : {}
+
         // return attributes; the pixel dimensions are the size, not the em ones
-        return { viewBox, ...(dims ? { width, height } : {}), ...attr }
+        return { viewBox, ...dims_attr, ...attr }
     }
 
     inner(ctx: Context): string {
