@@ -9,8 +9,8 @@ import {
 } from '../index';
 import type { FontProvider, Fragment } from '../index';
 
-const regular = readFileSync(new URL('../../fonts/IBMPlexSans-Regular.ttf', import.meta.url));
-const mono = readFileSync(new URL('../../fonts/IBMPlexMono-Regular.ttf', import.meta.url));
+const regular = readFileSync(new URL('../fonts/IBMPlexSans-Regular.ttf', import.meta.url));
+const mono = readFileSync(new URL('../fonts/IBMPlexMono-Regular.ttf', import.meta.url));
 const native = parse(regular.buffer.slice(regular.byteOffset, regular.byteOffset + regular.byteLength));
 const shaper = create(regular) as Font;
 

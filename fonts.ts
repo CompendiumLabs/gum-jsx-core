@@ -125,7 +125,7 @@ class Fonts implements FontProvider {
       for (const [name, weight] of [['Light', 300], ['Regular', 400], ['Bold', 700]] as const) {
         this.#faces.push({
           family: `IBM Plex ${family}`, weight, style: 'normal',
-          url: new URL(`../fonts/IBMPlex${family}-${name}.ttf`, import.meta.url),
+          url: new URL(`./fonts/IBMPlex${family}-${name}.ttf`, import.meta.url),
         });
       }
     }

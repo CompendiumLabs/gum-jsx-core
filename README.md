@@ -10,7 +10,21 @@ cover how to work on it.
 [DESIGN.md](./DESIGN.md) records the accepted decisions and the original assessment
 of the legacy implementation. The old assessment's APIs and bug reports are historical.
 
-Run directly from this directory, including inside its checkpoint repo:
+This is a standalone Bun project. Install and check it from this directory:
+
+```sh
+bun install
+bun run test
+bun run typecheck
+```
+
+Runtime dependencies are `acorn`, `acorn-jsx`, `fontkit`, and `linebreak`.
+`opentype.js` is a test dependency; TypeScript and library declarations are
+development dependencies. The JSX parser and its source-error helpers live in
+`lib/`, and the six bundled IBM Plex faces live in `fonts/` with their OFL
+license. No files or packages from the old core checkout are needed.
+
+Run the local tools directly:
 
 ```sh
 bun scripts/gum.ts examples/hugging.jsx -f tree --stats
@@ -26,22 +40,20 @@ bun test/run.ts
 ```
 
 PNG output uses the optional local `rsvg-convert` command. SVG, tree, and JSON
-output need only Bun and the existing core dependencies. The PNG ratio changes
+output need only Bun and the dependencies installed above. The PNG ratio changes
 sampling resolution while preserving the layout viewport. The CLI accepts a JSX
 file or stdin; `--help` lists its options. Bare elements get an automatic `Svg`.
 `--width` and `--height` independently override viewport axes; omitted axes retain
 the source's sizing or hug content. The [gallery](./examples/README.md) contains
 source, SVG, PNG, and exact numerical trees.
 
-From `gum-jsx-core`:
+Package scripts provide the same tools:
 
 ```sh
-bun run test:next
-bun run probe:next
-bun run probe:next hugging_box
-bun run gum:next src/next/examples/repeated.jsx -f tree
-bun run gallery:next
-bun run typecheck
+bun run probe
+bun run probe hugging_box
+bun run gum examples/repeated.jsx -f tree
+bun run gallery
 ```
 
 The stage 1 [contract probes](./examples/contracts.ts) remain executable:
@@ -747,16 +759,17 @@ only an explicit placement matrix scales completed geometry and strokes.
 
 ## Contributor notes
 
-Work in this directory's checkpoint git repo; it sits inside the `gum-jsx-core`
-package, which is itself an org submodule. Inspect `git status` here before editing.
-Checkpoints are kept by the maintainer; commit when asked. Keep this implementation
-isolated until a separate migration decision. The default core exports, legacy Env,
-math/plotting elements, and add-on packages continue to use the old core.
+Work in this standalone git repo, moved from the original core's `src/next`.
+Inspect `git status` here before editing. Checkpoints are kept by the maintainer;
+commit when asked. Keep this implementation isolated until a separate migration
+decision. The legacy Env, math/plotting elements, and add-on packages continue
+to use the old core.
 
-The local CLI above targets `next`. The installed `gum` CLI and legacy documentation
-or authoring skills target the old API. This directory is not a standalone package:
-it relies on core's dependencies, the sibling parser, and bundled font assets. Use
-the existing Bun workspace install; no build is needed to run TypeScript sources.
+The local CLI above targets this implementation. The installed `gum` CLI and
+legacy documentation or authoring skills target the old API. Run `bun install`
+here; `package.json` and `bun.lock` own the dependencies independently of the
+old org workspace. No build is needed to run TypeScript sources. JSX examples
+are read as source by `evaluate`, so they do not need React or its JSX runtime.
 
 | Responsibility | Start here |
 |---|---|
@@ -795,14 +808,13 @@ inspect both the images and numerical trees. The early custom placement fixtures
 are intentional protocol examples, while new composition examples should use the
 standard elements. Update this README, the gallery README, and roadmap status.
 
-For runtime changes, run `bun test/run.ts` here and `bun run typecheck` from the
-core package. The former covers contracts/layout plus CLI behavior and PNG when
+For runtime changes, run `bun run test` and `bun run typecheck` here. The former covers contracts/layout plus CLI behavior and PNG when
 `rsvg-convert` is available. At the completed 6(a) checkpoint, the suite had 81 named
 contract/layout checks plus CLI/PNG checks. For public type changes, also verify
-declaration emission from `gum-jsx-core` without rewriting the package's `types/`:
+declaration emission into a scratch directory:
 
 ```sh
-bun tsc -p tsconfig.types.json --outDir /tmp/gum-next-types
+bun tsc --noEmit false --declaration --emitDeclarationOnly --outDir /tmp/gum-next-types
 ```
 
 The checked-in gallery can be regenerated with `bun scripts/gallery.ts` here

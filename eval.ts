@@ -1,5 +1,5 @@
 // The existing parser depends only on Acorn and source-error helpers, not layout.
-import { runJSX } from '../lib/parse';
+import { runJSX } from './lib/parse';
 import { Element, define_element, element_children } from './element';
 import { Svg } from './elems';
 import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';

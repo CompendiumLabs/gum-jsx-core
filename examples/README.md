@@ -1,6 +1,6 @@
 # Stages 1–6(a) gallery
 
-Run `bun scripts/gallery.ts` from `src/next` to regenerate the files in `rendered/`.
+Run `bun run gallery` from the project root to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
 

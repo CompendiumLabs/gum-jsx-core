@@ -1,4 +1,4 @@
-/// <reference path="../types/linebreak.d.ts" />
+/// <reference path="./types/linebreak.d.ts" />
 import LineBreaker from 'linebreak';
 import { DEFAULTS } from './defaults';
 import { draw_path } from './drawing';
