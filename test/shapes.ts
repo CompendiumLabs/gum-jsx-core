@@ -22,13 +22,13 @@ const tests: Record<string, () => void> = {
     // Box can hug a child that accepts its offer; it need not force an exact size.
     const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Box({
       padding: px(10), border_width: px(2),
-      children: new Rect({ margin: px(4), stroke_width: px(3) }),
+      children: new Box({ padding: px(4), children: new Rect({ stroke_width: px(3) }) }),
     }) }));
-    const box = root.children[0].fragment, margin = box.children[0];
-    const shape = margin.fragment.children[0];
+    const box = root.children[0].fragment, wrapper = box.children[0];
+    const shape = wrapper.fragment.children[0];
     assert.deepEqual(box.size, root.size);
     assert.deepEqual(box.content, { x: 12, y: 12, width: 176, height: 76 });
-    assert.deepEqual(margin.offset, { x: 12, y: 12 });
+    assert.deepEqual(wrapper.offset, { x: 12, y: 12 });
     assert.deepEqual(shape.offset, { x: 4, y: 4 });
     assert.deepEqual(shape.fragment.size, { width: 168, height: 68 });
     assert.equal(shape.fragment.draw[0].stroke_width, 3);

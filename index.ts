@@ -19,7 +19,7 @@ export type {
   Axis, AxisRequest, LayoutRequest, SizeSpec, AxisSizing, Sizing,
 } from './layout';
 export { union_rects, intersect_rects, make_transform, transform_rect } from './geometry';
-export { make_fragment, place_fragment, content_bounds, transform_guides, inset_fragment } from './fragment';
+export { make_fragment, place_fragment, content_bounds, transform_guides } from './fragment';
 export type { Transform, Guides, Fragment, Placement, FragmentSpec } from './fragment';
 export { draw_rect, draw_ellipse, draw_path, drawing_ink } from './drawing';
 export type { Paint, Drawing, RectDraw, EllipseDraw, PathDraw } from './drawing';

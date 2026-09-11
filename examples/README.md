@@ -10,7 +10,7 @@ The stage 4 sources use standard Box composition, with no placement fixtures:
 |---|---|
 | [hugging.jsx](./hugging.jsx) | A 64px Square plus 16px padding and a 2px border makes a 100×100 Box and Svg. Neither parent specifies a size. |
 | [card.jsx](./card.jsx) | A 360px viewport with content-sized height. The gallery also lays out the same source at 220px. |
-| [nesting.jsx](./nesting.jsx) | Nested backgrounds, padding, a Frame with external margin, and a centered label. |
+| [nesting.jsx](./nesting.jsx) | Nested backgrounds, padding inside and outside a Frame, and a centered label. |
 | [box_clip.jsx](./box_clip.jsx) | A centered 280px Square overflowing a 220×100 rounded Box, clipped inside its 6px border. |
 | [fitting.jsx](./fitting.jsx) | Fit scales a natural text line to 280×80; Frame and Svg hug the result. |
 | [fill_rect.jsx](./fill_rect.jsx) / [fill_ellipse.jsx](./fill_ellipse.jsx) | Unsized aspectless shapes accept both dimensions of a 200×100 viewport. |
@@ -42,17 +42,17 @@ Compare the [wide tree](./rendered/card.tree) and
 bun scripts/gum.ts examples/card.jsx --width 260 -o /tmp/card.png
 ```
 
-![Nested boxes and external margins](./rendered/nesting.png)
+![Nested boxes and external spacing](./rendered/nesting.png)
 
 The [tree](./rendered/nesting.tree) distinguishes the inner Box's fixed 240×100
-border box from Frame's padding and external `Margin` fragment. The outer Box
+border box from Frame's padding and an enclosing Box with 8px padding. The outer Box
 and Svg derive their full 314×166 dimensions from those contributions.
 
 ![Clipped overflow and a rounded inside border](./rendered/box_clip.png)
 
 Clipping hides the overflowing Square while retaining its 280×280 allocation and
 overflow in the [tree](./rendered/box_clip.tree). Its painted ink is bounded by
-the inside of the border. The 12px outer margin contributes to Svg's 244×124 size.
+the inside of the border. The outer Box's 12px padding contributes to Svg's 244×124 size.
 
 ![Explicit fitting of a completed text line](./rendered/fitting.png)
 

@@ -36,18 +36,20 @@ const tests: Record<string, () => void> = {
       { width: 16, height: 16 });
   },
 
-  'nested frames add insets and propagate baselines through outer margins'() {
+  'nested boxes add insets and propagate baselines through outer padding'() {
     const pass = new LayoutPass();
     const leaf = new Fixed({ content_width: px(40), content_height: px(20), fill: 'teal' });
-    const box = new Box({
+    const inner = new Box({
       padding: { left: px(3), top: px(4), right: px(5), bottom: px(6) },
-      border_width: px(2),
-      margin: { left: px(7), top: px(8), right: px(9), bottom: px(10) }, children: leaf,
+      border_width: px(2), children: leaf,
+    });
+    const box = new Box({
+      padding: { left: px(7), top: px(8), right: px(9), bottom: px(10) }, children: inner,
     });
     const root = pass.layout(new Svg({ children: box }));
-    const margin = root.children[0].fragment, frame = margin.children[0];
+    const wrapper = root.children[0].fragment, frame = wrapper.children[0];
     assert.deepEqual(root.size, { width: 68, height: 52 });
-    assert.equal(margin.name, 'Margin');
+    assert.equal(wrapper.name, 'Box');
     assert.deepEqual(frame.offset, { x: 7, y: 8 });
     assert.deepEqual(frame.fragment.size, { width: 52, height: 34 });
     assert.deepEqual(frame.fragment.content, { x: 5, y: 6, width: 40, height: 20 });
@@ -58,9 +60,10 @@ const tests: Record<string, () => void> = {
     assert.equal(outer.guides.baseline, 34);
   },
 
-  'margin stays outside preferred sizes and exact allocations include it'() {
+  'outer padding leaves inner sizing intact and stretch forwards exact allocations'() {
     const pass = new LayoutPass();
-    const box = new Box({ width: px(80), height: px(40), margin: px(8), padding: px(4) });
+    const inner = new Box({ width: px(80), height: px(40), padding: px(4) });
+    const box = new Box({ padding: px(8), align: 'stretch', children: inner });
     const natural = pass.layout(box);
     assert.deepEqual(natural.size, { width: 96, height: 56 });
     assert.deepEqual(natural.children[0].fragment.size, { width: 80, height: 40 });
@@ -72,36 +75,46 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(tiny.children[0].fragment.size, make_size());
     assert.ok(tiny.overflow.right > 0 && tiny.overflow.bottom > 0);
     assert.doesNotMatch(render_svg(tiny), /NaN|Infinity/);
+
+    // Ordinary alignment keeps the child offer advisory, even in a tight wrapper.
+    const loose = pass.layout(new Box({ padding: px(8), children: inner }),
+      make_request({ width: exact(60), height: exact(30) }));
+    assert.deepEqual(loose.children[0].fragment.size, { width: 80, height: 40 });
+    assert.ok(loose.overflow.right > 0 && loose.overflow.bottom > 0);
   },
 
-  'local fonts resolve before padding and margin, independently of child font sizes'() {
+  'each box resolves em padding with its own font before measuring children'() {
     const pass = new LayoutPass();
     const source = new Svg({ font_size: px(10), children: new Box({
       font_size: em(2), padding: em(0.5), border_width: em(0.1),
-      children: new Square({ font_size: em(0.5), width: em(2), margin: em(0.5) }),
+      children: new Box({ font_size: em(0.5), padding: em(0.5),
+        children: new Square({ width: em(2) }),
+      }),
     }) });
     const root = pass.layout(source), box = root.children[0].fragment;
-    const margin = box.children[0].fragment;
-    assert.deepEqual(margin.size, { width: 30, height: 30 });
-    assert.deepEqual(margin.children[0].offset, { x: 5, y: 5 });
-    assert.deepEqual(margin.children[0].fragment.size, { width: 20, height: 20 });
+    const wrapper = box.children[0].fragment;
+    assert.deepEqual(wrapper.size, { width: 30, height: 30 });
+    assert.deepEqual(wrapper.children[0].offset, { x: 5, y: 5 });
+    assert.deepEqual(wrapper.children[0].fragment.size, { width: 20, height: 20 });
     assert.deepEqual(box.content, { x: 12, y: 12, width: 30, height: 30 });
     assert.deepEqual(root.size, { width: 54, height: 54 });
   },
 
-  'percentages use established content boxes before child margins or alignment'() {
+  'nested boxes establish their own percentage references after padding'() {
     const pass = new LayoutPass();
     const source = new Svg({ width: px(200), height: px(100), children: new Box({
-      width: 1, height: 1, padding: px(10), children: new Rect({
-        width: 0.5, height: px(20), margin: 0.1, stroke: 'none',
+      width: 1, height: 1, padding: px(10), children: new Box({
+        width: 1, height: 1, padding: 0.1,
+        children: new Rect({ width: 0.5, height: px(20), stroke: 'none' }),
       }),
     }) });
     const box = pass.layout(source).children[0].fragment;
-    const margin = box.children[0].fragment;
+    const wrapper = box.children[0].fragment;
     assert.deepEqual(box.content, { x: 10, y: 10, width: 180, height: 80 });
-    assert.deepEqual(margin.size, { width: 126, height: 36 });
-    assert.deepEqual(margin.children[0].fragment.size, { width: 90, height: 20 });
-    assert.deepEqual(margin.children[0].offset, { x: 18, y: 8 });
+    assert.deepEqual(wrapper.size, { width: 180, height: 80 });
+    assert.deepEqual(wrapper.content, { x: 18, y: 8, width: 144, height: 64 });
+    assert.deepEqual(wrapper.children[0].fragment.size, { width: 72, height: 20 });
+    assert.deepEqual(wrapper.children[0].offset, { x: 18, y: 8 });
     const partial = pass.layout(new Box({ width: px(200), padding: px(10),
       children: new Rect({ width: 0.5, height: px(20), stroke: 'none' }) }));
     assert.deepEqual(partial.size, { width: 200, height: 40 });

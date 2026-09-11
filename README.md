@@ -160,9 +160,9 @@ ratio on text or containers.
 fields. Missing sides default to zero. Deflation floors inner dimensions at zero;
 inflation preserves the full inset extent, including when it cannot fit.
 
-Box dimensions denote the border box, including padding and border but excluding
-margin. Padding and border deflate the child's space. The layout pass accounts
-for margin at the parent/child boundary, outside the element's own sizing policy.
+Box dimensions denote the border box, including padding and border. Padding and
+border deflate the child's space. External spacing is another Box's padding;
+each layer owns its size, style, and child reference box.
 
 The [fragment schema](./fragment.ts) contains only the result for one request:
 
@@ -208,8 +208,8 @@ belong to this evaluation. This runs ordinary trusted JavaScript, with its norma
 access to the host runtime.
 
 `Svg` accepts one content element and optional `px()` width and height. Each
-omitted axis hugs the child's measured allocation, including its margins. A fixed
-width with an omitted height supports reflowing documents; omitting both supports
+omitted axis hugs the child's measured allocation, including any surrounding Boxes.
+A fixed width with an omitted height supports reflowing documents; omitting both supports
 fully natural composition. An exact request can resize either axis. Established
 axes become child percentage references and available-space offers. A hugging
 axis remains indefinite during measurement; its final size is never fed back as
@@ -261,12 +261,10 @@ Pass a child's percentage reference explicitly once the container establishes it
 own content box. Omission leaves the reference indefinite. A finite available offer
 alone does not establish that box.
 
-`child(...)` and `pass.layout(...)` return the child's outer allocation, including
-margin. The pass resolves margin using the child's local font and the unchanged
-parent reference, deflates the incoming request, and prepares the element's own
-sizing. The layout method therefore receives and returns the inner box. A plain
-`Margin` fragment supplies the outer size, offset, and translated guides; zero
-margins need no wrapper. Containers do not subtract a child's margin themselves.
+`child(...)` and `pass.layout(...)` return the element's own layout result. The
+pass resolves shared style and sizing, runs the layout method, validates its size,
+and caches the fragment. Insets, placement, and decoration belong to elements.
+Element-specific properties are interpreted by the element's layout method.
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
@@ -317,7 +315,6 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 |---|---|
 | `width`, `height`, `min_width`, etc. | The shared sizing policy, applied to the border box. |
 | `padding` | Uniform length or named sides; default zero. |
-| `margin` | Uniform length or named sides outside the border box; default zero. Available on all layout elements. |
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
@@ -331,8 +328,8 @@ The border paints above the child, wholly inside the frame, even when thicker
 than half the box. Its drawing construction introduces no extra ink overflow.
 
 Box resolves em padding and border against its own font size, before querying
-the child. Fractional padding and margin use the corresponding parent content
-axis. Fractional border width uses the parent's shorter side, requiring both
+the child. Fractional padding uses the corresponding parent content axis.
+Fractional border width uses the parent's shorter side, requiring both
 axes; it cannot depend on the unresolved size that it helps determine. Radius
 is decoration and resolves against Box's final rectangle. Prefer `px()` or `em()`
 for border width in a naturally sized tree.
@@ -343,17 +340,32 @@ gives Box a definite width, then gives its child that width minus padding and
 border. Box and Svg can both hug height. A nonzero fractional child height on
 that unresolved axis produces a property-path error, without iteration.
 
-Alignment positions the child's outer allocation, including margins. Numeric
-alignment is dimensionless: 0 is start, 0.5 center, and 1 end. Stretch sends an
+Alignment positions the child's allocated box. Numeric alignment is dimensionless:
+0 is start, 0.5 center, and 1 end. Stretch sends an
 exact child request on axes established before measurement; other axes still
 hug. Center/end alignment may give oversized children negative offsets. Baselines
 move with the child. Clipping changes visible ink and retains overflow.
 
-Preferred dimensions exclude margin: a Box with `width={px(80)}` and 8px margins
-occupies 96px. A parent's exact 60px allocation includes those margins and leaves
-44px for the border box. Empty boxes measure their padding plus border; an empty
-undecorated Box is 0×0. Oversized insets floor content dimensions at zero and
-retain their full excess as overflow.
+Use nested Boxes for spacing outside a decorated frame:
+
+```jsx
+<Box padding={px(8)}>
+  <Box width={px(80)} padding={px(4)} border_width={px(1)}>
+    <Text>Hello</Text>
+  </Box>
+</Box>
+```
+
+The inner border box is 80px wide; the outer padding brings the total to 96px.
+Set `align="stretch"` on the outer Box to pass exact allocations inward: a 60px
+allocation then leaves 44px for the inner Box. Ordinary alignment offers that
+space and lets the child retain its preferred width, recording overflow.
+
+Each wrapper is a real container. Its children use its established content box
+for percentages, and its em padding uses its own font size. External spacing has
+no separate `margin` prop or implicit wrapper in the layout pass. Empty boxes
+measure their padding plus border; an empty undecorated Box is 0×0. Oversized
+insets floor content dimensions at zero and retain their full excess as overflow.
 
 `Fit` is an explicit uniform transform of one naturally measured child:
 
@@ -369,8 +381,8 @@ establishes its chosen target axes as references, then queries the child natural
 `scale_down` contains without enlarging. Alignment defaults to center and accepts
 the same positions as Box, excluding stretch. `clip` defaults to false; enable it
 for cropped cover fitting. Fit scales the child's allocated rectangle, including
-margins, glyphs, strokes, and guides; it does not fit ink extents. Text keeps its
-natural line breaks instead of reflowing to the target width. Zero source axes
+any nested padding, glyphs, strokes, and guides; it does not fit ink extents. Text
+keeps its natural line breaks instead of reflowing to the target width. Zero source axes
 contribute no scale ratio, and a zero target can produce an invisible scale of zero.
 
 ## Text and fonts

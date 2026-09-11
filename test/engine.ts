@@ -32,6 +32,18 @@ const tests: Record<string, () => void> = {
     assert.equal(calls, 1);
   },
 
+  'custom properties belong to the element and introduce no engine layout policy'() {
+    const Custom = define_element<ElementProps & { margin: string }>('Custom', (props, query) => {
+      // A custom element may use this name for its own data, with no reserved meaning.
+      assert.equal(props.margin, 'user data');
+      return make_fragment({ size: finish_size(make_size(37, 19), query.request, query.sizing) });
+    });
+    const fragment = new LayoutPass().layout(new Custom({ margin: 'user data' }));
+    assert.equal(fragment.name, 'Custom');
+    assert.deepEqual(fragment.size, { width: 37, height: 19 });
+    assert.equal(fragment.children.length, 0);
+  },
+
   'JSX components, spreads, fragments, and scope create ordinary immutable elements'() {
     const code = `
       function tile({ color }) { return <Rect width={0.5} height={em(2)} fill={color}/>; }

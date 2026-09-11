@@ -1,11 +1,10 @@
 import type { Fragment } from './fragment';
-import type { InsetSpec } from './geometry';
 import type { SizeSpec } from './layout';
 import type { LayoutQuery } from './pass';
 import type { StyleSpec } from './style';
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[];
-type ElementProps = SizeSpec & StyleSpec & Readonly<{ children?: Child; margin?: InsetSpec }>;
+type ElementProps = SizeSpec & StyleSpec & Readonly<{ children?: Child }>;
 type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragment;
 type ElementType = Readonly<{
   name: string;

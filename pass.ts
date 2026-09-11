@@ -1,10 +1,9 @@
 import { nonnegative } from './checks';
 import { Element } from './element';
 import { Fonts } from './fonts';
-import { make_fragment, inset_fragment } from './fragment';
+import { make_fragment } from './fragment';
 import type { Fragment } from './fragment';
-import { make_size, inflate_size, resolve_insets } from './geometry';
-import { deflate_request, finish_size, make_request, prepare_request, resolve_sizing } from './layout';
+import { finish_size, make_request, prepare_request, resolve_sizing } from './layout';
 import type { LayoutRequest, Sizing } from './layout';
 import { resolve_style } from './style';
 import type { Style } from './style';
@@ -120,12 +119,8 @@ class LayoutPass {
       active.add(key);
       try {
         const basis = { font_size: style.font_size, reference, path };
-        // The parent's allocation includes margin; element sizing describes the
-        // inner box. Resolve margin with local style and the unchanged parent basis.
-        const margin = resolve_insets(element.props.margin, basis, 'margin');
-        const inner = deflate_request(request, margin);
         const sizing = resolve_sizing(element.props, basis);
-        const prepared = prepare_request(inner, sizing);
+        const prepared = prepare_request(request, sizing);
         const query: LayoutQuery = Object.freeze({
           request: prepared, sizing, style, reference, path,
           child: (child, offer, basis = {}, index = 0) => this.layout(child, offer, {
@@ -149,15 +144,7 @@ class LayoutPass {
         if (size.width !== result.size.width || size.height !== result.size.height) {
           throw new Error('Element returned a size outside its sizing policy; use finish_size');
         }
-        let fragment = make_fragment({ ...result, name: element.type.name });
-        if (Object.values(margin).some(value => value !== 0)) {
-          const extent = inflate_size(fragment.size, margin);
-          const outer = make_size(
-            request.width.kind === 'exact' ? request.width.value : extent.width,
-            request.height.kind === 'exact' ? request.height.value : extent.height,
-          );
-          fragment = inset_fragment(fragment, margin, outer);
-        }
+        const fragment = make_fragment({ ...result, name: element.type.name });
         cache.set(key, fragment);
         return fragment;
       } finally {

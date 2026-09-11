@@ -3,7 +3,7 @@ import { drawing_ink, copy_drawing } from './drawing';
 import type { Drawing } from './drawing';
 import {
   make_size, make_point, make_rect, make_clip, make_insets, make_transform,
-  union_rects, intersect_rects, transform_rect, bounds_overflow, inflate_size,
+  union_rects, intersect_rects, transform_rect, bounds_overflow,
 } from './geometry';
 import type { Clip, Insets, Point, Rect, Size, Transform } from './geometry';
 
@@ -72,21 +72,6 @@ function transform_guides(guides: Guides, y: number, scale = 1): Guides {
     .map(([key, value]) => [key, finite(y + scale * value, `guide ${key}`)])));
 }
 
-// Wrap a completed fragment in outer space, preserving all inset extent even
-// when an exact allocation is smaller. The inner fragment keeps its own size.
-function inset_fragment(
-  fragment: Fragment, insets: Insets, size = inflate_size(fragment.size, insets), name = 'Margin',
-): Fragment {
-  const { left, top } = insets;
-  const extent = inflate_size(fragment.size, insets);
-  const content = make_rect(left, top, fragment.size.width, fragment.size.height);
-  return make_fragment({
-    name, size, content, guides: transform_guides(fragment.guides, top),
-    overflow: bounds_overflow(size, make_rect(0, 0, extent.width, extent.height)),
-    children: [place_fragment(fragment, make_point(left, top))],
-  });
-}
-
 // Own drawing and placement data, then aggregate geometry once during layout.
 // Overflow uses unclipped content; ink is intersected with this fragment's clip.
 function make_fragment(spec: FragmentSpec): Fragment {
@@ -133,5 +118,5 @@ function make_fragment(spec: FragmentSpec): Fragment {
 // Guides (including baseline) use pixels from the local origin. Ink describes
 // painted bounds after clipping; overflow records excess content before clipping.
 // An explicit transform acts in child coordinates, before the placement offset.
-export { make_fragment, place_fragment, content_bounds, transform_guides, inset_fragment };
+export { make_fragment, place_fragment, content_bounds, transform_guides };
 export type { Transform, Guides, Fragment, Placement, FragmentSpec };
