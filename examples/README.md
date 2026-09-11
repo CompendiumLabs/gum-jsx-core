@@ -1,8 +1,56 @@
-# Stages 1–3 gallery
+# Stages 1–4 gallery
 
 Run `bun scripts/gallery.ts` from `src/next` to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
+
+The stage 4 sources use standard Box composition, with no placement fixtures:
+
+| Example | What to inspect |
+|---|---|
+| [hugging.jsx](./hugging.jsx) | A 64px Square plus 16px padding and a 2px border makes a 100×100 Box and Svg. Neither parent specifies a size. |
+| [card.jsx](./card.jsx) | A 360px viewport with content-sized height. The gallery also lays out the same source at 220px. |
+| [nesting.jsx](./nesting.jsx) | Nested backgrounds, padding, a Frame with external margin, and a centered label. |
+| [box_clip.jsx](./box_clip.jsx) | A centered 280px Square overflowing a 220×100 rounded Box, clipped inside its 6px border. |
+| [fitting.jsx](./fitting.jsx) | Fit scales a natural text line to 280×80; Frame and Svg hug the result. |
+
+![A Box and Svg hugging a Square](./rendered/hugging.png)
+
+The [tree](./rendered/hugging.tree) records the content rectangle at `(18,18)`
+and three layout queries suffice. The [SVG](./rendered/hugging.svg) uses these
+pixel dimensions directly. No fitting transform is involved.
+
+![A paragraph in a 360px card](./rendered/card.png)
+![The same paragraph in a 220px card](./rendered/card_narrow.png)
+
+Both cards have an 18px font, 18px padding, and a 2px inside border. Text changes
+from seven to twelve lines; the document height changes from 216.4px to 342.4px.
+Compare the [wide tree](./rendered/card.tree) and
+[narrow tree](./rendered/card_narrow.tree). To try another width:
+
+```sh
+bun scripts/gum.ts examples/card.jsx --width 260 -o /tmp/card.png
+```
+
+![Nested boxes and external margins](./rendered/nesting.png)
+
+The [tree](./rendered/nesting.tree) distinguishes the inner Box's fixed 240×100
+border box from Frame's padding and external `Margin` fragment. The outer Box
+and Svg derive their full 314×166 dimensions from those contributions.
+
+![Clipped overflow and a rounded inside border](./rendered/box_clip.png)
+
+Clipping hides the overflowing Square while retaining its 280×280 allocation and
+overflow in the [tree](./rendered/box_clip.tree). Its painted ink is bounded by
+the inside of the border. The 12px outer margin contributes to Svg's 244×124 size.
+
+![Explicit fitting of a completed text line](./rendered/fitting.png)
+
+The [fitting tree](./rendered/fitting.tree) keeps the original 16px text geometry
+under one uniform transform. Fit fills the offered width while preserving aspect;
+the Frame adds its own 16px padding and 2px border afterward.
+
+The earlier protocol, text, and shape examples remain available:
 
 | Example | What to inspect |
 |---|---|
@@ -34,8 +82,8 @@ diameter; Ellipse uses both axes. All strokes stay 3px wide.
 
 ![Independently sized circle and label](./rendered/label.png)
 
-The stage 3 gallery uses small, explicit placement fixtures until the standard Box
-and stack elements arrive. All source children are constructed before layout.
+The stage 3 gallery retains small, explicit placement fixtures. Standard stacks
+arrive in stage 5. All source children are constructed before layout.
 
 ![One rectangle at multiple allocations](./rendered/repeated.png)
 

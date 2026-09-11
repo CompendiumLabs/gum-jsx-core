@@ -1,10 +1,11 @@
 import type { Fragment } from './fragment';
+import type { InsetSpec } from './geometry';
 import type { SizeSpec } from './layout';
 import type { LayoutQuery } from './pass';
 import type { StyleSpec } from './style';
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[];
-type ElementProps = SizeSpec & StyleSpec & Readonly<{ children?: Child }>;
+type ElementProps = SizeSpec & StyleSpec & Readonly<{ children?: Child; margin?: InsetSpec }>;
 type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragment;
 type ElementType = Readonly<{
   name: string;
@@ -60,6 +61,13 @@ function element_children(child: Child = []): readonly Element[] {
   return Object.freeze(result);
 }
 
+// Single-content containers share one validation rule, including conditional children.
+function content_child(child: Child = []): Element | undefined {
+  const children = element_children(child);
+  if (children.length > 1) throw new TypeError('Expected one content element');
+  return children[0];
+}
+
 class Element<Props extends ElementProps = ElementProps> {
   readonly type: ElementType;
   readonly props: Readonly<Props>;
@@ -72,5 +80,5 @@ class Element<Props extends ElementProps = ElementProps> {
   }
 }
 
-export { Element, define_element, element_children, copy_data };
+export { Element, define_element, element_children, content_child, copy_data };
 export type { Child, ElementProps, ElementType, LayoutMethod };

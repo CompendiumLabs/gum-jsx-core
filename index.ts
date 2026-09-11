@@ -7,10 +7,10 @@ export type {
   UnitLength, Length, NormalizedLength, LengthBasis, ReferenceBox, LengthContext,
 } from './units';
 export {
-  make_size, make_point, make_rect, make_insets, resolve_insets,
+  make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
 } from './geometry';
-export type { Point, Size, Rect as PixelRect, Insets, InsetSpec } from './geometry';
+export type { Point, Size, Rect as PixelRect, Clip as ClipShape, Insets, InsetSpec } from './geometry';
 export {
   natural, available, exact, make_request, deflate_request,
   resolve_sizing, prepare_request, finish_size, shape_size,
@@ -19,7 +19,7 @@ export type {
   Axis, AxisRequest, LayoutRequest, SizeSpec, AxisSizing, Sizing,
 } from './layout';
 export { union_rects, intersect_rects, make_transform, transform_rect } from './geometry';
-export { make_fragment, place_fragment, content_bounds } from './fragment';
+export { make_fragment, place_fragment, content_bounds, transform_guides, inset_fragment } from './fragment';
 export type { Transform, Guides, Fragment, Placement, FragmentSpec } from './fragment';
 export { draw_rect, draw_ellipse, draw_path, drawing_ink } from './drawing';
 export type { Paint, Drawing, RectDraw, EllipseDraw, PathDraw } from './drawing';
@@ -29,17 +29,21 @@ export { resolve_style, resolve_paint } from './style';
 export type { Style, StyleSpec, FontStyle, LineCap, LineJoin } from './style';
 export { Fonts } from './fonts';
 export type { FontProvider, MeasuredFont, GlyphShape, FontOptions, FontData } from './fonts';
-export { Element, define_element, element_children } from './element';
+export { Element, define_element, element_children, content_child } from './element';
 export type { Child, ElementProps, ElementType, LayoutMethod } from './element';
 export { LayoutPass, LayoutError } from './pass';
 export type { LayoutQuery, LayoutContext, Resource } from './pass';
 export { Svg } from './elems';
 export type { SvgProps } from './elems';
-export { Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
 export type { Position, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps } from './shapes';
 export { Text, Span } from './text';
 export type { TextProps, SpanProps } from './text';
+export { Box, Frame, Fit } from './box';
+export type { BoxProps, FitProps } from './box';
+export { resolve_alignment, align_offset, definite_reference, layout_content, fit_scale } from './composition';
+export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode } from './composition';
 export { render_svg } from './svg';
 export type { SvgOptions } from './svg';
 export { inspect_fragment } from './inspect';

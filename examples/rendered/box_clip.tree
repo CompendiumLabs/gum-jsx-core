@@ -1,0 +1,6 @@
+Svg 244×124 @(0,0) ink=12,12,220,100 overflow=left:36,top:96,right:36,bottom:96 clipped
+  Margin 244×124 @(0,0) ink=12,12,220,100 overflow=left:36,top:96,right:36,bottom:96 content=12,12,220,100
+    Box 220×100 @(12,12) ink=0,0,220,100 overflow=left:48,top:108,right:48,bottom:108 content=18,18,184,64
+      Clip 220×100 @(0,0) ink=6,6,208,88 overflow=left:31,top:91,right:31,bottom:91 clipped
+        Square 280×280 @(-30,-90) ink=-1,-1,282,282 overflow=left:1,top:1,right:1,bottom:1
+      Border 220×100 @(0,0) ink=0,0,220,100 clipped

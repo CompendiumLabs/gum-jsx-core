@@ -1,0 +1,10 @@
+Svg 314×166 @(0,0) ink=0,0,314,166 baseline=76.25 last_baseline=103.25 clipped
+  Box 314×166 @(0,0) ink=0,0,314,166 baseline=76.25 last_baseline=103.25 content=12,12,290,142
+    Margin 290×142 @(12,12) ink=8,8,274,126 baseline=64.25 last_baseline=91.25 content=8,8,274,126
+      Frame 274×126 @(8,8) ink=0,0,274,126 baseline=56.25 last_baseline=83.25 content=17,13,240,100
+        Box 240×100 @(17,13) ink=0,0,240,100 baseline=43.25 last_baseline=70.25 content=9,9,222,82
+          Text 170.118×54 @(34.941,23) ink=1.674,6.93,167.09400000000002,44.136 baseline=20.25 last_baseline=47.25
+            Line 120.69×27 @(24.714,0) ink=0.36,6.93,119.97000000000001,13.536000000000001 baseline=20.25
+            Line 170.118×27 @(0,27) ink=1.674,6.93,167.09400000000002,17.136 baseline=20.25
+          Border 240×100 @(0,0) ink=0,0,240,100 clipped
+        Border 274×126 @(0,0) ink=0,0,274,126 clipped

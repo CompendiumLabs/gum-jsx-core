@@ -6,6 +6,7 @@ import type { Length, LengthContext } from './units';
 type Point = Readonly<{ x: number; y: number }>;
 type Size = Readonly<{ width: number; height: number }>;
 type Rect = Readonly<Point & Size>;
+type Clip = Readonly<Rect & { radius?: Point }>;
 type Transform = readonly [number, number, number, number, number, number];
 type Insets = Readonly<{
   left: number;
@@ -41,6 +42,23 @@ function make_insets(sides: Partial<Insets> = {}): Insets {
     nonnegative(value, side);
   }
   return Object.freeze({ left, top, right, bottom });
+}
+
+// Combine independently resolved layers, such as border and padding.
+function add_insets(a: Insets, b: Insets): Insets {
+  return make_insets({
+    left: a.left + b.left, top: a.top + b.top,
+    right: a.right + b.right, bottom: a.bottom + b.bottom,
+  });
+}
+
+// Clips retain optional rounded corners; rectangular callers need no extra data.
+function make_clip(rect: Rect, radius?: Point): Clip {
+  const bounds = make_rect(rect.x, rect.y, rect.width, rect.height);
+  if (radius === undefined) return bounds;
+  const x = Math.min(nonnegative(radius.x, 'radius.x'), rect.width / 2);
+  const y = Math.min(nonnegative(radius.y, 'radius.y'), rect.height / 2);
+  return Object.freeze({ ...bounds, radius: make_point(x, y) });
 }
 
 // Horizontal fractions use containing width; vertical fractions use height.
@@ -143,8 +161,8 @@ function transform_rect(rect: Rect | null, offset: Point, transform?: Transform)
 }
 
 export {
-  make_size, make_point, make_rect, make_insets, resolve_insets,
+  make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
   union_rects, intersect_rects, make_transform, transform_rect,
 };
-export type { Point, Size, Rect, Transform, Insets, InsetSpec };
+export type { Point, Size, Rect, Clip, Transform, Insets, InsetSpec };

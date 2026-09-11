@@ -6,17 +6,16 @@ import { evaluate } from '../eval';
 import { Svg } from '../elems';
 import { LayoutPass } from '../pass';
 import { exact, make_request } from '../layout';
-import { px } from '../units';
 import { render_svg } from '../svg';
 import { inspect_fragment } from '../inspect';
 
 const HELP = `Usage: bun scripts/gum.ts [file.jsx] [options]
-Read JSX from a file or stdin. Use an explicit <Svg> viewport or both size flags.
+Read JSX from a file or stdin. Omitted viewport dimensions hug the content.
 
   -f, --format svg|png|tree|json   Output format (default: svg or output extension)
   -o, --output file              Write output to a file instead of stdout
-      --width pixels            Set the viewport width; requires --height
-      --height pixels           Set the viewport height; requires --width
+      --width pixels            Set the viewport width
+      --height pixels           Set the viewport height
       --ratio number            PNG sampling ratio (default: 1; uses rsvg-convert)
       --background color        Paint the viewport background
       --title text              Add an escaped SVG title
@@ -51,9 +50,6 @@ function main(): void {
   if (positionals.length > 1) throw new Error('Expected at most one JSX file');
   const width = number_option(values.width, 'width');
   const height = number_option(values.height, 'height');
-  if ((width === undefined) !== (height === undefined)) {
-    throw new Error('Set both --width and --height');
-  }
   const ratio = number_option(values.ratio, 'ratio') ?? 1;
   if (ratio === 0) throw new Error('ratio must be positive');
   const format = values.format ?? (values.output ? extname(values.output).slice(1) : 'svg');
@@ -62,14 +58,11 @@ function main(): void {
   const file = positionals[0];
   const code = readFileSync(!file || file === '-' ? 0 : file, 'utf8');
   let element = evaluate(code, { name: file ?? 'stdin.jsx' });
-  if (!(element instanceof Svg)) {
-    if (width === undefined || height === undefined) {
-      throw new Error('Use <Svg width={px(...)} height={px(...)}> or set --width and --height');
-    }
-    element = new Svg({ width: px(width), height: px(height), children: element });
-  }
-  const request = width === undefined || height === undefined ? make_request()
-    : make_request({ width: exact(width), height: exact(height) });
+  if (!(element instanceof Svg)) element = new Svg({ children: element });
+  const request = make_request({
+    ...(width === undefined ? {} : { width: exact(width) }),
+    ...(height === undefined ? {} : { height: exact(height) }),
+  });
   const pass = new LayoutPass();
   const fragment = pass.layout(element, request);
 

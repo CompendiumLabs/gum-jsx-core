@@ -44,12 +44,20 @@ try {
   assert.match(text_svg.stdout.toString(), /<path d="M/);
   assert.match(text_svg.stdout.toString(), /aria-label="Real text wraps here\."/);
 
-  const invalid = spawnSync(process.execPath, [cli, '--width', '32'], { input: code });
-  assert.equal(invalid.status, 1);
-  assert.match(invalid.stderr.toString(), /both --width and --height/);
-  const missing = spawnSync(process.execPath, [cli], { input: '<Rect/>' });
-  assert.equal(missing.status, 1);
-  assert.match(missing.stderr.toString(), /Use <Svg/);
+  const one_axis = spawnSync(process.execPath, [cli, '-f', 'tree', '--width', '64'], { input: code });
+  assert.equal(one_axis.status, 0, one_axis.stderr.toString());
+  assert.match(one_axis.stdout.toString(), /^Svg 64×20/);
+  const hugging = '<Box padding={px(8)} border_width={px(2)}><Square width={px(20)}/></Box>';
+  const bare = spawnSync(process.execPath, [cli, '-f', 'tree'], { input: hugging });
+  assert.equal(bare.status, 0, bare.stderr.toString());
+  assert.match(bare.stdout.toString(), /^Svg 40×40/);
+  const natural_height = spawnSync(process.execPath, [cli, '-f', 'json', '--width', '120'], {
+    input: '<Box padding={px(8)}><Text>Real text wraps into a content-sized height.</Text></Box>',
+  });
+  assert.equal(natural_height.status, 0, natural_height.stderr.toString());
+  const card = JSON.parse(natural_height.stdout.toString());
+  assert.equal(card.size.width, 120);
+  assert.ok(card.size.height > 40);
 
   const converter = spawnSync('rsvg-convert', ['--version']);
   if (converter.error) console.log('skip - PNG CLI check (rsvg-convert is not installed)');
@@ -63,6 +71,10 @@ try {
     assert.equal(text_png.status, 0, text_png.stderr.toString());
     assert.equal(text_png.stdout.readUInt32BE(16), 160);
     assert.equal(text_png.stdout.readUInt32BE(20), 80);
+    const box_png = spawnSync(process.execPath, [cli, '-f', 'png'], { input: hugging });
+    assert.equal(box_png.status, 0, box_png.stderr.toString());
+    assert.equal(box_png.stdout.readUInt32BE(16), 40);
+    assert.equal(box_png.stdout.readUInt32BE(20), 40);
     console.log('ok - PNG sampling changes pixel dimensions without changing layout');
   }
   console.log('ok - CLI stdin, tree, JSON, SVG files, resizing, and diagnostics');

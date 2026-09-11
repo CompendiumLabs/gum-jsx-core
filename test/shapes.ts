@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import {
-  LayoutPass, Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path,
+  LayoutPass, Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
   px, em, make_request, exact, move_to, line_to, quad_to, curve_to, close_path, render_svg,
 } from '../index';
 
 const tests: Record<string, () => void> = {
   'all primitives have finite natural geometry and explicit empty or degenerate ink'() {
     const pass = new LayoutPass();
-    for (const Shape of [Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path]) {
+    for (const Shape of [Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path]) {
       const normal = pass.layout(new Shape());
       assert.deepEqual(normal.size, { width: 16, height: 16 });
       const zero = pass.layout(new Shape(), make_request({ width: exact(0), height: exact(0) }));

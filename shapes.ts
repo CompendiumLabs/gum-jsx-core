@@ -4,7 +4,7 @@ import { draw_rect, draw_ellipse, draw_path } from './drawing';
 import { define_element, element_children } from './element';
 import type { ElementProps } from './element';
 import { make_fragment } from './fragment';
-import { make_point, make_rect } from './geometry';
+import { make_size, make_point, make_rect } from './geometry';
 import type { Size } from './geometry';
 import { shape_size } from './layout';
 import type { LayoutQuery } from './pass';
@@ -64,6 +64,15 @@ const Rect = define_element<RectProps>('Rect', rect_layout);
 const RoundedRect = define_element<RectProps>('RoundedRect', (props, query) =>
   rect_layout(props, query, DEFAULTS.rounded_radius));
 
+// Like Circle, Square keeps its geometry square inside a nonsquare allocation.
+const Square = define_element<RectProps>('Square', (props, query) => {
+  const { size, paint } = shape_context(props, query);
+  const side = Math.min(size.width, size.height);
+  const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side);
+  const radius = resolve_radius(props.radius ?? 0, make_size(side, side), query);
+  return make_fragment({ size, draw: [draw_rect(rect, paint, radius)] });
+});
+
 const Circle = define_element<CircleProps>('Circle', (props, query) => {
   const { size, paint } = shape_context(props, query);
   const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
@@ -108,6 +117,6 @@ const Path = define_element<PathProps>('Path', (props, query) => {
   return make_fragment({ size, draw: [draw_path(commands, paint)] });
 });
 
-export { Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path };
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius };
 export type { Position, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps };

@@ -1,4 +1,4 @@
-// A fixed gallery arrangement until Box and stacks arrive. Both columns query
+// A fixed stage 3 gallery arrangement. Both columns query
 // the same Text description; only the offered width changes.
 const Paragraphs = define_element('Paragraphs', (props, query) => {
   const size = finish_size(make_size(768, 440), query.request, query.sizing);

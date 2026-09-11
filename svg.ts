@@ -57,7 +57,9 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       if (!id) {
         id = `${id_prefix}-clip-${clips.size}`;
         clips.set(node, id);
-        const rect = `<rect ${rect_attributes(node.clip)}/>`;
+        const { radius } = node.clip;
+        const corners = radius ? ` rx="${radius.x}" ry="${radius.y}"` : '';
+        const rect = `<rect ${rect_attributes(node.clip)}${corners}/>`;
         definitions.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">${rect}</clipPath>`);
       }
       clip = ` clip-path="url(#${id})"`;

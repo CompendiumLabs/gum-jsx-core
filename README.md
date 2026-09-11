@@ -1,12 +1,14 @@
 # Next core
 
-Stages 1–3 are implemented: units and sizing, immutable descriptions and fragments,
-layout passes, JSX, SVG rendering, measured text, and ordinary shapes. Import the
-experimental API from `@gum-jsx/core/next`. Box composition is the next stage.
+Stages 1–4 are implemented: units and sizing, immutable descriptions and fragments,
+layout passes, JSX, SVG rendering, measured text, shapes, and Box composition.
+Import the experimental API from `@gum-jsx/core/next`. Stacks are the next stage.
 
 Run directly from this directory, including inside its checkpoint repo:
 
 ```sh
+bun scripts/gum.ts examples/hugging.jsx -f tree --stats
+bun scripts/gum.ts examples/card.jsx --width 220 -o /tmp/card.png
 bun scripts/gum.ts examples/repeated.jsx -f tree --stats
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.svg
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.png --ratio 2
@@ -18,8 +20,10 @@ bun test/run.ts
 PNG output uses the optional local `rsvg-convert` command. SVG, tree, and JSON
 output need only Bun and the existing core dependencies. The PNG ratio changes
 sampling resolution while preserving the layout viewport. The CLI accepts a JSX
-file or stdin; `--help` lists its options. The [gallery](./examples/README.md)
-contains source, SVG, PNG, and exact numerical trees.
+file or stdin; `--help` lists its options. Bare elements get an automatic `Svg`.
+`--width` and `--height` independently override viewport axes; omitted axes retain
+the source's sizing or hug content. The [gallery](./examples/README.md) contains
+source, SVG, PNG, and exact numerical trees.
 
 From `gum-jsx-core`:
 
@@ -151,19 +155,20 @@ natural size; `finish_size` does not impose a shape's ratio on text or container
 fields. Missing sides default to zero. Deflation floors inner dimensions at zero;
 inflation preserves the full inset extent, including when it cannot fit.
 
-Box dimensions will denote the border box, including padding and border but
-excluding margin. Padding and border deflate the child's space; margin is
-accounted for by the parent. This stage supplies the arithmetic, not Box itself.
+Box dimensions denote the border box, including padding and border but excluding
+margin. Padding and border deflate the child's space. The layout pass accounts
+for margin at the parent/child boundary, outside the element's own sizing policy.
 
 The [fragment schema](./fragment.ts) contains only the result for one request:
 
 - `size`: the allocated rectangle, based at the local origin.
-- `guides`: optional named pixel positions, initially `baseline` from the top.
+- `content`: optional usable content rectangle; Box exposes the space inside its insets.
+- `guides`: optional named vertical pixel positions, including `baseline` from the top.
 - `ink`: painted bounds after clipping, or `null` for no paint.
 - `overflow`: nonnegative excess content on each side, recorded before clipping.
 - `draw`: resolved rectangle, ellipse, and path drawing records, including glyph outlines.
 - `children`: child fragments with local offsets and optional affine transforms.
-- `clip`: an optional local rectangle clipping the fragment and its descendants.
+- `clip`: an optional local rectangle with optional rounded corners, clipping the fragment and its descendants.
 - `name`: an optional inspection label, assigned from the element type by the pass.
 - `label`: optional accessible content; Text retains its normalized logical string here.
 
@@ -175,6 +180,8 @@ mutable source element or layout-pass state.
 `make_fragment` owns and freezes drawing and placement data. It aggregates local
 ink and child ink, transforms child bounds, and retains both layout and paint
 overflow before clipping. Its `ink` is the visible result after its own clip.
+Rounded clips render their actual curves; their reported ink uses a conservative
+intersection with the clip's bounding rectangle. Singular transforms paint nothing.
 `place_fragment` preserves an owned fragment's identity; external records are
 normalized first. `PixelRect` names the public geometry type, leaving `Rect` for
 the element constructor.
@@ -195,13 +202,19 @@ existing Acorn parser; no old element or layout engine is used. Extra scope valu
 belong to this evaluation. This runs ordinary trusted JavaScript, with its normal
 access to the host runtime.
 
-`Svg` requires explicit `px()` width and height and accepts one content element.
-It establishes that child's reference box and offers the viewport as available
-space. An exact request can resize the viewport. For a bare element, the CLI needs
-both `--width` and `--height` and creates the viewport around it. `Rect` follows
-the stage 1 aspect policy. Its SVG path traces its layout rectangle, so a stroke
-extends half its width beyond the path; the fragment records that ink and overflow.
-An empty or zero-area rectangle paints nothing.
+`Svg` accepts one content element and optional `px()` width and height. Each
+omitted axis hugs the child's measured allocation, including its margins. A fixed
+width with an omitted height supports reflowing documents; omitting both supports
+fully natural composition. An exact request can resize either axis. Established
+axes become child percentage references and available-space offers. A hugging
+axis remains indefinite during measurement; its final size is never fed back as
+a percentage basis. An empty unsized Svg is 0×0.
+
+The viewport follows layout bounds, not ink, and clips overflow at its edges.
+`Rect` follows the stage 1 aspect policy. Its stroke straddles its geometry, so
+half the stroke extends outside the layout rectangle; the fragment records that
+ink and overflow. An empty or zero-area rectangle paints nothing. Box borders
+instead consume layout space and stay entirely inside their border box.
 
 The same source can answer different allocations without being rebuilt:
 
@@ -243,13 +256,20 @@ Pass a child's percentage reference explicitly once the container establishes it
 own content box. Omission leaves the reference indefinite. A finite available offer
 alone does not establish that box.
 
+`child(...)` and `pass.layout(...)` return the child's outer allocation, including
+margin. The pass resolves margin using the child's local font and the unchanged
+parent reference, deflates the incoming request, and prepares the element's own
+sizing. The layout method therefore receives and returns the inner box. A plain
+`Margin` fragment supplies the outer size, offset, and translated guides; zero
+margins need no wrapper. Containers do not subtract a child's margin themselves.
+
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
 size policy; an incorrect exact size is an error. Fixed content can draw its natural
 geometry inside a smaller allocated frame and record overflow. See the synthetic
 [fixed, expanding, and wrapping leaves](./examples/leaves.ts) and the custom parent
-in [repeated.jsx](./examples/repeated.jsx). These are protocol fixtures, not the
-future text or standard container implementations.
+in [repeated.jsx](./examples/repeated.jsx). These fixtures exercise custom layout
+policies independently of Text and the standard containers.
 
 Natural queries and constrained queries use this same method. Cache entries are
 keyed by element identity, request, resolved style, percentage reference, and a
@@ -264,6 +284,89 @@ parent results. Existing fragments remain independent of subsequent resource
 changes. Prepared content is invalidated along with layout results. A preparation
 must not depend on the current request, percentage reference, or diagnostic path.
 Finer resource dependency tracking can follow measured need.
+
+## Box composition
+
+This is a complete 100×100 document, with no manual placement or root dimensions:
+
+```jsx
+<Svg>
+  <Box padding={em(1)} border_width={px(2)}>
+    <Square width={px(64)} fill="#63b49d" stroke="none" />
+  </Box>
+</Svg>
+```
+
+Square reports 64×64. Box adds 16px padding and a 2px border on each side; Svg
+adopts its 100×100 result. Each element receives one layout query. See the
+[source, image, and tree](./examples/README.md) for this and the framed paragraph.
+
+Box has at most one content element; put text in an ordinary `Text` child. It
+hugs measured content unless its own sizing or an exact request fixes an axis.
+An available width is passed inward for reflow, without scaling glyphs or strokes.
+The shared `layout_content` operation deflates the request, queries the child,
+inflates its answer, selects the final size, and aligns the completed fragment.
+Svg uses the same operation with no insets. Neither reconstructs source elements.
+
+| Prop | Meaning |
+|---|---|
+| `width`, `height`, `min_width`, etc. | The shared sizing policy, applied to the border box. |
+| `padding` | Uniform length or named sides; default zero. |
+| `margin` | Uniform length or named sides outside the border box; default zero. Available on all layout elements. |
+| `border_width` | Uniform length occupying space inside all four edges; default zero. |
+| `border_color` | Border paint; defaults to the resolved text `color`. |
+| `background` | Local fill behind the content; default `"none"`. |
+| `radius` | Rounded outer corners; scalar or `{x,y}`, default zero. Clamped to the box. |
+| `align` | `"start"`, `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}`. Default start on both axes. |
+| `clip` | Clip the child inside the border, including the padding area; default false. |
+
+Background and border are local decoration. Ordinary `fill`, `stroke`, and font
+props still inherit to children. `Frame` is Box with a default 1px border.
+The border paints above the child, wholly inside the frame, even when thicker
+than half the box. Its drawing construction introduces no extra ink overflow.
+
+Box resolves em padding and border against its own font size, before querying
+the child. Fractional padding and margin use the corresponding parent content
+axis. Fractional border width uses the parent's shorter side, requiring both
+axes; it cannot depend on the unresolved size that it helps determine. Radius
+is decoration and resolves against Box's final rectangle. Prefer `px()` or `em()`
+for border width in a naturally sized tree.
+
+Only an exact axis or equal min/max limits establish a content reference before
+measurement. For example, `<Svg width={px(360)}><Box width={1}>…</Box></Svg>`
+gives Box a definite width, then gives its child that width minus padding and
+border. Box and Svg can both hug height. A nonzero fractional child height on
+that unresolved axis produces a property-path error, without iteration.
+
+Alignment positions the child's outer allocation, including margins. Numeric
+alignment is dimensionless: 0 is start, 0.5 center, and 1 end. Stretch sends an
+exact child request on axes established before measurement; other axes still
+hug. Center/end alignment may give oversized children negative offsets. Baselines
+move with the child. Clipping changes visible ink and retains overflow.
+
+Preferred dimensions exclude margin: a Box with `width={px(80)}` and 8px margins
+occupies 96px. A parent's exact 60px allocation includes those margins and leaves
+44px for the border box. Empty boxes measure their padding plus border; an empty
+undecorated Box is 0×0. Oversized insets floor content dimensions at zero and
+retain their full excess as overflow.
+
+`Fit` is an explicit uniform transform of one naturally measured child:
+
+```jsx
+<Fit width={px(280)} height={px(80)} mode="contain">
+  <Text font_size={px(16)}>One fitted line</Text>
+</Fit>
+```
+
+Fit occupies finite offered axes; unoffered axes follow the scaled child. It
+establishes its chosen target axes as references, then queries the child naturally.
+`contain` fits within the target, `cover` fills it with possible overflow, and
+`scale_down` contains without enlarging. Alignment defaults to center and accepts
+the same positions as Box, excluding stretch. `clip` defaults to false; enable it
+for cropped cover fitting. Fit scales the child's allocated rectangle, including
+margins, glyphs, strokes, and guides; it does not fit ink extents. Text keeps its
+natural line breaks instead of reflowing to the target width. Zero source axes
+contribute no scale ratio, and a zero target can produce an invisible scale of zero.
 
 ## Text and fonts
 
@@ -364,13 +467,14 @@ as native SVG text; an optional native-text rendering route can be added later.
 ## Shapes and paths
 
 All shapes use the shared preferred-aspect policy, with a finite 16×16 natural
-fallback. An explicit size or available offer resizes geometry. Circle remains
-circular inside a nonsquare allocation; Ellipse follows both axes. Empty polylines
-and paths paint nothing but retain the ordinary shape sizing policy.
+fallback. An explicit size or available offer resizes geometry. Square and Circle
+are inscribed in a nonsquare allocation; Rect and Ellipse follow both axes. Empty
+polylines and paths paint nothing but retain the ordinary shape sizing policy.
 
 | Element | Geometry props and defaults |
 |---|---|
 | `Rect` | `radius` defaults to zero; a scalar uses the shorter side, `{x,y}` resolves per axis. |
+| `Square` | Same props as Rect; centered square geometry with side equal to the shorter allocation axis. |
 | `RoundedRect` | Same props, with a default radius of 0.125 of the shorter side. Radii clamp to half the corresponding dimension. |
 | `Circle` | `center: {x: 0.5, y: 0.5}`, scalar `radius: 0.5` of the shorter side. |
 | `Ellipse` | Same center, `radius: {x: 0.5, y: 0.5}`. |
@@ -414,8 +518,9 @@ IDs are allocated per render and reused for repeated placements of a shared clip
 speculative layout queries cannot consume IDs. Supply distinct `id_prefix` values
 when embedding several generated documents inline in one page.
 
-`inspect_fragment(fragment)` prints local sizes, offsets, matrices, ink, overflow,
-and guides. The CLI's `tree` format uses it; `json` exposes the complete result.
+`inspect_fragment(fragment)` prints local sizes, content rectangles, offsets,
+matrices, ink, overflow, and guides. The CLI's `tree` format uses it; `json` exposes
+the complete result.
 The renderer uses the fragment's allocated size directly as both SVG dimensions
 and viewBox extent. Ordinary resizing relays a new request through the layout pass;
 only an explicit placement matrix scales completed geometry and strokes.
