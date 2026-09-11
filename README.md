@@ -5,6 +5,12 @@ layout passes, JSX, SVG rendering, measured text, shapes, Box composition, and s
 Stage 6(a) adds positioned Group canvases; wrapping stacks are next in 6(b).
 Import the experimental API from `@gum-jsx/core/next`.
 
+This README describes the implemented API; [contributor notes](#contributor-notes)
+cover how to work on it.
+[ROADMAP.md](./ROADMAP.md) tracks completed stages and future work;
+[DESIGN.md](./DESIGN.md) records the accepted decisions and the original assessment
+of the legacy implementation. The old assessment's APIs and bug reports are historical.
+
 Run directly from this directory, including inside its checkpoint repo:
 
 ```sh
@@ -739,3 +745,71 @@ the complete result.
 The renderer uses the fragment's allocated size directly as both SVG dimensions
 and viewBox extent. Ordinary resizing relays a new request through the layout pass;
 only an explicit placement matrix scales completed geometry and strokes.
+
+## Contributor notes
+
+Work in this directory's checkpoint git repo; it sits inside the `gum-jsx-core`
+package, which is itself an org submodule. Inspect `git status` here before editing.
+Checkpoints are kept by the maintainer; commit when asked. Keep this implementation
+isolated until a separate migration decision. The default core exports, legacy Env,
+math/plotting elements, and add-on packages continue to use the old core.
+
+The local CLI above targets `next`. The installed `gum` CLI and legacy documentation
+or authoring skills target the old API. This directory is not a standalone package:
+it relies on core's dependencies, the sibling parser, and bundled font assets. Use
+the existing Bun workspace install; no build is needed to run TypeScript sources.
+
+| Responsibility | Start here |
+|---|---|
+| Length syntax, reference resolution, and defaults | [units.ts](./units.ts), [defaults.ts](./defaults.ts), [style.ts](./style.ts) |
+| Requests, shared sizing, and geometry | [layout.ts](./layout.ts), [geometry.ts](./geometry.ts), [composition.ts](./composition.ts) |
+| Immutable descriptions and element factory | [element.ts](./element.ts) |
+| Queries, caches, resources, and diagnostics | [pass.ts](./pass.ts) |
+| Box, root Svg, and explicit fitting | [box.ts](./box.ts), [elems.ts](./elems.ts) |
+| Stack queries versus pure flex allocation | [stack.ts](./stack.ts), [flex.ts](./flex.ts) |
+| Positioned canvas and direct-child metadata | [group.ts](./group.ts) |
+| Text preparation/reflow and font adapter | [text.ts](./text.ts), [fonts.ts](./fonts.ts) |
+| Shapes, path commands, drawing, and immutable results | [shapes.ts](./shapes.ts), [path.ts](./path.ts), [drawing.ts](./drawing.ts), [fragment.ts](./fragment.ts) |
+| Public API and JSX names | [index.ts](./index.ts), [eval.ts](./eval.ts) |
+| Rendering and debugging | [svg.ts](./svg.ts), [inspect.ts](./inspect.ts), [scripts/gum.ts](./scripts/gum.ts) |
+
+“Keep the layout pass ice cold.” Add container behavior to the container or a pure
+helper. Shared ElementProps includes flex and position metadata for typing; their
+presence does not make them engine policies. Use `define_element` for new elements,
+keep source data immutable, and place the returned fragments. Opaque objects and
+font providers belong in pass resources. No measuring in constructors, rebuilding
+children during queries, implicit margin wrappers, or layout inside the serializer.
+
+Keep `query.request`, `query.reference`, and `query.style` distinct. Pass child
+references explicitly; omitted references are indefinite. Exact allocations override
+preferred dimensions and min/max, but source sizing still has to resolve first.
+Do not round widths to improve cache hits: text break boundaries are observable.
+`query.prepare()` may depend on source, resolved style, and resources, never the
+current request, reference box, or path. Resource revisions invalidate the pass's
+layout and preparation caches. Reuse source identities to reuse fragments; equal
+props on two newly constructed elements do not give them a shared cache entry.
+
+When adding a public element, export it and its types in `index.ts`, add its JSX
+binding in `eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
+examples to `scripts/gallery.ts` and regenerate their SVG/PNG/tree artifacts;
+inspect both the images and numerical trees. The early custom placement fixtures
+are intentional protocol examples, while new composition examples should use the
+standard elements. Update this README, the gallery README, and roadmap status.
+
+For runtime changes, run `bun test/run.ts` here and `bun run typecheck` from the
+core package. The former covers contracts/layout plus CLI behavior and PNG when
+`rsvg-convert` is available. At the completed 6(a) checkpoint, the suite had 81 named
+contract/layout checks plus CLI/PNG checks. For public type changes, also verify
+declaration emission from `gum-jsx-core` without rewriting the package's `types/`:
+
+```sh
+bun tsc -p tsconfig.types.json --outDir /tmp/gum-next-types
+```
+
+The checked-in gallery can be regenerated with `bun scripts/gallery.ts` here
+(`rsvg-convert` is required). Use `pass.stats` and counting font providers for
+measurement-cost regressions. Natural hugging and Group examples generally query
+each child once; flex/reflow/stretch may require additional queries. Counted layouts,
+cache hits, and prepared glyph reuse are distinct. Preserve the opposing-clamp and
+text-width-boundary cases when changing allocation. See the
+[roadmap style guide](./ROADMAP.md#style-guide) for the project's implementation style.
