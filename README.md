@@ -406,7 +406,10 @@ placement transform still scales the completed drawing, including its strokes.
 
 `render_svg(fragment, { title?, background?, id_prefix? })` consumes only fragments.
 It emits escaped SVG, resolved drawing geometry, explicit placement transforms,
-and rectangular clip definitions. It performs no layout or font work. Definition
+and rectangular clip definitions. Identity placements and attribute-free fragment
+groups are omitted; transforms, clipping, and accessible labels retain their groups.
+The fragment tree remains intact for layout and inspection. Rendering performs no
+layout or font work. Definition
 IDs are allocated per render and reused for repeated placements of a shared clip;
 speculative layout queries cannot consume IDs. Supply distinct `id_prefix` values
 when embedding several generated documents inline in one page.

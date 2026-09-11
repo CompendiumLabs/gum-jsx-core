@@ -4,6 +4,7 @@ import type { Rect } from './geometry';
 import { path_data } from './path';
 
 type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string }>;
+const IDENTITY = [1, 0, 0, 1, 0, 0] as const;
 
 // Escape text and quoted attributes; drawing records never contain raw SVG markup.
 function escape_xml(value: string): string {
@@ -64,11 +65,19 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
     const draw = node.draw.map(render_drawing);
     const children = node.children.map(child => {
       const { x, y } = child.offset;
-      const matrix = child.transform ? ` matrix(${child.transform.join(' ')})` : '';
-      return `<g transform="translate(${x} ${y})${matrix}">${render_fragment(child.fragment)}</g>`;
+      const transforms: string[] = [];
+      if (x !== 0 || y !== 0) transforms.push(`translate(${x} ${y})`);
+      if (child.transform?.some((value, index) => value !== IDENTITY[index])) {
+        transforms.push(`matrix(${child.transform.join(' ')})`);
+      }
+      const body = render_fragment(child.fragment);
+      return transforms.length ? `<g transform="${transforms.join(' ')}">${body}</g>` : body;
     });
+
+    // Layout hierarchy needs no matching SVG group unless it carries semantics.
     const label = node.label === undefined ? '' : ` role="img" aria-label="${escape_xml(node.label)}"`;
-    return `<g${clip}${label}>${[...draw, ...children].join('')}</g>`;
+    const body = [...draw, ...children].join('');
+    return clip || label ? `<g${clip}${label}>${body}</g>` : body;
   }
 
   const body = render_fragment(fragment);
