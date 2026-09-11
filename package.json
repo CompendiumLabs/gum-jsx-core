@@ -1,5 +1,5 @@
 {
-  "name": "gum-jsx-core",
+  "name": "gum-next-core",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
