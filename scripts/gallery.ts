@@ -13,7 +13,8 @@ const examples = fileURLToPath(new URL('../examples/', import.meta.url));
 const output = process.argv[2] ? resolve(process.argv[2]) : join(examples, 'rendered');
 mkdirSync(output, { recursive: true });
 const names = ['rectangle', 'repeated', 'clipping', 'paragraph', 'typography', 'shapes', 'label',
-  'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse'];
+  'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse',
+  'stack', 'stack_hugging', 'stack_flex', 'stack_alignment'];
 const scenes: Scene[] = names.map(name => {
   const file = join(examples, `${name}.jsx`);
   return { name, element: evaluate(readFileSync(file, 'utf8'), { name: file }) };
@@ -22,6 +23,8 @@ scenes.push({ name: 'protocol', element: protocol_demo });
 // The same source card also answers a narrower viewport request.
 const card = scenes.find(scene => scene.name === 'card')!;
 scenes.push({ ...card, name: 'card_narrow', request: make_request({ width: exact(220) }) });
+const stack = scenes.find(scene => scene.name === 'stack')!;
+scenes.push({ ...stack, name: 'stack_narrow', request: make_request({ width: exact(360) }) });
 
 for (const { name, element, request } of scenes) {
   const pass = new LayoutPass();

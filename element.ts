@@ -1,10 +1,11 @@
 import type { Fragment } from './fragment';
+import type { FlexSpec } from './flex';
 import type { SizeSpec } from './layout';
 import type { LayoutQuery } from './pass';
 import type { StyleSpec } from './style';
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[];
-type ElementProps = SizeSpec & StyleSpec & Readonly<{ children?: Child }>;
+type ElementProps = SizeSpec & StyleSpec & FlexSpec & Readonly<{ children?: Child }>;
 type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragment;
 type ElementType = Readonly<{
   name: string;
@@ -32,17 +33,19 @@ function copy_data<T>(value: T, active = new Set<object>()): T {
   return Object.freeze(result) as T;
 }
 
-// Define a constructor whose only job is to snapshot a description, never measure it.
+// Snapshot optional defaults once; each instance overrides them with its own data.
+// Construction never measures and leaves parent-readable metadata in source props.
 function define_element<Props extends ElementProps = ElementProps>(
-  name: string, layout: LayoutMethod<Props>,
+  name: string, layout: LayoutMethod<Props>, defaults: Partial<Props> = {},
 ) {
+  const preset = copy_data(defaults);
   const type: ElementType = Object.freeze({
     name,
     layout: (element, query) => layout(element.props as Readonly<Props>, query),
   });
   return class extends Element<Props> {
     constructor(props: Props = {} as Props) {
-      super(type, props);
+      super(type, { ...preset, ...props });
     }
   };
 }

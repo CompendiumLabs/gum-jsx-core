@@ -1,14 +1,15 @@
 # Next core
 
-Stages 1–4 are implemented: units and sizing, immutable descriptions and fragments,
-layout passes, JSX, SVG rendering, measured text, shapes, and Box composition.
-Import the experimental API from `@gum-jsx/core/next`. Stacks are the next stage.
+Stages 1–5 are implemented: units and sizing, immutable descriptions and fragments,
+layout passes, JSX, SVG rendering, measured text, shapes, Box composition, and stacks.
+Import the experimental API from `@gum-jsx/core/next`. Other composition is next.
 
 Run directly from this directory, including inside its checkpoint repo:
 
 ```sh
 bun scripts/gum.ts examples/hugging.jsx -f tree --stats
 bun scripts/gum.ts examples/card.jsx --width 220 -o /tmp/card.png
+bun scripts/gum.ts examples/stack.jsx --width 360 -o /tmp/stack.png
 bun scripts/gum.ts examples/repeated.jsx -f tree --stats
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.svg
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.png --ratio 2
@@ -89,7 +90,7 @@ use the resolved local font size. Defaults live in [defaults.ts](./defaults.ts):
 16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
 
-Fractional gaps will use the stack's definite main-axis length. Shape coordinates
+Fractional gaps use the stack's definite main-axis length. Shape coordinates
 use their own resolved rectangle; scalar radii and stroke widths use its shorter
 side. Two-axis radii resolve per axis. A zero reference is
 definite even for degenerate geometry. Dimensionless aspect and flex weights are
@@ -243,8 +244,10 @@ Opaque resources belong to the pass. The pass resolves the local font size and
 inherited paint before preparing requests or running the element's layout method.
 Paint defaults are an unfilled shape with a black 1px stroke.
 
-`define_element(name, layout)` returns a constructor for a custom element. Its
-layout function receives readonly source props and a frozen query:
+`define_element(name, layout, defaults?)` returns a constructor for a custom element.
+Optional defaults are snapshotted once, then overridden by each instance's props.
+They become ordinary immutable source data, visible to parents; Spacer uses this
+for its flex defaults. The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
 |---|---|
@@ -265,6 +268,8 @@ alone does not establish that box.
 pass resolves shared style and sizing, runs the layout method, validates its size,
 and caches the fragment. Insets, placement, and decoration belong to elements.
 Element-specific properties are interpreted by the element's layout method.
+The direct stack parent interprets a child's `basis`, `grow`, and `shrink`; these
+properties introduce no policy in the layout pass and do not inherit.
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
@@ -384,6 +389,111 @@ for cropped cover fitting. Fit scales the child's allocated rectangle, including
 any nested padding, glyphs, strokes, and guides; it does not fit ink extents. Text
 keeps its natural line breaks instead of reflowing to the target width. Zero source axes
 contribute no scale ratio, and a zero target can produce an invisible scale of zero.
+
+## Stacks
+
+HStack packs left to right; VStack packs top to bottom. Both use the same
+main-axis/cross-axis implementation. They accept any number of element children,
+including arrays, JSX fragments, and conditional children. Empty stacks are 0×0
+unless their own sizing or an exact request requires more space.
+
+```jsx
+<Svg width={px(400)}>
+  <HStack width={1} gap={px(12)} align="center">
+    <Text width={px(80)}>Label</Text>
+    <Text grow={1} shrink={1}
+      text="A paragraph gets the remaining width and reflows to find its height." />
+    <Square width={px(40)} fill="#317969" stroke="none" />
+  </HStack>
+</Svg>
+```
+
+The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
+12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
+and Svg hugs the row's height. See [stack.jsx](./examples/stack.jsx) for two such
+rows nested inside columns and a Box, at two viewport widths. For plain JSX text,
+use a single line or `text={...}` when source newlines should not become line breaks.
+
+Without dimensions or flex weights, stacks hug natural content. This 52×32 row
+needs one query per element, including Svg:
+
+```jsx
+<Svg>
+  <HStack gap={px(4)}>
+    <Square width={px(32)} stroke="none" />
+    <Square width={px(16)} stroke="none" />
+  </HStack>
+</Svg>
+```
+
+| Stack prop | Meaning |
+|---|---|
+| `width`, `height`, `min_width`, etc. | Shared sizing for the stack's full allocation. |
+| `gap` | Length between adjacent children, default zero. No leading or trailing gap. |
+| `align` | Cross-axis `"start"` (default), `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1. HStack also accepts `"baseline"`. |
+| `justify` | Main-axis `"start"` (default), `"center"`, `"end"`, a number from 0 to 1, `"space_between"`, `"space_around"`, or `"space_evenly"`. |
+
+Flex properties belong to the **direct child** of a stack. Put them on an enclosing
+Box when the Box is the item being allocated; they do not pass through wrappers.
+
+| Child prop | Meaning |
+|---|---|
+| `basis` | Starting main-axis length. Otherwise use the child's preferred width/height, otherwise its measured natural size. |
+| `grow` | Nonnegative weight for surplus space, default **0**. |
+| `shrink` | Nonnegative shortage weight, default **0**; multiplied by the original basis. |
+| `min_width`, `max_width`, etc. | Bounds on the stack's main-axis allocation to this item. |
+
+The allocator reserves gaps, clamps bases, then distributes surplus or shortage
+among participating children. Growth uses `grow`; shrinkage uses `shrink × basis`.
+Items reaching limits freeze and the remaining space is redistributed. Zero weights
+keep their clamped bases. If maxima prevent filling the frame, `justify` places the
+unused space. If minima or zero shrink weights prevent fitting, overflow remains
+explicit; the stack does not clip. Wrap it in a Box with `clip` when needed.
+
+`basis={0} grow={1}` gives an item an equal share of remaining space alongside
+other such items. `grow={1}` alone adds equal surplus to potentially unequal
+natural bases. `width={0.5}` instead means half the stack's **full established
+width**, before subtracting gaps. Two half-width children plus a gap overflow
+unless shrinking is enabled. A fraction used as `basis` follows the same rule.
+
+Basis, preferred sizes, and limits resolve using the child's local font size;
+the gap uses the stack's font size. A fractional gap uses the stack's established
+main-axis length. Those references stay fixed across every probe and allocation.
+For example, `HStack width={1}` under a fixed-width Svg establishes that width.
+An unsized HStack may still hug under a finite available offer; that offer alone
+does not establish a reference for nonzero fractional child widths or gaps.
+
+Stacks use a finite main-axis offer as a flex budget but hug what is actually
+used unless their own sizing or an exact request fixes the frame. Cross-axis
+offers pass inward for measurement. A natural main axis packs clamped bases;
+an own minimum can supply additional space to growing items.
+
+Text is measured at the selected width before the stack determines its height.
+For `align="stretch"`, a definite cross axis becomes an exact child request. On a
+hugging cross axis, a column selects its shared width and remeasures text heights
+before allocating vertical space; a row allocates widths and reflows text before
+selecting the shared height. Stretch may override a child's preferred cross size
+and cross limits, following the exact-request contract. The selected cross size
+is never fed back into percentage references. These are bounded measurement
+phases, with no aspect-fitting search or font scaling.
+
+Baseline alignment uses each child's first `baseline` guide, falling back to its
+bottom edge. The row includes the largest extent above and below that guide.
+Stacks propagate the first guided child's guides and the last textual child's
+`last_baseline`, shifted into the stack's coordinates. `justify` only positions
+completed main-axis slots; `align` positions their cross axes; `Text.text_align`
+positions text inside its own allocation. Center/end can use negative offsets
+for overflowing content. Distributed spacing only adds positive free space to gaps.
+
+`Spacer` is an empty element whose source defaults are `{ basis: 0, grow: 1 }`.
+It needs no parent type check, has no ink, and is zero-sized naturally. Override
+its basis, weights, or bounds like any other stack child. For a fixed spacer, use
+`<Spacer basis={px(20)} grow={0}/>`; its default zero basis takes precedence over
+a preferred main-axis dimension.
+
+The pure [flex allocator](./flex.ts) accepts resolved pixel bases and bounds and
+returns immutable sizes. The [stack implementation](./stack.ts) owns child queries,
+text reflow, guides, and placement. LayoutPass remains independent of both policies.
 
 ## Text and fonts
 

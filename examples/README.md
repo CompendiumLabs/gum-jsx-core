@@ -1,10 +1,50 @@
-# Stages 1–4 gallery
+# Stages 1–5 gallery
 
 Run `bun scripts/gallery.ts` from `src/next` to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
 
-The stage 4 sources use standard Box composition, with no placement fixtures:
+The stage 5 sources use ordinary stacks and Boxes throughout:
+
+| Example | What to inspect |
+|---|---|
+| [stack.jsx](./stack.jsx) | Fixed-width labels, growing paragraphs, and fixed-size Squares in rows nested inside columns. The same source renders at 620px and 360px. |
+| [stack_hugging.jsx](./stack_hugging.jsx) | A natural row inside a natural column; the Box and Svg hug the whole result. |
+| [stack_flex.jsx](./stack_flex.jsx) | Weighted growth, redistribution after a maximum, explicit shrinkage, and Spacer. |
+| [stack_alignment.jsx](./stack_alignment.jsx) | Mixed-font baselines, space-between packing, and a bar stretched to a reflowed paragraph's height. |
+
+![Two mixed rows nested in columns](./rendered/stack.png)
+![The same stacked document at a narrower width](./rendered/stack_narrow.png)
+
+The paragraphs get 433px in the wide document and 173px in the narrow one.
+Each changes from three lines to seven. The document's height changes from
+345.8px to 547.4px; both renders use 21 layout queries, with prepared glyphs
+reused across each paragraph's intrinsic and allocated widths. Compare the
+[wide tree](./rendered/stack.tree) and [narrow tree](./rendered/stack_narrow.tree).
+
+```sh
+bun scripts/gum.ts examples/stack.jsx --width 440 -o /tmp/stack.png
+```
+
+![Entirely natural stack composition](./rendered/stack_hugging.png)
+
+There are no parent dimensions in [this source](./stack_hugging.jsx). Seven
+elements require seven queries; the [tree](./rendered/stack_hugging.tree) shows
+their natural allocations adding up to a 331.47×96.8 SVG.
+
+![Flex allocation with limits and explicit shrinkage](./rendered/stack_flex.png)
+
+The [flex tree](./rendered/stack_flex.tree) records 126/252/126px in the first row,
+192/120/192px after the middle item's maximum, and 256/256px after shrinking
+two 300px bases. Each row has 520px, including its 8px gaps. These widths belong
+to the Boxes; their labels retain their natural font sizes.
+
+![Baseline alignment, main packing, and cross stretch](./rendered/stack_alignment.png)
+
+The [alignment tree](./rendered/stack_alignment.tree) exposes the common baseline
+and the bar's final height. None of these rows uses fitting or manual placement.
+
+The stage 4 sources use standard Box composition:
 
 | Example | What to inspect |
 |---|---|
@@ -92,8 +132,9 @@ diameter; Ellipse uses both axes. All strokes stay 3px wide.
 
 ![Independently sized circle and label](./rendered/label.png)
 
-The stage 3 gallery retains small, explicit placement fixtures. Standard stacks
-arrive in stage 5. All source children are constructed before layout.
+The stage 3 gallery retains its small, explicit placement fixtures as protocol
+examples. The stage 5 examples above use standard stacks. All source children
+are constructed before layout.
 
 ![One rectangle at multiple allocations](./rendered/repeated.png)
 

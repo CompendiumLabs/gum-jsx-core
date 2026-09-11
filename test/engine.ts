@@ -44,6 +44,20 @@ const tests: Record<string, () => void> = {
     assert.equal(fragment.children.length, 0);
   },
 
+  'element defaults snapshot source data before instances override them'() {
+    const defaults = { grow: 1, data: { label: 'original' } };
+    const Preset = define_element<ElementProps & { data?: { label: string } }>('Preset', (_, q) =>
+      make_fragment({ size: finish_size(make_size(), q.request, q.sizing) }), defaults);
+    defaults.grow = 2;
+    defaults.data.label = 'changed';
+    const a = new Preset(), b = new Preset({ grow: 3 });
+    assert.deepEqual(a.props, { grow: 1, data: { label: 'original' } });
+    assert.equal(b.props.grow, 3);
+    assert.equal(b.props.data?.label, 'original');
+    assert.ok(Object.isFrozen(a.props.data));
+    assert.ok(!Object.isFrozen(defaults.data));
+  },
+
   'JSX components, spreads, fragments, and scope create ordinary immutable elements'() {
     const code = `
       function tile({ color }) { return <Rect width={0.5} height={em(2)} fill={color}/>; }

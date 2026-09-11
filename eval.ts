@@ -4,6 +4,7 @@ import { Element, define_element, element_children } from './element';
 import { Svg } from './elems';
 import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
 import { Box, Frame, Fit } from './box';
+import { HStack, VStack, Spacer } from './stack';
 import { Text, Span } from './text';
 import { move_to, line_to, quad_to, curve_to, close_path } from './path';
 import { em, px } from './units';
@@ -18,7 +19,7 @@ type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; nam
 function evaluate(code: string, options: EvaluateOptions = {}): Element {
   const { scope = {}, name = 'gum-next.jsx' } = options;
   const bindings = {
-    Svg, Box, Frame, Fit, Rect, RoundedRect, Square, Circle, Ellipse,
+    Svg, Box, Frame, Fit, HStack, VStack, Spacer, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     move_to, line_to, quad_to, curve_to, close_path,
     em, px, define_element, element_children,
