@@ -2,8 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { evaluate, LayoutPass, render_svg, inspect_fragment, make_request, exact } from '../index';
-import type { Element, LayoutRequest } from '../index';
+import { evaluate, LayoutPass, render_svg, inspect_fragment, make_request, exact } from '../src/index';
+import type { Element, LayoutRequest } from '../src/index';
 import { protocol_demo } from '../examples/protocol';
 
 type Scene = { name: string; element: Element; request?: LayoutRequest };

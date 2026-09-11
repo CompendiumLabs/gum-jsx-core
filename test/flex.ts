@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { distribute_flex } from '../index';
-import type { FlexItem } from '../index';
+import { distribute_flex } from '../src/index';
+import type { FlexItem } from '../src/index';
 
 // Build a resolved item; these numbers are pixels and dimensionless weights.
 function item(props: Partial<FlexItem> = {}): FlexItem {

@@ -5,8 +5,8 @@ import {
   make_insets, resolve_insets, deflate_size, inflate_size, bounds_overflow,
   natural, available, exact, make_request, deflate_request, resolve_sizing,
   prepare_request, finish_size, shape_size,
-} from '../index';
-import type { Length, SizeSpec } from '../index';
+} from '../src/index';
+import type { Length, SizeSpec } from '../src/index';
 import { probes } from '../examples/contracts';
 
 // Test contracts at their boundaries and in small compositions, using literal results.

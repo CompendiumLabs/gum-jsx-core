@@ -3,8 +3,8 @@ import {
   HStack, VStack, Spacer, Box, Svg, Rect, Square, Text, Fonts, LayoutPass,
   define_element, evaluate, px, em, make_request, exact, available,
   make_fragment, make_size, finish_size,
-} from '../index';
-import type { FontProvider, StackJustify } from '../index';
+} from '../src/index';
+import type { FontProvider, StackJustify } from '../src/index';
 
 function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);

@@ -6,11 +6,11 @@ import type { Font } from 'fontkit';
 import {
   Fonts, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
   resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point,
-} from '../index';
-import type { FontProvider, Fragment } from '../index';
+} from '../src/index';
+import type { FontProvider, Fragment } from '../src/index';
 
-const regular = readFileSync(new URL('../fonts/IBMPlexSans-Regular.ttf', import.meta.url));
-const mono = readFileSync(new URL('../fonts/IBMPlexMono-Regular.ttf', import.meta.url));
+const regular = readFileSync(new URL('../src/fonts/IBMPlexSans-Regular.ttf', import.meta.url));
+const mono = readFileSync(new URL('../src/fonts/IBMPlexMono-Regular.ttf', import.meta.url));
 const native = parse(regular.buffer.slice(regular.byteOffset, regular.byteOffset + regular.byteLength));
 const shaper = create(regular) as Font;
 

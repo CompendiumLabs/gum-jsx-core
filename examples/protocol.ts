@@ -1,7 +1,7 @@
 import {
   define_element, Rect, Svg, px, available, exact, make_request, make_size,
   make_point, finish_size, make_fragment, place_fragment,
-} from '../index';
+} from '../src/index';
 import { Fixed, Expanding, Wrapping } from './leaves';
 
 // Five independent requests show packing, allocation, growth, and a wrap boundary.

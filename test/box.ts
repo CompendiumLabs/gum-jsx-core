@@ -3,8 +3,8 @@ import {
   Box, Frame, Fit, Svg, Square, Rect, Text, Fonts, LayoutPass, evaluate,
   px, em, make_request, exact, available, make_size, make_insets,
   render_svg, inspect_fragment,
-} from '../index';
-import type { FontProvider } from '../index';
+} from '../src/index';
+import type { FontProvider } from '../src/index';
 import { Fixed } from '../examples/leaves';
 
 function near(actual: number, expected: number): void {

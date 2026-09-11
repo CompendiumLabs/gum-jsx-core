@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   LayoutPass, Svg, Box, Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
   px, em, make_request, available, exact, move_to, line_to, quad_to, curve_to, close_path, render_svg,
-} from '../index';
+} from '../src/index';
 
 const tests: Record<string, () => void> = {
   'aspectless shapes fill available space from Svg, including through Box insets'() {

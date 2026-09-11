@@ -86,8 +86,8 @@ const svg = render_svg(fragment);
 There is no separate `intrinsics()` API. `make_request()` uses natural axes by
 default; a container asks the same layout method for natural or constrained
 geometry. `define_element(name, layout, defaults?)` keeps construction independent
-of these queries. See the actual contracts in [element.ts](./element.ts),
-[pass.ts](./pass.ts), and [fragment.ts](./fragment.ts).
+of these queries. See the actual contracts in [element.ts](./src/element.ts),
+[pass.ts](./src/pass.ts), and [fragment.ts](./src/fragment.ts).
 
 Each axis request distinguishes `natural`, `available(value)`, and `exact(value)`.
 Available space is a budget: a child can report needing more. An exact request fixes the
@@ -121,7 +121,7 @@ followed by element implementation.
 | 6. Remaining composition | Pending | Content-sized overlays, a simple grid, and an optional common-height figure policy; separate slices after wrapping. |
 | 7. Stabilize the new core | Pending | Consolidate API documentation, diagnostics, numerical contracts, SVG/browser inspection, and measured layout costs. |
 
-**Milestone 1 established the contracts and defaults.** [defaults.ts](./defaults.ts)
+**Milestone 1 established the contracts and defaults.** [defaults.ts](./src/defaults.ts)
 contains the 16px font and natural shape fallback, 1.2em line height, and 1px stroke.
 The probes cover a fixed viewport, hugging content, a half-width child, tight aspect
 allocations, and insufficient space for padding. Zero-size content remains distinct

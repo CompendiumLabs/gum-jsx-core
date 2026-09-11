@@ -2,12 +2,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { evaluate } from '../eval';
-import { Svg } from '../elems';
-import { LayoutPass } from '../pass';
-import { exact, make_request } from '../layout';
-import { render_svg } from '../svg';
-import { inspect_fragment } from '../inspect';
+import { evaluate } from '../src/eval';
+import { Svg } from '../src/elems';
+import { LayoutPass } from '../src/pass';
+import { exact, make_request } from '../src/layout';
+import { render_svg } from '../src/svg';
+import { inspect_fragment } from '../src/inspect';
 
 const HELP = `Usage: bun scripts/gum.ts [file.jsx] [options]
 Read JSX from a file or stdin. Omitted viewport dimensions hug the content.

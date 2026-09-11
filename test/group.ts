@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {
   Group, Svg, Box, Rect, Circle, Text, Fonts, LayoutPass, define_element, evaluate,
   px, em, available, exact, make_request, make_size, make_fragment, finish_size, render_svg,
-} from '../index';
-import type { FontProvider } from '../index';
+} from '../src/index';
+import type { FontProvider } from '../src/index';
 
 function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);

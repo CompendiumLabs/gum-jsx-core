@@ -20,9 +20,12 @@ bun run typecheck
 
 Runtime dependencies are `acorn`, `acorn-jsx`, `fontkit`, and `linebreak`.
 `opentype.js` is a test dependency; TypeScript and library declarations are
-development dependencies. The JSX parser and its source-error helpers live in
-`lib/`, and the six bundled IBM Plex faces live in `fonts/` with their OFL
-license. No files or packages from the old core checkout are needed.
+development dependencies. Runtime code lives in `src/`, with `src/index.ts` as
+the package entry point. The JSX parser and its source-error helpers live in
+`src/lib/`, declarations in `src/types/`, and the six bundled IBM Plex faces in
+`src/fonts/` with their OFL license. Tests, tools, and examples live in the
+top-level `test/`, `scripts/`, and `examples/` directories. No files or packages
+from the old core checkout are needed.
 
 Run the local tools directly:
 
@@ -105,7 +108,7 @@ are allocated. Deflating an offer does not change that reference.
 
 Resolve `font_size` first using `resolve_font_size(value, inherited)`. Both its
 relative forms refer to the inherited size. Subsequent em lengths and line height
-use the resolved local font size. Defaults live in [defaults.ts](./defaults.ts):
+use the resolved local font size. Defaults live in [defaults.ts](./src/defaults.ts):
 16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
 
@@ -184,7 +187,7 @@ Box dimensions denote the border box, including padding and border. Padding and
 border deflate the child's space. External spacing is another Box's padding;
 each layer owns its size, style, and child reference box.
 
-The [fragment schema](./fragment.ts) contains only the result for one request:
+The [fragment schema](./src/fragment.ts) contains only the result for one request:
 
 - `size`: the allocated rectangle, based at the local origin.
 - `content`: optional usable content rectangle; Box exposes the space inside its insets.
@@ -512,8 +515,8 @@ its basis, weights, or bounds like any other stack child. For a fixed spacer, us
 `<Spacer basis={px(20)} grow={0}/>`; its default zero basis takes precedence over
 a preferred main-axis dimension.
 
-The pure [flex allocator](./flex.ts) accepts resolved pixel bases and bounds and
-returns immutable sizes. The [stack implementation](./stack.ts) owns child queries,
+The pure [flex allocator](./src/flex.ts) accepts resolved pixel bases and bounds and
+returns immutable sizes. The [stack implementation](./src/stack.ts) owns child queries,
 text reflow, guides, and placement. LayoutPass remains independent of both policies.
 
 ## Positioned groups
@@ -581,7 +584,7 @@ fonts and strokes remain pixel-sized when the canvas changes; text reflows withi
 its region. Use a positioned `Fit` when the intent is to scale a completed drawing.
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
-See the [Group implementation](./group.ts) and the
+See the [Group implementation](./src/group.ts) and the
 [canvas, anchors, and clipping examples](./examples/README.md). Stage 6(a) covers
 this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
 the optional common-height figure policy remain later work.
@@ -773,17 +776,17 @@ are read as source by `evaluate`, so they do not need React or its JSX runtime.
 
 | Responsibility | Start here |
 |---|---|
-| Length syntax, reference resolution, and defaults | [units.ts](./units.ts), [defaults.ts](./defaults.ts), [style.ts](./style.ts) |
-| Requests, shared sizing, and geometry | [layout.ts](./layout.ts), [geometry.ts](./geometry.ts), [composition.ts](./composition.ts) |
-| Immutable descriptions and element factory | [element.ts](./element.ts) |
-| Queries, caches, resources, and diagnostics | [pass.ts](./pass.ts) |
-| Box, root Svg, and explicit fitting | [box.ts](./box.ts), [elems.ts](./elems.ts) |
-| Stack queries versus pure flex allocation | [stack.ts](./stack.ts), [flex.ts](./flex.ts) |
-| Positioned canvas and direct-child metadata | [group.ts](./group.ts) |
-| Text preparation/reflow and font adapter | [text.ts](./text.ts), [fonts.ts](./fonts.ts) |
-| Shapes, path commands, drawing, and immutable results | [shapes.ts](./shapes.ts), [path.ts](./path.ts), [drawing.ts](./drawing.ts), [fragment.ts](./fragment.ts) |
-| Public API and JSX names | [index.ts](./index.ts), [eval.ts](./eval.ts) |
-| Rendering and debugging | [svg.ts](./svg.ts), [inspect.ts](./inspect.ts), [scripts/gum.ts](./scripts/gum.ts) |
+| Length syntax, reference resolution, and defaults | [units.ts](./src/units.ts), [defaults.ts](./src/defaults.ts), [style.ts](./src/style.ts) |
+| Requests, shared sizing, and geometry | [layout.ts](./src/layout.ts), [geometry.ts](./src/geometry.ts), [composition.ts](./src/composition.ts) |
+| Immutable descriptions and element factory | [element.ts](./src/element.ts) |
+| Queries, caches, resources, and diagnostics | [pass.ts](./src/pass.ts) |
+| Box, root Svg, and explicit fitting | [box.ts](./src/box.ts), [elems.ts](./src/elems.ts) |
+| Stack queries versus pure flex allocation | [stack.ts](./src/stack.ts), [flex.ts](./src/flex.ts) |
+| Positioned canvas and direct-child metadata | [group.ts](./src/group.ts) |
+| Text preparation/reflow and font adapter | [text.ts](./src/text.ts), [fonts.ts](./src/fonts.ts) |
+| Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/shapes.ts), [path.ts](./src/path.ts), [drawing.ts](./src/drawing.ts), [fragment.ts](./src/fragment.ts) |
+| Public API and JSX names | [index.ts](./src/index.ts), [eval.ts](./src/eval.ts) |
+| Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts), [scripts/gum.ts](./scripts/gum.ts) |
 
 “Keep the layout pass ice cold.” Add container behavior to the container or a pure
 helper. Shared ElementProps includes flex and position metadata for typing; their
@@ -801,8 +804,8 @@ current request, reference box, or path. Resource revisions invalidate the pass'
 layout and preparation caches. Reuse source identities to reuse fragments; equal
 props on two newly constructed elements do not give them a shared cache entry.
 
-When adding a public element, export it and its types in `index.ts`, add its JSX
-binding in `eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
+When adding a public element, export it and its types in `src/index.ts`, add its JSX
+binding in `src/eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
 examples to `scripts/gallery.ts` and regenerate their SVG/PNG/tree artifacts;
 inspect both the images and numerical trees. The early custom placement fixtures
 are intentional protocol examples, while new composition examples should use the

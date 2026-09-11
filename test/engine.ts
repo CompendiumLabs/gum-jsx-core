@@ -5,8 +5,8 @@ import {
   em, px, natural, available, exact, make_request, finish_size,
   make_size, make_point, make_rect, make_fragment, place_fragment,
   transform_rect, draw_rect, render_svg, inspect_fragment,
-} from '../index';
-import type { ElementProps } from '../index';
+} from '../src/index';
+import type { ElementProps } from '../src/index';
 import { Fixed, Expanding, Wrapping } from '../examples/leaves';
 
 const tests: Record<string, () => void> = {
