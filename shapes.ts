@@ -24,10 +24,12 @@ type PolylineProps = ElementProps & Readonly<{ points?: readonly Position[] }>;
 type PolygonProps = PolylineProps;
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>;
 
-// Geometry references the shape's own rectangle, after shared sizing has finished.
-function shape_context(props: ElementProps, query: LayoutQuery) {
+// Only shapes with an intrinsic ratio supply a default aspect. Geometry references
+// the shape's own rectangle, after shared sizing has finished.
+function shape_context(props: ElementProps, query: LayoutQuery, aspect?: number) {
   if (element_children(props.children).length) throw new TypeError('Shapes have no content children');
-  const size = shape_size(query.request, query.sizing);
+  const sizing = { ...query.sizing, aspect: query.sizing.aspect ?? aspect };
+  const size = shape_size(query.request, sizing);
   const paint = resolve_paint(query.style, size, query.path);
   return { size, paint };
 }
@@ -66,7 +68,7 @@ const RoundedRect = define_element<RectProps>('RoundedRect', (props, query) =>
 
 // Like Circle, Square keeps its geometry square inside a nonsquare allocation.
 const Square = define_element<RectProps>('Square', (props, query) => {
-  const { size, paint } = shape_context(props, query);
+  const { size, paint } = shape_context(props, query, 1);
   const side = Math.min(size.width, size.height);
   const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side);
   const radius = resolve_radius(props.radius ?? 0, make_size(side, side), query);
@@ -74,7 +76,7 @@ const Square = define_element<RectProps>('Square', (props, query) => {
 });
 
 const Circle = define_element<CircleProps>('Circle', (props, query) => {
-  const { size, paint } = shape_context(props, query);
+  const { size, paint } = shape_context(props, query, 1);
   const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
   const radius = resolve_radius(props.radius ?? 0.5, size, query);
   return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] });

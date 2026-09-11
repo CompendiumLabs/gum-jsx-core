@@ -13,12 +13,22 @@ The stage 4 sources use standard Box composition, with no placement fixtures:
 | [nesting.jsx](./nesting.jsx) | Nested backgrounds, padding, a Frame with external margin, and a centered label. |
 | [box_clip.jsx](./box_clip.jsx) | A centered 280px Square overflowing a 220×100 rounded Box, clipped inside its 6px border. |
 | [fitting.jsx](./fitting.jsx) | Fit scales a natural text line to 280×80; Frame and Svg hug the result. |
+| [fill_rect.jsx](./fill_rect.jsx) / [fill_ellipse.jsx](./fill_ellipse.jsx) | Unsized aspectless shapes accept both dimensions of a 200×100 viewport. |
 
 ![A Box and Svg hugging a Square](./rendered/hugging.png)
 
 The [tree](./rendered/hugging.tree) records the content rectangle at `(18,18)`
 and three layout queries suffice. The [SVG](./rendered/hugging.svg) uses these
 pixel dimensions directly. No fitting transform is involved.
+
+![A Rect filling a 200×100 viewport](./rendered/fill_rect.png)
+![An Ellipse filling a 200×100 viewport](./rendered/fill_ellipse.png)
+
+Neither shape specifies width or height. They accept the available dimensions
+independently, as shown in the [Rect tree](./rendered/fill_rect.tree) and
+[Ellipse tree](./rendered/fill_ellipse.tree). Square and Circle instead preserve
+their preferred 1:1 aspect under the same offer. Box can also fill a finite offer
+by hugging a child that expands to use the space inside its insets.
 
 ![A paragraph in a 360px card](./rendered/card.png)
 ![The same paragraph in a 220px card](./rendered/card_narrow.png)

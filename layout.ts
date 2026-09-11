@@ -123,15 +123,20 @@ function finish_size(content: Size, request: LayoutRequest, sizing: Sizing): Siz
   );
 }
 
-// A shape fills its offer at its preferred aspect; an unoffered shape is finite.
-// Exact dimensions take precedence over aspect, and one exact axis derives the other.
+// Without an aspect, each axis fills its offer or uses the finite natural fallback.
+// A preferred aspect couples the axes; exact dimensions take precedence over it.
 function shape_size(request: LayoutRequest, sizing: Sizing = resolve_sizing()): Size {
   const prepared = prepare_request(request, sizing);
   const { width, height } = prepared;
-  const aspect = sizing.aspect ?? 1;
+  const { aspect } = sizing;
   let size: Size;
 
-  if (width.kind === 'exact' && height.kind === 'exact') {
+  if (aspect === undefined) {
+    size = make_size(
+      width.kind === 'natural' ? DEFAULTS.shape_height : width.value,
+      height.kind === 'natural' ? DEFAULTS.shape_height : height.value,
+    );
+  } else if (width.kind === 'exact' && height.kind === 'exact') {
     size = make_size(width.value, height.value);
   } else if (width.kind === 'exact') {
     size = make_size(width.value, width.value / aspect);

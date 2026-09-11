@@ -13,7 +13,7 @@ const examples = fileURLToPath(new URL('../examples/', import.meta.url));
 const output = process.argv[2] ? resolve(process.argv[2]) : join(examples, 'rendered');
 mkdirSync(output, { recursive: true });
 const names = ['rectangle', 'repeated', 'clipping', 'paragraph', 'typography', 'shapes', 'label',
-  'hugging', 'card', 'nesting', 'box_clip', 'fitting'];
+  'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse'];
 const scenes: Scene[] = names.map(name => {
   const file = join(examples, `${name}.jsx`);
   return { name, element: evaluate(readFileSync(file, 'utf8'), { name: file }) };

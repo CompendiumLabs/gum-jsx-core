@@ -86,7 +86,7 @@ are allocated. Deflating an offer does not change that reference.
 Resolve `font_size` first using `resolve_font_size(value, inherited)`. Both its
 relative forms refer to the inherited size. Subsequent em lengths and line height
 use the resolved local font size. Defaults live in [defaults.ts](./defaults.ts):
-16px text, 1.2em line height, 16px natural shape height, and 1px stroke width. The
+16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
 
 Fractional gaps will use the stack's definite main-axis length. Shape coordinates
@@ -143,11 +143,16 @@ later exact allocation overrides. Missing references and invalid min/max ranges
 are errors in the source sizing policy. An omitted maximum is represented by
 `Infinity` in the resolved policy only; allocated geometry is always finite.
 
-`shape_size` establishes the preferred-aspect policy for shapes: two exact axes
-win; one exact axis derives the other; otherwise the shape fits the available
-axes while preserving aspect. With two natural axes it uses the default height.
-Own min/max limits can also override aspect. Other content uses its measured
-natural size; `finish_size` does not impose a shape's ratio on text or containers.
+`shape_size` fills offered axes independently when no aspect is specified. An
+unoffered axis uses the 16px natural fallback, independently of the other axis.
+Preferred dimensions and min/max limits apply through the shared sizing policy.
+
+An explicit `aspect`, or the intrinsic 1:1 aspect supplied by Square and Circle,
+couples the axes: two exact axes win; one exact axis derives the other; otherwise
+the shape fits the available axes while preserving aspect. With two natural axes
+it uses the default height. Own min/max limits can also override aspect. Other
+content uses its measured natural size; `finish_size` does not impose a shape's
+ratio on text or containers.
 
 ## Insets and fragments
 
@@ -211,8 +216,8 @@ axis remains indefinite during measurement; its final size is never fed back as
 a percentage basis. An empty unsized Svg is 0×0.
 
 The viewport follows layout bounds, not ink, and clips overflow at its edges.
-`Rect` follows the stage 1 aspect policy. Its stroke straddles its geometry, so
-half the stroke extends outside the layout rectangle; the fragment records that
+An unsized `Rect` fills both available viewport axes. Its stroke straddles its
+geometry, so half the stroke extends outside the layout rectangle; the fragment records that
 ink and overflow. An empty or zero-area rectangle paints nothing. Box borders
 instead consume layout space and stay entirely inside their border box.
 
@@ -466,10 +471,24 @@ as native SVG text; an optional native-text rendering route can be added later.
 
 ## Shapes and paths
 
-All shapes use the shared preferred-aspect policy, with a finite 16×16 natural
-fallback. An explicit size or available offer resizes geometry. Square and Circle
-are inscribed in a nonsquare allocation; Rect and Ellipse follow both axes. Empty
-polylines and paths paint nothing but retain the ordinary shape sizing policy.
+Rect, RoundedRect, Ellipse, Line, Polyline, Polygon, and Path have no default aspect
+ratio. Each axis fills its available space unless a preferred dimension or min/max
+limit specifies otherwise. Square and Circle instead prefer 1:1. Any shape can
+specify an explicit preferred `aspect`.
+
+```jsx
+<Svg width={px(200)} height={px(100)}>
+  <Rect />
+</Svg>
+```
+
+Rect fills the full 200×100 viewport; Ellipse does the same with radii 100×50.
+Square and Circle measure 100×100 under that offer. Two exact axes may allocate
+them a nonsquare frame, in which their geometry remains inscribed. An unoffered
+axis on an aspectless shape uses 16px: `<Rect width={px(60)}/>` naturally measures
+60×16, while `<Square width={px(60)}/>` measures 60×60. With neither axis offered,
+all defaults remain 16×16. Empty polylines and paths paint nothing but retain the
+ordinary shape sizing policy.
 
 | Element | Geometry props and defaults |
 |---|---|
