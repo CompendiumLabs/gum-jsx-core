@@ -2,7 +2,7 @@
 
 ## Current decisions through stage 6(a)
 
-This directory is the fresh core implementation, exposed as `@gum-jsx/core/next`.
+This directory is the fresh core implementation, exposed as `@gum-jsx/core`.
 Stages 1–5 and 6(a) are complete: units, the element/layout/fragment protocol,
 SVG rendering, text and shapes, Box/Frame/Fit, HStack/VStack/Spacer, and Group.
 [README.md](./README.md) documents the implemented API and development workflow;

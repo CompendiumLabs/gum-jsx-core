@@ -274,23 +274,6 @@ cases as regressions for the new algorithms. These are semantic references, not 
 to reproduce old behavior. Profile layout-query counts and prepared-text reuse on nested
 examples; avoid speculative optimization without an observed cost.
 
-**Development stays isolated while the design settles.** This `src/next` directory has
-its own checkpoint git repo and is exposed through `@gum-jsx/core/next`, with local tests
-and examples. This avoids forcing math and the other packages to migrate before the new core
-works. It is an isolation boundary for development, not a compatibility layer: new elements
-do not inherit from the old `Element`, import its layout engine, or carry its `.em` records.
-
-Source parsing, font assets, and independent utilities may be reused after
-checking their dependencies. Keep the evaluation/resource environment thin; layout style
-and parent information belong to the layout pass. The existing core remains available to
-its consumers until a separate replacement/migration decision. No package-wide version
-changes, default-export switch, publishing, or legacy cleanup belong to this roadmap.
-
-Milestone 4 delivered the framed, wrapping paragraph and basic geometry without
-constructor-driven layout. Milestone 5 exercised the composition protocol, and 6(a)
-added independent positioning. The rest of milestones 6 and 7 complete and stabilize the scoped
-core before work begins on math or plotting.
-
 # Style Guide
 
 Elegance! Things should be simple and beautiful. If you're adding more and more

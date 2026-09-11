@@ -3,7 +3,6 @@
 Stages 1–5 are implemented: units and sizing, immutable descriptions and fragments,
 layout passes, JSX, SVG rendering, measured text, shapes, Box composition, and stacks.
 Stage 6(a) adds positioned Group canvases; wrapping stacks are next in 6(b).
-Import the experimental API from `@gum-jsx/core/next`.
 
 This README describes the implemented API; [contributor notes](#contributor-notes)
 cover how to work on it.
@@ -68,7 +67,7 @@ objects. Negative lengths are valid for coordinates. Sizing and inset operations
 require nonnegative resolved values.
 
 ```ts
-import { em, px, resolve_length, measure_length } from '@gum-jsx/core/next';
+import { em, px, resolve_length, measure_length } from '@gum-jsx/core';
 
 const basis = { font_size: 16, fraction: 200 };
 resolve_length(0.5, basis);       // 100 pixels
@@ -122,7 +121,7 @@ and nonnegative; zero is an exact value, not an absent dimension.
 ```ts
 import {
   available, make_request, resolve_sizing, prepare_request, finish_size, make_size,
-} from '@gum-jsx/core/next';
+} from '@gum-jsx/core';
 
 const context = { reference: { width: 640 }, path: 'root/child' };
 const sizing = resolve_sizing({ width: 0.5 }, context);
@@ -234,7 +233,7 @@ The same source can answer different allocations without being rebuilt:
 
 ```ts
 import { Rect, Svg, px, em, LayoutPass, make_request, exact, render_svg }
-  from '@gum-jsx/core/next';
+  from '@gum-jsx/core';
 
 const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) });
 const scene = new Svg({ width: px(160), height: px(80), children: tile });
@@ -650,7 +649,7 @@ implementation. Browser asset packaging is deferred; no installed/system font is
 required by the resulting SVG.
 
 ```ts
-import { Fonts, LayoutPass } from '@gum-jsx/core/next';
+import { Fonts, LayoutPass } from '@gum-jsx/core';
 
 const fonts = new Fonts();
 fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' });
