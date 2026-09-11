@@ -6,6 +6,7 @@ import type { Length, LengthContext } from './units';
 type Point = Readonly<{ x: number; y: number }>;
 type Size = Readonly<{ width: number; height: number }>;
 type Rect = Readonly<Point & Size>;
+type Transform = readonly [number, number, number, number, number, number];
 type Insets = Readonly<{
   left: number;
   top: number;
@@ -96,8 +97,54 @@ function bounds_overflow(size: Size, bounds: Rect | null): Insets {
   });
 }
 
+// Union nullable bounds, preserving the difference between no paint and zero size.
+function union_rects(...rects: readonly (Rect | null)[]): Rect | null {
+  const items = rects.filter((rect): rect is Rect => rect !== null);
+  if (items.length === 0) return null;
+  const x = Math.min(...items.map(rect => rect.x));
+  const y = Math.min(...items.map(rect => rect.y));
+  const right = Math.max(...items.map(rect => rect.x + rect.width));
+  const bottom = Math.max(...items.map(rect => rect.y + rect.height));
+  return make_rect(x, y, right - x, bottom - y);
+}
+
+// A clip with no overlapping area leaves no visible ink.
+function intersect_rects(a: Rect | null, b: Rect): Rect | null {
+  if (a === null) return null;
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const bottom = Math.min(a.y + a.height, b.y + b.height);
+  return right <= x || bottom <= y ? null : make_rect(x, y, right - x, bottom - y);
+}
+
+// Own a finite affine matrix: x' = ax + cy + e; y' = bx + dy + f.
+function make_transform(values: Transform): Transform {
+  if (values.length !== 6) throw new TypeError('An affine transform needs six values');
+  values.forEach(value => finite(value, 'transform'));
+  return Object.freeze([...values]) as Transform;
+}
+
+// Transform in child coordinates, then add the parent's placement offset.
+function transform_rect(rect: Rect | null, offset: Point, transform?: Transform): Rect | null {
+  if (rect === null) return null;
+  const [a, b, c, d, e, f] = transform ?? [1, 0, 0, 1, 0, 0];
+  const { x, y, width, height } = rect;
+  const corners = [[x, y], [x + width, y], [x, y + height], [x + width, y + height]];
+  const points = corners.map(([x, y]) => make_point(
+    a * x + c * y + e + offset.x,
+    b * x + d * y + f + offset.y,
+  ));
+  const left = Math.min(...points.map(point => point.x));
+  const top = Math.min(...points.map(point => point.y));
+  const right = Math.max(...points.map(point => point.x));
+  const bottom = Math.max(...points.map(point => point.y));
+  return make_rect(left, top, right - left, bottom - top);
+}
+
 export {
   make_size, make_point, make_rect, make_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
+  union_rects, intersect_rects, make_transform, transform_rect,
 };
-export type { Point, Size, Rect, Insets, InsetSpec };
+export type { Point, Size, Rect, Transform, Insets, InsetSpec };

@@ -1,0 +1,5 @@
+Svg 432×144 @(0,0) ink=14.5,22.5,395,99 clipped
+  Repeated 432×144 @(0,0) ink=14.5,22.5,395,99
+    Rect 96×64 @(16,24) ink=-1.5,-1.5,99,67 overflow=left:1.5,top:1.5,right:1.5,bottom:1.5
+    Rect 96×64 @(136,24) ink=-1.5,-1.5,99,67 overflow=left:1.5,top:1.5,right:1.5,bottom:1.5
+    Rect 144×96 @(264,24) ink=-1.5,-1.5,147,99 overflow=left:1.5,top:1.5,right:1.5,bottom:1.5
