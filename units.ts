@@ -28,14 +28,14 @@ function px(value: number) {
 }
 
 // Copy the input so normalization never freezes a caller's own object.
-function normalize_length(length: Length | NormalizedLength): NormalizedLength {
+function normalize_length(length: Length | NormalizedLength, path = 'length'): NormalizedLength {
   const { value, unit } = typeof length === 'number'
     ? { value: length, unit: 'fraction' as const }
     : length;
 
-  finite(value, 'length');
+  finite(value, path);
   if (unit !== 'fraction' && unit !== 'em' && unit !== 'px') {
-    throw new RangeError(`Unknown length unit: ${unit}`);
+    throw new RangeError(`${path}: Unknown length unit: ${unit}`);
   }
   return Object.freeze({ value, unit });
 }
@@ -44,15 +44,16 @@ function normalize_length(length: Length | NormalizedLength): NormalizedLength {
 function measure_length(
   length: Length | NormalizedLength,
   basis: LengthBasis = {},
+  path = 'length',
 ): number | NormalizedLength {
-  const normalized = normalize_length(length);
+  const normalized = normalize_length(length, path);
   const { value, unit } = normalized;
   if (value === 0 || unit === 'px') return value;
 
   const reference = unit === 'em' ? basis.font_size : basis.fraction;
   if (reference === undefined) return normalized;
-  nonnegative(reference, `${unit} reference`);
-  return finite(value * reference, 'resolved length');
+  nonnegative(reference, `${path} ${unit} reference`);
+  return finite(value * reference, path);
 }
 
 // Final layout must resolve every length; include the source property in errors.
@@ -61,7 +62,7 @@ function resolve_length(
   basis: LengthBasis = {},
   path = 'length',
 ): number {
-  const result = measure_length(length, basis);
+  const result = measure_length(length, basis, path);
   if (typeof result === 'number') return result;
   throw new UnresolvedLengthError(result, path);
 }

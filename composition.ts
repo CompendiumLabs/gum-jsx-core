@@ -16,14 +16,14 @@ type ResolvedAlignment = Readonly<{ x: number | 'stretch'; y: number | 'stretch'
 type FitMode = 'contain' | 'cover' | 'scale_down';
 
 // Alignment values are dimensionless: 0/start, 0.5/center, and 1/end.
-function resolve_alignment(align: Alignment = 'start'): ResolvedAlignment {
+function resolve_alignment(align: Alignment = 'start', path = 'alignment'): ResolvedAlignment {
   const axes = typeof align === 'object' ? align : { x: align, y: align };
   function resolve(value: AlignmentValue = 'start'): number | 'stretch' {
     if (value === 'stretch') return value;
     const fraction = typeof value === 'number' ? value
       : { start: 0, center: 0.5, end: 1 }[value];
-    finite(fraction, 'alignment');
-    if (fraction < 0 || fraction > 1) throw new RangeError('Alignment must be between 0 and 1');
+    finite(fraction, path);
+    if (fraction < 0 || fraction > 1) throw new RangeError(`${path} must be between 0 and 1`);
     return fraction;
   }
   return Object.freeze({ x: resolve(axes.x), y: resolve(axes.y) });

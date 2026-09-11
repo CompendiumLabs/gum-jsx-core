@@ -1,8 +1,44 @@
-# Stages 1–5 gallery
+# Stages 1–6(a) gallery
 
 Run `bun scripts/gallery.ts` from `src/next` to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
+
+Stage 6(a) adds positioned Group canvases, using ordinary elements as children:
+
+| Example | What to inspect |
+|---|---|
+| [group.jsx](./group.jsx) | Fractional positions, fixed-pixel nodes and strokes, and a text region that reflows at two canvas widths. |
+| [group_anchors.jsx](./group_anchors.jsx) | Nested local canvases; top-left, center, and bottom-right anchors at the same fractional position. |
+| [group_clip.jsx](./group_clip.jsx) | The same artwork with and without clipping; shared child fragments and retained overflow. |
+
+![A canvas with independently positioned shapes and text](./rendered/group.png)
+![The same drawing at a narrower canvas width](./rendered/group_narrow.png)
+
+Group's 2:1 canvas changes from 608×304 to 368×184. The nodes keep their 52px
+and 40px diameters, while the paragraph's width changes from 237.12px to 143.52px
+and its line count from four to six. Each rendering uses 18 queries. Compare the
+[wide tree](./rendered/group.tree) and [narrow tree](./rendered/group_narrow.tree).
+The canvas height comes from its aspect; the surrounding column and Box add their
+natural text heights, gaps, and padding afterward.
+
+```sh
+bun scripts/gum.ts examples/group.jsx --width 480 -o /tmp/group.png
+```
+
+![Three anchors meeting the same position](./rendered/group_anchors.png)
+
+Each nested Group has its own reference rectangle. The dark dot marks `(0.5,0.5)`;
+the same 80×48 Box places a different point at that position. Its allocated box,
+including its inside border, determines the anchor. See the
+[anchor tree](./rendered/group_anchors.tree).
+
+![Unclipped and clipped versions of shared artwork](./rendered/group_clip.png)
+
+Both canvases remain 180×100. The clipped version has the same 14px left and
+22.4px right overflow, while only paint inside its rectangle is visible. The
+[clipping tree](./rendered/group_clip.tree) records both results. Three cache hits
+reuse the background, rectangle, and circle fragments between canvases.
 
 The stage 5 sources use ordinary stacks and Boxes throughout:
 

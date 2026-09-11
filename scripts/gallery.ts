@@ -14,7 +14,8 @@ const output = process.argv[2] ? resolve(process.argv[2]) : join(examples, 'rend
 mkdirSync(output, { recursive: true });
 const names = ['rectangle', 'repeated', 'clipping', 'paragraph', 'typography', 'shapes', 'label',
   'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse',
-  'stack', 'stack_hugging', 'stack_flex', 'stack_alignment'];
+  'stack', 'stack_hugging', 'stack_flex', 'stack_alignment',
+  'group', 'group_anchors', 'group_clip'];
 const scenes: Scene[] = names.map(name => {
   const file = join(examples, `${name}.jsx`);
   return { name, element: evaluate(readFileSync(file, 'utf8'), { name: file }) };
@@ -25,6 +26,8 @@ const card = scenes.find(scene => scene.name === 'card')!;
 scenes.push({ ...card, name: 'card_narrow', request: make_request({ width: exact(220) }) });
 const stack = scenes.find(scene => scene.name === 'stack')!;
 scenes.push({ ...stack, name: 'stack_narrow', request: make_request({ width: exact(360) }) });
+const group = scenes.find(scene => scene.name === 'group')!;
+scenes.push({ ...group, name: 'group_narrow', request: make_request({ width: exact(400) }) });
 
 for (const { name, element, request } of scenes) {
   const pass = new LayoutPass();

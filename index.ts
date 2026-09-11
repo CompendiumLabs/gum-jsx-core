@@ -44,6 +44,8 @@ export { Box, Frame, Fit } from './box';
 export type { BoxProps, FitProps } from './box';
 export { HStack, VStack, Spacer } from './stack';
 export type { StackProps, StackAlign, StackJustify } from './stack';
+export { Group } from './group';
+export type { GroupProps, PositionSpec, Anchor, AnchorValue } from './group';
 export { distribute_flex } from './flex';
 export type { FlexSpec, FlexItem } from './flex';
 export { resolve_alignment, align_offset, definite_reference, layout_content, fit_scale } from './composition';

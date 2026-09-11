@@ -1,11 +1,12 @@
 import type { Fragment } from './fragment';
 import type { FlexSpec } from './flex';
+import type { PositionSpec } from './group';
 import type { SizeSpec } from './layout';
 import type { LayoutQuery } from './pass';
 import type { StyleSpec } from './style';
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[];
-type ElementProps = SizeSpec & StyleSpec & FlexSpec & Readonly<{ children?: Child }>;
+type ElementProps = SizeSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{ children?: Child }>;
 type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragment;
 type ElementType = Readonly<{
   name: string;

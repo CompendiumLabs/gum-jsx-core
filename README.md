@@ -2,7 +2,8 @@
 
 Stages 1–5 are implemented: units and sizing, immutable descriptions and fragments,
 layout passes, JSX, SVG rendering, measured text, shapes, Box composition, and stacks.
-Import the experimental API from `@gum-jsx/core/next`. Other composition is next.
+Stage 6(a) adds positioned Group canvases; wrapping stacks are next in 6(b).
+Import the experimental API from `@gum-jsx/core/next`.
 
 Run directly from this directory, including inside its checkpoint repo:
 
@@ -10,6 +11,7 @@ Run directly from this directory, including inside its checkpoint repo:
 bun scripts/gum.ts examples/hugging.jsx -f tree --stats
 bun scripts/gum.ts examples/card.jsx --width 220 -o /tmp/card.png
 bun scripts/gum.ts examples/stack.jsx --width 360 -o /tmp/stack.png
+bun scripts/gum.ts examples/group.jsx --width 400 -o /tmp/group.png
 bun scripts/gum.ts examples/repeated.jsx -f tree --stats
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.svg
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.png --ratio 2
@@ -270,6 +272,8 @@ and caches the fragment. Insets, placement, and decoration belong to elements.
 Element-specific properties are interpreted by the element's layout method.
 The direct stack parent interprets a child's `basis`, `grow`, and `shrink`; these
 properties introduce no policy in the layout pass and do not inherit.
+Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
+do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
@@ -494,6 +498,76 @@ a preferred main-axis dimension.
 The pure [flex allocator](./flex.ts) accepts resolved pixel bases and bounds and
 returns immutable sizes. The [stack implementation](./stack.ts) owns child queries,
 text reflow, guides, and placement. LayoutPass remains independent of both policies.
+
+## Positioned groups
+
+`Group` is a canvas for independently positioned children. It establishes its
+rectangle before measuring them, fills finite offers, and accepts the shared
+width/height and min/max sizing props. A preferred `aspect` can derive an omitted
+axis or fit within two available axes; exact axes take precedence, as for shapes.
+
+```jsx
+<Svg width={px(400)}>
+  <Group aspect={2}>
+    <Rect fill="#edf4f1" stroke="none" />
+    <Circle x={0.25} y={0.5} anchor="center" width={px(60)}
+      fill="#317969" stroke="none" />
+    <Text x={0.5} y={0.5} anchor={{ y: 'center' }} width={0.4}
+      text="A label in its own region." />
+  </Group>
+</Svg>
+```
+
+This SVG is 400×200. The Circle's center is `(100,100)`, its diameter is 60px,
+and the Text has a 160px region beginning at x=200. Its line count determines
+its own height; `anchor` centers that allocation vertically on y=100. The first
+Rect fills the canvas and paints behind the other children.
+
+| Prop | Meaning |
+|---|---|
+| Group `width`, `height`, `min_width`, etc. | Shared sizing for the canvas; independent of child bounds. |
+| Group `aspect` | Optional preferred width/height ratio, using the same sizing rules as shapes. |
+| Group `clip` | Clip painted ink to the canvas rectangle, default false; overflow is retained. |
+| Child `x`, `y` | Position lengths, default zero. Fractions reference the corresponding full canvas axis; negatives and values outside the canvas are allowed. |
+| Child `anchor` | The point of the child's allocated box that meets `(x,y)`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` with these values. |
+| Child `width`, `height`, etc. | Ordinary sizing, resolved against the canvas. Use these to define a text region or shape size. |
+
+The canvas must have both axes supplied by dimensions or finite offers, or one
+axis plus an aspect. For example, `<Svg width={px(200)} height={px(100)}><Group>…`
+needs no Group dimensions. A bare `<Group width={px(200)} height={px(100)}>`
+can be hugged by its enclosing Svg. A Group with unresolved axes reports an error
+before querying children, including when empty. Explicit zero is valid. Group
+does not infer a viewport from positioned children or fall back to a shape's 16px
+natural size. Use Box and stacks for composition whose size comes from content.
+
+Group commits to its chosen size, so even axes selected from available offers
+become definite percentage references for its children. All children receive an
+available offer of the **whole canvas**. Their own sizing then selects any smaller
+region. Moving a child or changing its anchor does not reduce the offer to the space
+between its position and the canvas edge. An unsized Rect therefore fills the whole
+canvas, even at a nonzero position; give it width and height for a smaller region.
+
+Position em lengths use the child's resolved local font size, matching its other
+lengths. Anchors are dimensionless fractions of the allocated child rectangle, not
+its painted ink. `anchor="center"` subtracts half the child's width and height;
+`anchor={{x: "end", y: "start"}}` places its top-right corner at the position.
+There is no stretch anchor; width and height control sizing.
+
+Position metadata belongs to the direct child. Put it on the Box or VStack when
+that container is what Group should place. Nested Groups create local canvas
+references: a half-width child of a half-width Group occupies a quarter of the
+outer width. Source order is paint order. Group has no implicit baseline from its
+arbitrarily placed labels; child fragments retain their local guides.
+
+Group uses one query per child, then positions completed fragments. Pixel-sized
+fonts and strokes remain pixel-sized when the canvas changes; text reflows within
+its region. Use a positioned `Fit` when the intent is to scale a completed drawing.
+Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
+
+See the [Group implementation](./group.ts) and the
+[canvas, anchors, and clipping examples](./examples/README.md). Stage 6(a) covers
+this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
+the optional common-height figure policy remain later work.
 
 ## Text and fonts
 

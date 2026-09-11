@@ -168,6 +168,8 @@ const tests: Record<string, () => void> = {
     assert.throws(() => resolve_length(em(1), { font_size: Infinity }), RangeError);
     assert.throws(() => resolve_length(1, { fraction: -1 }), RangeError);
     assert.throws(() => resolve_length(2, { fraction: Number.MAX_VALUE }), RangeError);
+    assert.throws(() => resolve_length(NaN, {}, 'root/child.x'), /root\/child.x/);
+    assert.throws(() => resolve_length(2, { fraction: Number.MAX_VALUE }, 'root/child.x'), /root\/child.x/);
     assert.throws(() => normalize_length({ value: 1, unit: 'pt' } as unknown as Length));
 
     const invalid: SizeSpec[] = [
