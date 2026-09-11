@@ -1,5 +1,5 @@
 import { finite } from './checks';
-import { drawing_ink, draw_rect } from './drawing';
+import { drawing_ink, copy_drawing } from './drawing';
 import type { Drawing } from './drawing';
 import {
   make_size, make_point, make_rect, make_insets, make_transform,
@@ -13,6 +13,7 @@ const OWNED = Symbol('next.fragment');
 // All geometry is local to this fragment. A renderer never performs layout.
 interface Fragment<Draw = Drawing> {
   readonly name?: string;
+  readonly label?: string;
   readonly size: Size;
   readonly guides: Guides;
   readonly ink: Rect | null;
@@ -32,6 +33,7 @@ interface Placement<Draw = Drawing> {
 type FragmentSpec = Readonly<{
   size: Size;
   name?: string;
+  label?: string;
   guides?: Guides;
   ink?: Rect | null;
   overflow?: Insets;
@@ -67,10 +69,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
   const guides = Object.fromEntries(Object.entries(spec.guides ?? {})
     .filter((entry): entry is [string, number] => entry[1] !== undefined)
     .map(([key, value]) => [key, finite(value, `guide ${key}`)]));
-  const draw = (spec.draw ?? []).map(item => {
-    if (item.kind !== 'rect') throw new TypeError(`Unknown drawing kind: ${item.kind}`);
-    return draw_rect(item.rect, item);
-  });
+  const draw = (spec.draw ?? []).map(copy_drawing);
   const children = (spec.children ?? []).map(child =>
     place_fragment(child.fragment, child.offset, child.transform));
 
@@ -86,6 +85,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
     : make_rect(spec.clip.x, spec.clip.y, spec.clip.width, spec.clip.height);
   const fragment: Fragment = {
     ...(spec.name === undefined ? {} : { name: spec.name }),
+    ...(spec.label === undefined ? {} : { label: spec.label }),
     size, guides: Object.freeze(guides),
     ink: clip === undefined ? ink : intersect_rects(ink, clip),
     overflow: bounds_overflow(size, bounds),

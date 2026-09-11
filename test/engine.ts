@@ -180,6 +180,7 @@ const tests: Record<string, () => void> = {
     const leaf = make_fragment({ size: make_size(20, 10), draw: [draw] });
     rect.width = 40;
     draw.fill = 'red';
+    assert.ok(leaf.draw[0].kind === 'rect');
     assert.equal(leaf.draw[0].rect.width, 20);
     assert.equal(leaf.draw[0].fill, 'blue');
     assert.ok(Object.isFrozen(leaf.draw[0].rect));

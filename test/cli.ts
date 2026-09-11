@@ -37,6 +37,13 @@ try {
   assert.equal(svg.stdout.length, 0);
   assert.match(readFileSync(file, 'utf8'), /stroke-width="2"/);
 
+  const paragraph = '<Svg width={px(160)} height={px(80)}>'
+    + '<Text font_size={px(18)}>Real <Span font_weight={700}>text</Span> wraps here.</Text></Svg>';
+  const text_svg = spawnSync(process.execPath, [cli, '-f', 'svg'], { input: paragraph });
+  assert.equal(text_svg.status, 0, text_svg.stderr.toString());
+  assert.match(text_svg.stdout.toString(), /<path d="M/);
+  assert.match(text_svg.stdout.toString(), /aria-label="Real text wraps here\."/);
+
   const invalid = spawnSync(process.execPath, [cli, '--width', '32'], { input: code });
   assert.equal(invalid.status, 1);
   assert.match(invalid.stderr.toString(), /both --width and --height/);
@@ -52,6 +59,10 @@ try {
     assert.deepEqual([...png.stdout.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
     assert.equal(png.stdout.readUInt32BE(16), 64);
     assert.equal(png.stdout.readUInt32BE(20), 40);
+    const text_png = spawnSync(process.execPath, [cli, '-f', 'png'], { input: paragraph });
+    assert.equal(text_png.status, 0, text_png.stderr.toString());
+    assert.equal(text_png.stdout.readUInt32BE(16), 160);
+    assert.equal(text_png.stdout.readUInt32BE(20), 80);
     console.log('ok - PNG sampling changes pixel dimensions without changing layout');
   }
   console.log('ok - CLI stdin, tree, JSON, SVG files, resizing, and diagnostics');

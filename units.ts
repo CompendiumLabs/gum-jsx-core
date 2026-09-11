@@ -80,7 +80,7 @@ function resolve_font_size(
 
 // Line height and other em lengths use the newly resolved local font size.
 function resolve_line_height(
-  length: Length = em(DEFAULTS.line_height),
+  length: Length | NormalizedLength = em(DEFAULTS.line_height),
   font_size: number = DEFAULTS.font_size,
   path = 'line_height',
 ): number {

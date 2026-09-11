@@ -1,7 +1,10 @@
 // The existing parser depends only on Acorn and source-error helpers, not layout.
 import { runJSX } from '../lib/parse';
 import { Element, define_element, element_children } from './element';
-import { Rect, Svg } from './elems';
+import { Svg } from './elems';
+import { Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
+import { Text, Span } from './text';
+import { move_to, line_to, quad_to, curve_to, close_path } from './path';
 import { em, px } from './units';
 import { available, exact, natural, make_request, finish_size, shape_size } from './layout';
 import { make_size, make_point, make_rect } from './geometry';
@@ -14,7 +17,9 @@ type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; nam
 function evaluate(code: string, options: EvaluateOptions = {}): Element {
   const { scope = {}, name = 'gum-next.jsx' } = options;
   const bindings = {
-    Rect, Svg, em, px, define_element, element_children,
+    Svg, Rect, RoundedRect, Circle, Ellipse, Line, Polyline, Polygon, Path, Text, Span,
+    move_to, line_to, quad_to, curve_to, close_path,
+    em, px, define_element, element_children,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...scope,

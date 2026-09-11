@@ -1,5 +1,6 @@
 import { nonnegative } from './checks';
 import { Element } from './element';
+import { Fonts } from './fonts';
 import { make_fragment } from './fragment';
 import type { Fragment } from './fragment';
 import { finish_size, make_request, prepare_request, resolve_sizing } from './layout';
@@ -21,6 +22,7 @@ type LayoutQuery = Readonly<{
     element: Element, request: LayoutRequest, reference?: ReferenceBox, index?: number,
   ) => Fragment;
   resource: <T>(name: string) => T;
+  prepare: <T>(name: string, compute: () => T) => T;
 }>;
 
 // References describe established boxes, not offers. Missing axes stay missing.
@@ -53,6 +55,7 @@ class LayoutError extends Error {
 
 class LayoutPass {
   #cache = new WeakMap<Element, Map<string, Fragment>>();
+  #prepared = new WeakMap<Element, Map<string, unknown>>();
   #active = new WeakMap<Element, Set<string>>();
   #resources = new Map<string, Resource>();
   #epoch = 0;
@@ -62,6 +65,7 @@ class LayoutPass {
 
   // Resources and cache lifetimes belong to this pass, never to source elements.
   constructor(resources: Readonly<Record<string, Resource>> = {}) {
+    if (!resources.fonts) this.set_resource('fonts', new Fonts(), 0);
     for (const [name, resource] of Object.entries(resources)) {
       this.set_resource(name, resource.value, resource.version);
     }
@@ -74,6 +78,7 @@ class LayoutPass {
     this.#resources.set(name, Object.freeze({ value, version }));
     this.#epoch++;
     this.#cache = new WeakMap();
+    this.#prepared = new WeakMap();
   }
 
   // Resource access occurs during measurement; the renderer needs no resources.
@@ -122,6 +127,15 @@ class LayoutPass {
             style, reference: basis, path: `${path}/${child.type.name}[${index}]`,
           }),
           resource: <T>(name: string) => this.resource<T>(name),
+          // Prepared content depends on source, style, and resources, never offers
+          // or percentage references. Failed preparations are not retained.
+          prepare: <T>(name: string, compute: () => T): T => {
+            const cache = this.#prepared.get(element) ?? new Map<string, unknown>();
+            this.#prepared.set(element, cache);
+            const key = JSON.stringify([name, style, this.#epoch]);
+            if (!cache.has(key)) cache.set(key, compute());
+            return cache.get(key) as T;
+          },
         });
 
         this.#layouts++;

@@ -1,9 +1,8 @@
 # Next core
 
-Stages 1 and 2 are implemented: units and sizing, immutable element descriptions,
-layout passes, immutable fragments, JSX evaluation, and SVG rendering. Import the
-experimental API from `@gum-jsx/core/next`. Real text and the remaining shapes come
-next; the current elements are `Svg` and `Rect`.
+Stages 1–3 are implemented: units and sizing, immutable descriptions and fragments,
+layout passes, JSX, SVG rendering, measured text, and ordinary shapes. Import the
+experimental API from `@gum-jsx/core/next`. Box composition is the next stage.
 
 Run directly from this directory, including inside its checkpoint repo:
 
@@ -11,6 +10,7 @@ Run directly from this directory, including inside its checkpoint repo:
 bun scripts/gum.ts examples/repeated.jsx -f tree --stats
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.svg
 bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.png --ratio 2
+bun scripts/gum.ts examples/paragraph.jsx -o /tmp/paragraph.png
 bun scripts/gallery.ts
 bun test/run.ts
 ```
@@ -85,10 +85,9 @@ use the resolved local font size. Defaults live in [defaults.ts](./defaults.ts):
 16px text, 1.2em line height, 16px natural shape height, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
 
-Fractional gaps will use the stack's definite main-axis length. A rectangle's
-fractional stroke width uses its own shorter side. Other shape coordinates will
-use their own resolved rectangle; scalar radii will use its shorter side.
-A zero reference is
+Fractional gaps will use the stack's definite main-axis length. Shape coordinates
+use their own resolved rectangle; scalar radii and stroke widths use its shorter
+side. Two-axis radii resolve per axis. A zero reference is
 definite even for degenerate geometry. Dimensionless aspect and flex weights are
 ordinary numbers, independent of the length syntax.
 
@@ -162,10 +161,11 @@ The [fragment schema](./fragment.ts) contains only the result for one request:
 - `guides`: optional named pixel positions, initially `baseline` from the top.
 - `ink`: painted bounds after clipping, or `null` for no paint.
 - `overflow`: nonnegative excess content on each side, recorded before clipping.
-- `draw`: resolved rectangle drawing records; more drawing kinds follow with shapes and text.
+- `draw`: resolved rectangle, ellipse, and path drawing records, including glyph outlines.
 - `children`: child fragments with local offsets and optional affine transforms.
 - `clip`: an optional local rectangle clipping the fragment and its descendants.
 - `name`: an optional inspection label, assigned from the element type by the pass.
+- `label`: optional accessible content; Text retains its normalized logical string here.
 
 The parent owns placement. An explicit transform acts in child coordinates before
 the placement offset; ordinary placement changes neither font size nor stroke
@@ -232,11 +232,12 @@ layout function receives readonly source props and a frozen query:
 |---|---|
 | `request` | Prepared pixel requests, including explicit preferred dimensions. |
 | `sizing` | Resolved preferred sizes, min/max, and aspect. |
-| `style` | Resolved font size and inherited paint; stroke units await shape geometry. |
+| `style` | Inherited font and paint; font size is resolved, relative line height and stroke width retain their units. |
 | `reference` | The established **parent** content box used for this element's lengths. |
 | `path` | The instance path for diagnostics; it must not affect geometry. |
 | `child(element, request, reference?, index?)` | Query a child with inherited style and its own path. |
 | `resource(name)` | Read a pass-owned resource during measurement. |
+| `prepare(name, compute)` | Cache source/style/resource work independently of requests and percentage references. |
 
 Pass a child's percentage reference explicitly once the container establishes its
 own content box. Omission leaves the reference indefinite. A finite available offer
@@ -260,7 +261,146 @@ Register a resource with `pass.set_resource(name, value, version)`, or supply a
 record of `{ value, version }` entries to the constructor. Advance the version when
 its contents change. Updates conservatively invalidate the pass cache, including
 parent results. Existing fragments remain independent of subsequent resource
-changes. Finer resource dependency tracking can follow measured need.
+changes. Prepared content is invalidated along with layout results. A preparation
+must not depend on the current request, percentage reference, or diagnostic path.
+Finer resource dependency tracking can follow measured need.
+
+## Text and fonts
+
+```jsx
+<Svg width={px(360)} height={px(200)} font_size={px(18)} color="#203746">
+  <Text width={px(320)} line_height={em(1.4)}>
+    {'A paragraph with '}
+    <Span font_weight={700}>bold words</Span>
+    {' and '}<Span font_style="italic">italic words.</Span>
+  </Text>
+</Svg>
+```
+
+`Text` accepts strings, numbers, nested arrays, conditional children, and inline
+`Span` elements. `text="..."` is a convenience alternative to children. Spans inherit
+font family, weight, style, size, line height, and `color`; they introduce no boxes
+or word breaks. A standalone `Span` can also be measured as text. Other graphics
+belong beside Text through composition. Inline spans have style props, not sizing
+or independent layout props.
+
+Text defaults to IBM Plex Sans, weight 400, 16px, 1.2em line height, and black.
+`color` paints glyphs; `fill`/`stroke` paint shapes. Relative font sizes refer to the
+inherited size; relative line height refers to each run's newly resolved size.
+An inherited `line_height={px(20)}` remains 20px even in a larger span.
+
+| Text property | Behavior |
+|---|---|
+| `wrap` | Defaults to true; wrap at supported Unicode line-break opportunities. |
+| `whitespace="normal"` | Collapse horizontal spaces/tabs and trim hard-line edges; **retain explicit newlines**. |
+| `whitespace="pre"` | Preserve spaces and expand tabs at `tab_size` column stops (default 4). Wrapping remains independently controlled by `wrap`. |
+| `text_align` | `left` (default), `center`, or `right`, inside the final allocated width. |
+| `font_family` | `IBM Plex Sans`, `IBM Plex Mono`, or a registered family. |
+| `font_weight` | Numeric 1–1000; choose the nearest available weight, lower on ties. Bundled weights are 300, 400, 700. |
+| `font_style` | `normal` or `italic`; a registered italic face is preferred, otherwise synthesize a 12° oblique outline. |
+
+Newlines include CRLF/CR and Unicode line/paragraph separators. A trailing newline
+adds a blank line; empty normal text is 0×0. Nonbreaking spaces remain nonbreaking;
+zero-width spaces permit a break without painting a glyph. JSX formatting-only
+whitespace is removed by the parser; use explicit string expressions when spaces
+or newlines matter. Automatic hyphenation, emergency word splitting, full paragraph
+bidi, fallback font chains, and color emoji are outside this stage's coverage.
+Unknown families and missing glyphs produce errors instead of silent substitution.
+
+Text hugs its measured width under a natural or available request. An exact width
+fixes the frame and reflows its lines; an unbreakable word can overflow it, including
+a zero-width frame. Height requests never scale glyphs or truncate lines. Min/max
+limits and preferred dimensions use the same sizing policy as other elements.
+
+Font ascent/descent determine the baseline; half of the extra leading goes above
+and below. Each line combines its runs' extents around a common baseline, with the
+Text style providing a minimum strut. A small line height allows ink to overflow;
+glyphs keep their font size. Text exposes `baseline` and `last_baseline`; its plain
+`Line` fragments expose individual baselines. Lines are results, not elements
+reconstructed during measurement.
+
+Text preparation normalizes runs, identifies legal breaks across span boundaries,
+and measures each break unit. Reflow only packs those advances into lines. Kerning
+and ligatures apply within each uninterrupted style/break unit; shaping across
+different styles or break boundaries is deferred. Equivalent adjacent spans merge.
+The exact-width regression checks both sides of a break just 1e-9px apart, and a
+counting provider verifies that changing width performs no additional shaping.
+
+`Fonts` is a small adapter around Fontkit and the existing bundled font files. It
+replaces the old font registry without importing the old Env or text layout.
+Fontkit handles Plex's extension kerning tables, which the old OpenType library
+skips. One adapter-local workaround gives empty TrueType glyphs zero bounds: Fontkit
+2.0.4 otherwise reads past the end of Plex Mono's glyph table for spaces. Neither
+font files nor global library prototypes are modified.
+
+Each pass supplies its own lazy `fonts` resource. Bun/Node loads bundled files on
+first use; importing the module does no file I/O. Other hosts can preload with
+`await fonts.load()`, register font bytes, or provide a different measurement
+implementation. Browser asset packaging is deferred; no installed/system font is
+required by the resulting SVG.
+
+```ts
+import { Fonts, LayoutPass } from '@gum-jsx/core/next';
+
+const fonts = new Fonts();
+fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' });
+const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } });
+
+// After later registrations, explicitly invalidate any reused pass:
+pass.set_resource('fonts', fonts, fonts.version);
+```
+
+The replaceable `FontProvider.resolve(family, weight, style)` returns ascent,
+descent, and `shape(text)`. Metrics use em, with positive ascent/descent distances;
+shapes contain an advance, immutable outline commands, and ink in y-down coordinates
+at a one-em font with baseline zero. Font resources and preparation caches belong to
+the pass, and source elements contain no resource objects.
+
+**SVG text is currently outlined.** The same measured glyphs become pixel paths,
+so SVG and PNG agree without installing or embedding fonts. Text retains an escaped
+accessible label. Outlines make output larger and text is not selectable/searchable
+as native SVG text; an optional native-text rendering route can be added later.
+
+## Shapes and paths
+
+All shapes use the shared preferred-aspect policy, with a finite 16×16 natural
+fallback. An explicit size or available offer resizes geometry. Circle remains
+circular inside a nonsquare allocation; Ellipse follows both axes. Empty polylines
+and paths paint nothing but retain the ordinary shape sizing policy.
+
+| Element | Geometry props and defaults |
+|---|---|
+| `Rect` | `radius` defaults to zero; a scalar uses the shorter side, `{x,y}` resolves per axis. |
+| `RoundedRect` | Same props, with a default radius of 0.125 of the shorter side. Radii clamp to half the corresponding dimension. |
+| `Circle` | `center: {x: 0.5, y: 0.5}`, scalar `radius: 0.5` of the shorter side. |
+| `Ellipse` | Same center, `radius: {x: 0.5, y: 0.5}`. |
+| `Line` | `from: {x: 0, y: 0}`, `to: {x: 1, y: 1}`. Fill is ignored. |
+| `Polyline` / `Polygon` | `points: [{x,y}, ...]`; Polygon closes the path. |
+| `Path` | `commands` from the absolute path helpers below. |
+
+```jsx
+<Path width={px(120)} height={px(60)} stroke_width={px(2)}
+  commands={[
+    move_to(0, 0.5),
+    curve_to(0.25, em(-1), 0.75, 1, 1, 0.5),
+    line_to(px(10), 1), close_path(),
+  ]} />
+```
+
+Path helpers are `move_to(x,y)`, `line_to(x,y)`, `quad_to(x1,y1,x,y)`,
+`curve_to(x1,y1,x2,y2,x,y)`, and `close_path()`. A nonempty path starts with a move.
+The first API uses structured absolute commands, without SVG string parsing,
+relative commands, or arcs. Each coordinate accepts fractions, `px()`, or `em()`;
+negative and out-of-frame coordinates are valid and contribute overflow.
+
+Shape defaults are `fill="none"`, `stroke="black"`, and `stroke_width={px(1)}`.
+Strokes straddle geometry, including rectangle edges; they do not consume layout
+space. `stroke_linecap` accepts butt/round/square; `stroke_linejoin` accepts
+miter/round/bevel; `stroke_miterlimit` defaults to 4. Curve ink uses a conservative
+control hull enlarged for caps/joins. Text instead supplies precise glyph ink.
+Zero-area rectangles/ellipses paint nothing; a zero-length round-capped line can
+paint a dot. Pixel strokes remain fixed when the layout box changes. An explicit
+placement transform still scales the completed drawing, including its strokes.
 
 ## Rendering and inspection
 

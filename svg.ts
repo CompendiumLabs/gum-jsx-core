@@ -1,6 +1,7 @@
 import type { Drawing } from './drawing';
 import type { Fragment } from './fragment';
 import type { Rect } from './geometry';
+import { path_data } from './path';
 
 type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string }>;
 
@@ -18,9 +19,23 @@ function rect_attributes(rect: Rect): string {
 
 // Each drawing kind has an explicit vocabulary, with no arbitrary attribute injection.
 function render_drawing(draw: Drawing): string {
-  const { rect, fill, stroke, stroke_width } = draw;
-  const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`;
-  return `<rect ${rect_attributes(rect)} ${paint} stroke-width="${stroke_width}"/>`;
+  const { fill, stroke, stroke_width, stroke_linecap = 'butt',
+    stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw;
+  const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`
+    + ` stroke-width="${stroke_width}" stroke-linecap="${stroke_linecap}"`
+    + ` stroke-linejoin="${stroke_linejoin}" stroke-miterlimit="${stroke_miterlimit}"`;
+  switch (draw.kind) {
+    case 'rect': {
+      const { radius } = draw;
+      const rounded = radius ? ` rx="${radius.x}" ry="${radius.y}"` : '';
+      return `<rect ${rect_attributes(draw.rect)}${rounded} ${paint}/>`;
+    }
+    case 'ellipse': {
+      const { center, radius } = draw;
+      return `<ellipse cx="${center.x}" cy="${center.y}" rx="${radius.x}" ry="${radius.y}" ${paint}/>`;
+    }
+    case 'path': return `<path d="${path_data(draw.commands)}" ${paint}/>`;
+  }
 }
 
 // Render an immutable result, allocating definition IDs only within this document.
@@ -52,7 +67,8 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       const matrix = child.transform ? ` matrix(${child.transform.join(' ')})` : '';
       return `<g transform="translate(${x} ${y})${matrix}">${render_fragment(child.fragment)}</g>`;
     });
-    return `<g${clip}>${[...draw, ...children].join('')}</g>`;
+    const label = node.label === undefined ? '' : ` role="img" aria-label="${escape_xml(node.label)}"`;
+    return `<g${clip}${label}>${[...draw, ...children].join('')}</g>`;
   }
 
   const body = render_fragment(fragment);
