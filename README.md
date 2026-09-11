@@ -6,14 +6,14 @@ Stage 6(a) adds positioned Group canvases; wrapping stacks are next in 6(b).
 
 This README describes the implemented API; [contributor notes](#contributor-notes)
 cover how to work on it.
-[ROADMAP.md](./ROADMAP.md) tracks completed stages and future work;
-[DESIGN.md](./DESIGN.md) records the accepted decisions and the original assessment
+[ROADMAP.md](../docs/ROADMAP.md) tracks completed stages and future work;
+[DESIGN.md](../docs/DESIGN.md) records the accepted decisions and the original assessment
 of the legacy implementation. The old assessment's APIs and bug reports are historical.
 
-This is a standalone Bun project. Install and check it from this directory:
+Install workspace dependencies with `bun install` from the parent directory,
+then check the core from this directory:
 
 ```sh
-bun install
 bun run test
 bun run typecheck
 ```
@@ -27,35 +27,24 @@ the package entry point. The JSX parser and its source-error helpers live in
 top-level `test/`, `scripts/`, and `examples/` directories. No files or packages
 from the old core checkout are needed.
 
-Run the local tools directly:
+The rendering command now lives in [gum-next-cli](../gum-next-cli/README.md).
+From the workspace root, render an example with:
 
 ```sh
-bun scripts/gum.ts examples/hugging.jsx -f tree --stats
-bun scripts/gum.ts examples/card.jsx --width 220 -o /tmp/card.png
-bun scripts/gum.ts examples/stack.jsx --width 360 -o /tmp/stack.png
-bun scripts/gum.ts examples/group.jsx --width 400 -o /tmp/group.png
-bun scripts/gum.ts examples/repeated.jsx -f tree --stats
-bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.svg
-bun scripts/gum.ts examples/repeated.jsx -o /tmp/repeated.png --ratio 2
-bun scripts/gum.ts examples/paragraph.jsx -o /tmp/paragraph.png
-bun scripts/gallery.ts
-bun test/run.ts
+bun run gum gum-next-core/examples/hugging.jsx -f tree --stats
+bun run gum gum-next-core/examples/card.jsx --width 220 -o /tmp/card.png
 ```
 
-PNG output uses the optional local `rsvg-convert` command. SVG, tree, and JSON
-output need only Bun and the dependencies installed above. The PNG ratio changes
-sampling resolution while preserving the layout viewport. The CLI accepts a JSX
-file or stdin; `--help` lists its options. Bare elements get an automatic `Svg`.
-`--width` and `--height` independently override viewport axes; omitted axes retain
-the source's sizing or hug content. The [gallery](./examples/README.md) contains
-source, SVG, PNG, and exact numerical trees.
+The CLI accepts a JSX file or stdin and emits SVG, PNG, tree, or JSON output.
+PNG uses the optional `rsvg-convert` command. See the CLI README for options and
+viewport behavior. The core's [gallery](./examples/README.md) contains source,
+SVG, PNG, and exact numerical trees.
 
-Package scripts provide the same tools:
+Core development tools remain available from this directory:
 
 ```sh
 bun run probe
 bun run probe hugging_box
-bun run gum examples/repeated.jsx -f tree
 bun run gallery
 ```
 
@@ -82,7 +71,7 @@ objects. Negative lengths are valid for coordinates. Sizing and inset operations
 require nonnegative resolved values.
 
 ```ts
-import { em, px, resolve_length, measure_length } from '@gum-jsx/core';
+import { em, px, resolve_length, measure_length } from 'gum-next-core';
 
 const basis = { font_size: 16, fraction: 200 };
 resolve_length(0.5, basis);       // 100 pixels
@@ -136,7 +125,7 @@ and nonnegative; zero is an exact value, not an absent dimension.
 ```ts
 import {
   available, make_request, resolve_sizing, prepare_request, finish_size, make_size,
-} from '@gum-jsx/core';
+} from 'gum-next-core';
 
 const context = { reference: { width: 640 }, path: 'root/child' };
 const sizing = resolve_sizing({ width: 0.5 }, context);
@@ -248,7 +237,7 @@ The same source can answer different allocations without being rebuilt:
 
 ```ts
 import { Rect, Svg, px, em, LayoutPass, make_request, exact, render_svg }
-  from '@gum-jsx/core';
+  from 'gum-next-core';
 
 const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) });
 const scene = new Svg({ width: px(160), height: px(80), children: tile });
@@ -664,7 +653,7 @@ implementation. Browser asset packaging is deferred; no installed/system font is
 required by the resulting SVG.
 
 ```ts
-import { Fonts, LayoutPass } from '@gum-jsx/core';
+import { Fonts, LayoutPass } from 'gum-next-core';
 
 const fonts = new Fonts();
 fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' });
@@ -768,11 +757,11 @@ commit when asked. Keep this implementation isolated until a separate migration
 decision. The legacy Env, math/plotting elements, and add-on packages continue
 to use the old core.
 
-The local CLI above targets this implementation. The installed `gum` CLI and
-legacy documentation or authoring skills target the old API. Run `bun install`
-here; `package.json` and `bun.lock` own the dependencies independently of the
-old org workspace. No build is needed to run TypeScript sources. JSX examples
-are read as source by `evaluate`, so they do not need React or its JSX runtime.
+The workspace's `gum-next-cli` targets this implementation. A globally installed
+legacy `gum` and the legacy documentation or authoring skills still target the
+old API. Run `bun install` at the workspace root to link the packages. No build
+is needed to run TypeScript sources. JSX examples are read as source by
+`evaluate`, so they do not need React or its JSX runtime.
 
 | Responsibility | Start here |
 |---|---|
@@ -786,7 +775,8 @@ are read as source by `evaluate`, so they do not need React or its JSX runtime.
 | Text preparation/reflow and font adapter | [text.ts](./src/text.ts), [fonts.ts](./src/fonts.ts) |
 | Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/shapes.ts), [path.ts](./src/path.ts), [drawing.ts](./src/drawing.ts), [fragment.ts](./src/fragment.ts) |
 | Public API and JSX names | [index.ts](./src/index.ts), [eval.ts](./src/eval.ts) |
-| Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts), [scripts/gum.ts](./scripts/gum.ts) |
+| Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts) |
+| Command-line I/O and PNG conversion | [gum-next-cli](../gum-next-cli/README.md) |
 
 “Keep the layout pass ice cold.” Add container behavior to the container or a pure
 helper. Shared ElementProps includes flex and position metadata for typing; their
@@ -811,9 +801,11 @@ inspect both the images and numerical trees. The early custom placement fixtures
 are intentional protocol examples, while new composition examples should use the
 standard elements. Update this README, the gallery README, and roadmap status.
 
-For runtime changes, run `bun run test` and `bun run typecheck` here. The former covers contracts/layout plus CLI behavior and PNG when
-`rsvg-convert` is available. At the completed 6(a) checkpoint, the suite had 81 named
-contract/layout checks plus CLI/PNG checks. For public type changes, also verify
+For runtime changes, run `bun run test` and `bun run typecheck` here. The core suite
+covers contracts and layout. CLI behavior and optional PNG checks now live in
+`gum-next-cli/test/cli.ts`; the workspace's `bun run test` runs both suites.
+At the completed 6(a) checkpoint, the core suite had 81 named contract/layout checks.
+For public type changes, also verify
 declaration emission into a scratch directory:
 
 ```sh
@@ -826,4 +818,4 @@ measurement-cost regressions. Natural hugging and Group examples generally query
 each child once; flex/reflow/stretch may require additional queries. Counted layouts,
 cache hits, and prepared glyph reuse are distinct. Preserve the opposing-clamp and
 text-width-boundary cases when changing allocation. See the
-[roadmap style guide](./ROADMAP.md#style-guide) for the project's implementation style.
+[roadmap style guide](../docs/ROADMAP.md#style-guide) for the project's implementation style.

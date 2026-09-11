@@ -1,8 +1,11 @@
 # Stages 1–6(a) gallery
 
-Run `bun run gallery` from the project root to regenerate the files in `rendered/`.
+Run `bun run gallery` from `gum-next-core` to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
+
+The rendering commands below run from the workspace root using
+[gum-next-cli](../../gum-next-cli/README.md).
 
 Stage 6(a) adds positioned Group canvases, using ordinary elements as children:
 
@@ -23,7 +26,7 @@ The canvas height comes from its aspect; the surrounding column and Box add thei
 natural text heights, gaps, and padding afterward.
 
 ```sh
-bun scripts/gum.ts examples/group.jsx --width 480 -o /tmp/group.png
+bun run gum gum-next-core/examples/group.jsx --width 480 -o /tmp/group.png
 ```
 
 ![Three anchors meeting the same position](./rendered/group_anchors.png)
@@ -59,7 +62,7 @@ reused across each paragraph's intrinsic and allocated widths. Compare the
 [wide tree](./rendered/stack.tree) and [narrow tree](./rendered/stack_narrow.tree).
 
 ```sh
-bun scripts/gum.ts examples/stack.jsx --width 440 -o /tmp/stack.png
+bun run gum gum-next-core/examples/stack.jsx --width 440 -o /tmp/stack.png
 ```
 
 ![Entirely natural stack composition](./rendered/stack_hugging.png)
@@ -115,7 +118,7 @@ Compare the [wide tree](./rendered/card.tree) and
 [narrow tree](./rendered/card_narrow.tree). To try another width:
 
 ```sh
-bun scripts/gum.ts examples/card.jsx --width 260 -o /tmp/card.png
+bun run gum gum-next-core/examples/card.jsx --width 260 -o /tmp/card.png
 ```
 
 ![Nested boxes and external spacing](./rendered/nesting.png)
