@@ -10,7 +10,8 @@ import { resolve_font_size, resolve_length } from './units';
 import type { Length } from './units';
 
 type AnchorValue = Exclude<AlignmentValue, 'stretch'>;
-type Anchor = AnchorValue | Readonly<{ x?: AnchorValue; y?: AnchorValue }>;
+type Anchor = AnchorValue | Readonly<{ x?: AnchorValue; y?: AnchorValue }>
+  | readonly [x: AnchorValue, y: AnchorValue];
 type PositionSpec = Readonly<{ x?: Length; y?: Length; anchor?: Anchor }>;
 type GroupProps = ElementProps & Readonly<{ clip?: boolean }>;
 

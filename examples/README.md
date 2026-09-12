@@ -14,6 +14,10 @@ The rendering commands below run from the workspace root using
 The plotting slice adds data coordinates, measured axes and labels, and sampled
 geometry. The [overview](../../docs/PLOTTING.md) explains API choices and limits.
 
+Point inputs accept `[x,y]` as well as `{x,y}`. The math helper example feeds
+`zip(xs, ys)` directly to Points; the [point values example](../../gum-next-docs/docs/code/PointValues.jsx)
+mixes both forms and shows callbacks using named coordinates.
+
 | Example | What to inspect |
 |---|---|
 | [plot_wave.jsx](plot_wave.jsx) | A sampled line, uncertainty band, observations, and legend; also rendered at 420px wide. |
@@ -21,12 +25,16 @@ geometry. The [overview](../../docs/PLOTTING.md) explains API choices and limits
 | [graph_scatter.jsx](graph_scatter.jsx) | Reversed x limits, upright text, custom marker shapes, and independent axis parts. |
 | [plot_field.jsx](plot_field.jsx) | Vectors mapped through unequal axis scales, fixed-pixel arrowheads, and a parametric trajectory. |
 | [plot_slide.jsx](plot_slide.jsx) | A measured slide title, plot, and caption using ordinary text composition. |
+| [math_helpers.jsx](math_helpers.jsx) | Bare sin/cos/exp callbacks, periodic linspace samples, zip, range, mean, norm, and compact number labels. |
+| [arrow_caps.jsx](arrow_caps.jsx) | Thick butt/round/square shafts stop behind fixed head tips; straight, curved, and rounded routes. |
 
 ![Curve, band, points, and measured legend](rendered/plot_wave.png)
 ![The same plot at a narrower width](rendered/plot_wave_narrow.png)
 ![Negative categorical bars](rendered/plot_bars.png)
 ![A vector field and trajectory](rendered/plot_field.png)
 ![A slide containing a plot](rendered/plot_slide.png)
+![Math helpers in a complete plot](rendered/math_helpers.png)
+![Arrowhead clearance for three cap styles and curved routes](rendered/arrow_caps.png)
 
 Compare the [wide](rendered/plot_wave.tree) and [narrow](rendered/plot_wave_narrow.tree)
 trees: data geometry and the measured content rectangle change while 12px labels,

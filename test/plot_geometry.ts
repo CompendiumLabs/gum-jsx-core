@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {
-  Overlay, Attach, Anchor, Rotate, TransformBox, Rect, Circle, Text, TextRow, TextCol,
+  Overlay, Attach, Anchor, Rotate, TransformBox, Box, Fit, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
   TextFrame, Bullets, Slide, Graph, Points, Arc, Arrow, Spline, RoundedLine, HFill,
-  Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d,
+  Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d, evaluate,
 } from '../src/index';
-import type { PathDraw } from '../src/index';
+import type { Alignment, AnchorSpec, Element, PathDraw, Side } from '../src/index';
 
 function near(a: number, b: number): void { assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`); }
 const fixed = make_request({ width: exact(200), height: exact(100) });
@@ -42,12 +42,111 @@ const tests: Record<string, () => void> = {
     const child = new Rect({ width: px(100), height: px(50), stroke: 'none' });
     const decoration = new Rect({ width: px(20), height: px(10), fill: 'red', stroke: 'none' });
     const pass = new LayoutPass(), attached = pass.layout(new Attach({ children: child,
-      attachment: decoration, side: 'left', offset: px(5), at: 1, align: 1 }));
+      attachment: decoration, side: 'left', offset: px(5), at: 1, attachment_anchor: 1 }));
     assert.deepEqual(attached.size, { width: 100, height: 50 });
     assert.deepEqual(attached.children[1].offset, { x: -25, y: 40 });
     const anchor = pass.layout(new Anchor({ children: decoration }));
     assert.deepEqual(anchor.size, { width: 0, height: 0 });
     assert.deepEqual(anchor.children[0].offset, { x: -10, y: -5 });
+  },
+
+  'tuple anchors preserve parent placement and independent content alignment across resizing'() {
+    const anchor: [number, number] = [1, 0.25];
+    const props = { x: 0.75, y: 0.25, width: px(40), height: px(20),
+      align: { x: 'center', y: 'end' } as const,
+      children: new Rect({ width: px(10), height: px(4), fill: 'blue', stroke: 'none' }) };
+    const tuple = new Box({ ...props, anchor });
+    const record = new Box({ ...props, anchor: { x: 'end', y: 0.25 } });
+    anchor[0] = 0;
+    assert.deepEqual(tuple.props.anchor, [1, 0.25]);
+    assert.ok(Object.isFrozen(tuple.props.anchor));
+    const parents: ((child: Element) => Element)[] = [
+      child => new Group({ children: child }),
+      child => new Graph({ xlim: [0, 1], ylim: [0, 1], children: child }),
+      child => new Plot({ xlim: [0, 1], ylim: [0, 1], children: child }),
+      child => new Overlay({ children: [new Rect({ width: px(200), height: px(100) }), child] }),
+    ];
+    const pass = new LayoutPass();
+    for (const parent of parents) {
+      for (const request of [fixed, make_request({ width: exact(300), height: exact(200) })]) {
+        assert.deepEqual(pass.layout(parent(tuple), request), pass.layout(parent(record), request));
+      }
+    }
+    const group = pass.layout(parents[0](tuple), fixed), graph = pass.layout(parents[1](tuple), fixed);
+    assert.deepEqual(group.children[0].offset, { x: 110, y: 20 });
+    assert.deepEqual(graph.children[0].offset, { x: 110, y: 70 });
+    assert.deepEqual(group.children[0].fragment.children[0].offset, { x: 15, y: 16 });
+  },
+
+  'shared alignment and rotation origins accept numeric and keyword tuples'() {
+    const child = new Rect({ width: px(40), height: px(20), fill: 'blue' });
+    const pairs: readonly (readonly [Alignment, Alignment])[] = [
+      [['end', 0.25], { x: 'end', y: 0.25 }],
+      [[0, 'center'], { y: 'center' }],
+    ];
+    const pass = new LayoutPass();
+    for (const [tuple, record] of pairs) {
+      for (const Wrapper of [Box, Fit, Anchor]) {
+        assert.deepEqual(pass.layout(new Wrapper({ align: tuple, children: child }), fixed),
+          pass.layout(new Wrapper({ align: record, children: child }), fixed));
+      }
+      assert.deepEqual(pass.layout(new Rotate({ origin: tuple, angle: 45, resize: false, children: child })),
+        pass.layout(new Rotate({ origin: record, angle: 45, resize: false, children: child })));
+    }
+    const stretched = pass.layout(new Box({ align: ['stretch', 'end'], children: child }), fixed);
+    assert.deepEqual(stretched.children[0].fragment.size, { width: 200, height: 20 });
+    assert.deepEqual(stretched.children[0].offset, { x: 0, y: 80 });
+  },
+
+  'attachment anchors remain independent of the wrapper anchor on every side'() {
+    const child = new Rect({ width: px(100), height: px(50), stroke: 'none' });
+    const attachment = new Rect({ width: px(20), height: px(10), fill: 'red', stroke: 'none' });
+    const offsets: Record<Side, { x: number; y: number }> = {
+      top: { x: 70, y: -15 }, bottom: { x: 70, y: 55 },
+      left: { x: -25, y: 35 }, right: { x: 105, y: 35 },
+    };
+    const pass = new LayoutPass();
+    for (const side of Object.keys(offsets) as Side[]) {
+      const attach = new Attach({ x: 0.75, y: 0.5, anchor: [1, 0.5], children: child,
+        attachment, side, offset: px(5), at: 0.75, attachment_anchor: 0.25 });
+      const placed = pass.layout(new Group({ children: attach }), fixed).children[0];
+      assert.deepEqual(placed.offset, { x: 50, y: 25 });
+      assert.deepEqual(placed.fragment.size, { width: 100, height: 50 });
+      assert.deepEqual(placed.fragment.children[1].offset, offsets[side]);
+    }
+    assert.deepEqual(pass.layout(new Attach({ children: child, attachment })).children[1].offset,
+      { x: 40, y: 50 });
+    assert.throws(() => pass.layout(new Attach({ attachment_anchor: NaN, children: child })), /attachment_anchor/);
+    const code = `<Group width={px(200)} height={px(100)}>
+      <Attach x={0.75} y={0.5} anchor={[1, 0.5]} at={0.75} attachment-anchor={0.25}
+        attachment={<Rect width={px(20)} height={px(10)} />}>
+        <Rect width={px(100)} height={px(50)} />
+      </Attach>
+    </Group>`;
+    const dashed = pass.layout(evaluate(code)), underscored = pass.layout(evaluate(code.replace('attachment-anchor', 'attachment_anchor')));
+    assert.deepEqual(dashed, underscored);
+    assert.deepEqual(dashed.children[0].fragment.children[1].offset, { x: 70, y: 50 });
+  },
+
+  'tuple anchors reject malformed pairs, out-of-range values, and stretch'() {
+    const pass = new LayoutPass();
+    const parents = [
+      (child: Element) => new Group({ children: child }),
+      (child: Element) => new Graph({ children: child }),
+      (child: Element) => new Overlay({ children: [new Rect(), child] }),
+    ];
+    for (const parent of parents) {
+      for (const anchor of [[], [0.5], [0.5, 0.5, 0.5], Array(2)]) {
+        assert.throws(() => pass.layout(parent(new Rect({ anchor: anchor as unknown as AnchorSpec })), fixed),
+          /exactly two coordinates/);
+      }
+      assert.throws(() => pass.layout(parent(new Rect({ anchor: [0, undefined] as unknown as AnchorSpec })), fixed),
+        /two alignment values/);
+      for (const anchor of [[NaN, 0], [0, Infinity], [px(1), 0], [-0.1, 0], [0, 1.1], ['stretch', 0]]) {
+        assert.throws(() => pass.layout(parent(new Rect({ anchor: anchor as unknown as AnchorSpec })), fixed),
+          /finite|between 0 and 1|selects a point/);
+      }
+    }
   },
 
   'marker callbacks are construction-only and scalar sizes are isotropic'() {

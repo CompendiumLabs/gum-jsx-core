@@ -219,12 +219,18 @@ JSX creates descriptions without doing layout:
 Named constants are available both in evaluated JSX and as imports from
 `gum-next-core`: `sans`, `mono`, `light` (300), `regular` (400), `bold` (700),
 `none`, `white`, `black`, `blue`, `red`, `green`, `yellow`, `purple`, `gray`,
-`lightgray`, `darkgray`, `slate`, and `e`, `pi`, `phi`, `r2d`, `d2r`.
+`lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
 For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
 [style reference](../gum-next-docs/docs/text/Style.md) for their exact values.
 
-`evaluate(code, { scope?, name? })` evaluates a bare JSX element or JavaScript that
+JSX attribute names also accept dashes: `font-size` becomes `font_size`, and
+`stroke-dasharray` becomes `stroke_dasharray`. This applies to built-in elements
+and function components; values are unchanged and the last attribute wins when
+both spellings are used. JavaScript object keys, including spread props, keep
+their spelling, so use underscores there.
+
+`evaluate(code, { scope?, name?, seed? })` evaluates a bare JSX element or JavaScript that
 returns one. Function components, spreads, and JSX fragments work through the
 existing Acorn parser; no old element or layout engine is used. Extra scope values
 belong to this evaluation. This runs ordinary trusted JavaScript, with its normal
@@ -347,8 +353,8 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
-| `radius` | Rounded outer corners; scalar or `{x,y}`, default zero. Clamped to the box. |
-| `align` | `"start"`, `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}`. Default start on both axes. |
+| `radius` | Rounded outer corners; scalar, `{x,y}`, or `[x,y]`, default zero. Clamped to the box. |
+| `align` | `"start"`, `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}` or `[x,y]`. Default start on both axes. |
 | `clip` | Clip the child inside the border, including the padding area; default false. |
 
 Background and border are local decoration. Ordinary `fill`, `stroke`, and font
@@ -551,7 +557,7 @@ Rect fills the canvas and paints behind the other children.
 | Group `aspect` | Optional preferred width/height ratio, using the same sizing rules as shapes. |
 | Group `clip` | Clip painted ink to the canvas rectangle, default false; overflow is retained. |
 | Child `x`, `y` | Position lengths, default zero. Fractions reference the corresponding full canvas axis; negatives and values outside the canvas are allowed. |
-| Child `anchor` | The point of the child's allocated box that meets `(x,y)`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` with these values. |
+| Child `anchor` | The point of the child's allocated box that meets `(x,y)`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` / `[x,y]` with these values. |
 | Child `width`, `height`, etc. | Ordinary sizing, resolved against the canvas. Use these to define a text region or shape size. |
 
 The canvas must have both axes supplied by dimensions or finite offers, or one
@@ -572,7 +578,10 @@ canvas, even at a nonzero position; give it width and height for a smaller regio
 Position em lengths use the child's resolved local font size, matching its other
 lengths. Anchors are dimensionless fractions of the allocated child rectangle, not
 its painted ink. `anchor="center"` subtracts half the child's width and height;
-`anchor={{x: "end", y: "start"}}` places its top-right corner at the position.
+`anchor={[1, 0]}` or `anchor={{x: "end", y: "start"}}` places its top-right corner
+at the position. Tuple entries can mix fractions and keywords, for example
+`anchor={['end', 0.5]}`. Per-axis Box/Fit/Anchor alignment and Rotate origins also
+accept tuples. Stack alignment stays a single-axis value.
 There is no stretch anchor; width and height control sizing.
 
 Position metadata belongs to the direct child. Put it on the Box or VStack when
@@ -734,6 +743,15 @@ ordinary shape sizing policy.
 | `Polyline` / `Polygon` | `points: [{x,y}, ...]`; Polygon closes the path. |
 | `Path` | `commands` from the absolute path helpers below. |
 
+Point inputs accept `{x,y}` or `[x,y]`, including mixtures in a list. This applies
+to endpoints, centers, paired radii, plot marks, field vectors, and curve/coordinate
+helpers. Tuples can mix fractions, px, and em wherever length coordinates are
+allowed: `<Line from={[px(12), 0.5]} to={[1, 0.5]} />`. `zip(xs, ys)` can be passed
+directly as `points`. Callbacks and generated geometry retain named `{x,y}` records.
+TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengths;
+`Point` and `Position` remain record types. See the
+[point values reference](../gum-next-docs/docs/text/PointValues.md) and its runnable example.
+
 ```jsx
 <Path width={px(120)} height={px(60)} stroke_width={px(2)}
   commands={[
@@ -758,13 +776,45 @@ Zero-area rectangles/ellipses paint nothing; a zero-length round-capped line can
 paint a dot. Pixel strokes remain fixed when the layout box changes. An explicit
 placement transform still scales the completed drawing, including its strokes.
 
+## Math and data helpers
+
+Numeric helpers are shared by named imports and the JSX evaluator. Use `sin`,
+`cos`, `exp`, and `sqrt` directly in formulas or as sampling callbacks. The
+original public utility set is available alongside additional Math aliases,
+`lerp`, and `tau` (2 pi).
+
+| Group | Reference and examples |
+|---|---|
+| Scalars, reductions, interpolation | [Math helpers](../gum-next-docs/docs/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
+| Sequences and arrays | [Arrays](../gum-next-docs/docs/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
+| Vector and complex arithmetic | [Vectors](../gum-next-docs/docs/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
+| Color interpolation | [Colors](../gum-next-docs/docs/text/Colors.md): interp, palette |
+| Reproducible samples | [Random](../gum-next-docs/docs/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
+
+`range` excludes its stop; `linspace` includes its endpoint by default and keeps
+the existing 101-sample default. Pass false as its fourth argument for periodic
+data. Counts and generated grid sizes are bounded at 100000. Generated arrays
+and points are frozen without freezing caller-owned objects.
+
+`polar` and 2D arithmetic return native `{x,y}` points. Array reductions `min`
+and `max` accept arrays; `minimum` and `maximum` accept separate arguments.
+All skip null/undefined. Empty min/max return undefined and empty mean returns NaN.
+
+Each `evaluate` call owns a fresh random stream, defaulting to seed 42; pass
+`{seed: 7}` or call `setSeed(7)` in JSX to choose another sequence. Direct imports
+share a separate host stream; `new RNG(seed)` creates an independent one.
+`integer` excludes its upper bound. Layout and rendering never consume random
+samples, so resizing preserves the data. See the
+[migration notes](../gum-next-docs/docs/text/Migration.md#numeric-helpers) for
+differences from the original helpers.
+
 ## Graphs and plotting
 
 ```jsx
 <Svg width={px(640)} height={px(400)}>
   <Plot title="A sampled curve" xlabel="x" ylabel="sin(x)"
-    xlim={[0, 2 * pi]} ylim={[-1.2, 1.2]} background="white">
-    <SymLine fy={Math.sin} xlim={[0, 2 * pi]}
+    xlim={[0, tau]} ylim={[-1.2, 1.2]} background="white">
+    <SymLine fy={sin} xlim={[0, tau]}
       stroke={blue} stroke_width={px(2)} />
   </Plot>
 </Svg>
@@ -792,6 +842,19 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Sampling | [Sampling](../gum-next-docs/docs/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
+
+`Attach` uses `at` to select a point along the content edge and `attachment_anchor`
+to select the attachment's own point along that edge; both default to 0.5. The
+wrapper's own `anchor` remains independent. Use `attachment-anchor` in JSX or
+`attachment_anchor` in host props; this replaces the earlier `Attach.align` name.
+
+Arrow shafts retreat at headed ends to hide the cap behind the triangular tip.
+Clearance uses the resolved shaft stroke, cap style, and head width after data
+mapping. Original head tips, unheaded endpoints, and inferred limits stay fixed.
+Short terminal segments are consumed without reversing the shaft; if the whole
+route is consumed, only the heads remain. Field arrows share the same rule.
+See the [cap comparison](examples/arrow_caps.jsx) for thick straight, curved, and
+rounded arrows.
 
 Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
 [value,label] pairs. Plot accepts nested axis/tick/label/grid/title style objects,
@@ -893,8 +956,8 @@ standard elements. Update this README, the gallery README, and roadmap status.
 
 For runtime changes, run `bun run test` and `bun run typecheck` here. The core suite
 covers contracts and layout. The workspace's `bun run test` runs this core suite.
-The core suite has 106 named checks, including 25 plotting, sampling, geometry,
-and composition checks added after the 6(a) checkpoint.
+The suite also covers plotting, sampling, numeric helpers, mixed point inputs,
+and composition behavior.
 For public type changes, also verify
 declaration emission into a scratch directory:
 

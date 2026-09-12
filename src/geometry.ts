@@ -2,6 +2,8 @@ import { finite, nonnegative } from './checks';
 import { resolve_length } from './units';
 import type { Length, LengthContext } from './units';
 
+// Inputs may use tuples; geometry results always retain named coordinates.
+type PointValue<T = number> = Readonly<{ x: T; y: T }> | readonly [x: T, y: T];
 // These records contain resolved pixels, never source length values.
 type Point = Readonly<{ x: number; y: number }>;
 type Size = Readonly<{ width: number; height: number }>;
@@ -15,6 +17,21 @@ type Insets = Readonly<{
   bottom: number;
 }>;
 type InsetSpec = Length | Readonly<Partial<Record<keyof Insets, Length>>>;
+
+// Read the representation independently of units and finiteness. Plotting callers
+// must be able to preserve nonfinite samples as gaps until they build paths.
+function read_point<T>(value: PointValue<T>, name = 'point'): Readonly<{ x: T; y: T }> {
+  if (value !== null && typeof value === 'object') {
+    if (Array.isArray(value)) {
+      if (value.length === 2 && 0 in value && 1 in value) {
+        return Object.freeze({ x: value[0], y: value[1] });
+      }
+    } else if ('x' in value && 'y' in value) {
+      return Object.freeze({ x: value.x, y: value.y });
+    }
+  }
+  throw new TypeError(`${name} needs {x, y} or [x, y] with exactly two coordinates`);
+}
 
 // Constructors own and freeze their records; no layout dimension is infinite.
 function make_size(width = 0, height = 0): Size {
@@ -53,11 +70,12 @@ function add_insets(a: Insets, b: Insets): Insets {
 }
 
 // Clips retain optional rounded corners; rectangular callers need no extra data.
-function make_clip(rect: Rect, radius?: Point): Clip {
+function make_clip(rect: Rect, radius?: PointValue): Clip {
   const bounds = make_rect(rect.x, rect.y, rect.width, rect.height);
   if (radius === undefined) return bounds;
-  const x = Math.min(nonnegative(radius.x, 'radius.x'), rect.width / 2);
-  const y = Math.min(nonnegative(radius.y, 'radius.y'), rect.height / 2);
+  const pair = read_point(radius, 'radius');
+  const x = Math.min(nonnegative(pair.x, 'radius.x'), rect.width / 2);
+  const y = Math.min(nonnegative(pair.y, 'radius.y'), rect.height / 2);
   return Object.freeze({ ...bounds, radius: make_point(x, y) });
 }
 
@@ -144,14 +162,15 @@ function make_transform(values: Transform): Transform {
 }
 
 // Transform in child coordinates, then add the parent's placement offset.
-function transform_rect(rect: Rect | null, offset: Point, transform?: Transform): Rect | null {
+function transform_rect(rect: Rect | null, offset: PointValue, transform?: Transform): Rect | null {
   if (rect === null) return null;
+  const translation = read_point(offset, 'offset');
   const [a, b, c, d, e, f] = transform ?? [1, 0, 0, 1, 0, 0];
   const { x, y, width, height } = rect;
   const corners = [[x, y], [x + width, y], [x, y + height], [x + width, y + height]];
   const points = corners.map(([x, y]) => make_point(
-    a * x + c * y + e + offset.x,
-    b * x + d * y + f + offset.y,
+    a * x + c * y + e + translation.x,
+    b * x + d * y + f + translation.y,
   ));
   const left = Math.min(...points.map(point => point.x));
   const top = Math.min(...points.map(point => point.y));
@@ -161,8 +180,8 @@ function transform_rect(rect: Rect | null, offset: Point, transform?: Transform)
 }
 
 export {
-  make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
+  read_point, make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
   union_rects, intersect_rects, make_transform, transform_rect,
 };
-export type { Point, Size, Rect, Clip, Transform, Insets, InsetSpec };
+export type { Point, PointValue, Size, Rect, Clip, Transform, Insets, InsetSpec };

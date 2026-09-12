@@ -4,7 +4,7 @@ return <Svg width={px(600)} height={px(480)}>
     background="white" aspect={1.25}>
     <SymField f={(x, y) => [-y, x]} xlim={[-2, 2]} ylim={[-2, 2]} samples={11}
       scale={0.14} stroke="#0f766e" stroke_width={px(1.5)} head_size={px(5)} />
-    <SymLine f={t => [1.25 * Math.cos(t), 1.25 * Math.sin(t)]} tlim={[0, 2 * pi]}
+    <SymLine f={t => polar(t, 1.25)} tlim={[0, tau]}
       stroke="#e8793c" stroke_width={px(2.5)} />
   </Plot>
 </Svg>;

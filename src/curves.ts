@@ -1,11 +1,12 @@
 import { finite, nonnegative } from './checks';
-import { make_point } from './geometry';
-import type { Point } from './geometry';
+import { make_point, read_point } from './geometry';
+import type { Point, PointValue } from './geometry';
 import type { PathCommand } from './path';
 
 // Uniform Catmull–Rom tangents expressed as cubic Bezier commands. Endpoints use
 // one-sided tangents; repeated points and singletons require no division.
-function spline_path(points: readonly Point[], tension = 1, closed = false): PathCommand[] {
+function spline_path(values: readonly PointValue[], tension = 1, closed = false): PathCommand[] {
+  const points = values.map(value => read_point(value));
   nonnegative(tension, 'tension');
   if (!points.length) return [];
   const path: PathCommand[] = [{ kind: 'M', ...points[0] }];
@@ -22,7 +23,8 @@ function spline_path(points: readonly Point[], tension = 1, closed = false): Pat
 }
 
 // Corner trimming is in final pixels, keeping the requested rounding stable on resize.
-function rounded_path(points: readonly Point[], radius: number): PathCommand[] {
+function rounded_path(values: readonly PointValue[], radius: number): PathCommand[] {
+  const points = values.map(value => read_point(value));
   nonnegative(radius, 'radius');
   if (!points.length) return [];
   const path: PathCommand[] = [{ kind: 'M', ...points[0] }];
@@ -41,7 +43,8 @@ function rounded_path(points: readonly Point[], radius: number): PathCommand[] {
 
 // Elliptic arcs use cubic pieces of at most a quarter turn. Angles are degrees
 // in drawing coordinates (positive clockwise); radii may carry a flipped axis.
-function arc_path(center: Point, radius: Point, start = 0, end = 360): PathCommand[] {
+function arc_path(center_value: PointValue, radius_value: PointValue, start = 0, end = 360): PathCommand[] {
+  const center = read_point(center_value, 'center'), radius = read_point(radius_value, 'radius');
   finite(start, 'start'); finite(end, 'end');
   if (Math.abs(end - start) > 360) throw new RangeError('An arc spans at most 360 degrees');
   const radians = Math.PI / 180;
@@ -62,9 +65,10 @@ function arc_path(center: Point, radius: Point, start = 0, end = 360): PathComma
 }
 
 // Evaluate a uniform spline on t in [0,1]. This helper owns a copy of its inputs.
-function spline2d(points: readonly Point[], tension = 1): (t: number) => Point {
+function spline2d(points: readonly PointValue[], tension = 1): (t: number) => Point {
   if (!points.length) throw new RangeError('spline2d needs at least one point');
-  const first = make_point(points[0].x, points[0].y);
+  const start = read_point(points[0]);
+  const first = make_point(start.x, start.y);
   const commands = spline_path(points, tension).filter(command => command.kind === 'C');
   return (t: number) => {
     finite(t, 't');

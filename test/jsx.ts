@@ -3,6 +3,33 @@ import { evaluate, LayoutPass, Text, element_children } from '../src/index';
 import { ErrorRuntime } from '../src/lib/errors';
 
 const tests: Record<string, () => void> = {
+  'dashed JSX attributes produce the same properties and layout as underscore attributes'() {
+    const pass = new LayoutPass();
+    const dashed = evaluate('<Text font-size={px(24)} font-weight={bold} line-height={em(1.5)} text-align="center">April-June</Text>');
+    const underscored = evaluate('<Text font_size={px(24)} font_weight={bold} line_height={em(1.5)} text_align="center">April-June</Text>');
+    assert.deepEqual(dashed.props, underscored.props);
+    assert.deepEqual(pass.layout(dashed), pass.layout(underscored));
+
+    // Mixed spellings name the same property; source order determines the value.
+    const lastUnderscore = evaluate('<Text font-size={px(12)} font_size={px(24)}>Label</Text>');
+    const lastDash = evaluate('<Text font_size={px(12)} font-size={px(24)}>Label</Text>');
+    assert.deepEqual(lastUnderscore.props, lastDash.props);
+    assert.deepEqual(lastDash.props.font_size, { unit: 'px', value: 24 });
+  },
+
+  'custom components receive underscore names for dashed string, expression, and boolean attributes'() {
+    const code = `
+      const Label = ({ label_text, label_font_size, show_label }) => (
+        <Text font_size={label_font_size}>{show_label ? label_text : ''}</Text>
+      );
+      return <Label label-text="April-June" label-font-size={px(18)} show-label />;
+    `;
+    const pass = new LayoutPass();
+    const result = pass.layout(evaluate(code));
+    const expected = pass.layout(evaluate('<Text font_size={px(18)}>April-June</Text>'));
+    assert.deepEqual(result, expected);
+  },
+
   'indented JSX labels have the same content and size as inline labels'() {
     const pass = new LayoutPass();
     const inline = pass.layout(evaluate('<Text>Revenue</Text>'));

@@ -4,8 +4,8 @@ import { draw_rect, draw_ellipse, draw_path } from './drawing';
 import { define_component, define_element, element_children } from './element';
 import type { ElementProps } from './element';
 import { make_fragment } from './fragment';
-import { make_size, make_point, make_rect } from './geometry';
-import type { Size } from './geometry';
+import { make_size, make_point, make_rect, read_point } from './geometry';
+import type { PointValue, Size } from './geometry';
 import { shape_size } from './layout';
 import type { LayoutQuery } from './pass';
 import { map_path } from './path';
@@ -15,12 +15,13 @@ import { px, resolve_length } from './units';
 import type { Length } from './units';
 
 type Position = Readonly<{ x: Length; y: Length }>;
-type Radius = Length | Position;
+type PositionValue = PointValue<Length>;
+type Radius = Length | PositionValue;
 type RectProps = ElementProps & Readonly<{ radius?: Radius }>;
-type CircleProps = ElementProps & Readonly<{ center?: Position; radius?: Length }>;
-type EllipseProps = ElementProps & Readonly<{ center?: Position; radius?: Position }>;
-type LineProps = ElementProps & Readonly<{ from?: Position; to?: Position }>;
-type PolylineProps = ElementProps & Readonly<{ points?: readonly Position[] }>;
+type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>;
+type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>;
+type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue }>;
+type PolylineProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>;
 type PolygonProps = PolylineProps;
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>;
 
@@ -34,7 +35,8 @@ function shape_context(props: ElementProps, query: LayoutQuery, aspect?: number)
   return { size, paint };
 }
 
-function resolve_position(point: Position, size: Size, query: LayoutQuery, path: string) {
+function resolve_position(value: PositionValue, size: Size, query: LayoutQuery, path: string) {
+  const point = read_point(value, `${query.path}.${path}`);
   const { font_size } = query.style;
   return make_point(
     resolve_length(point.x, { font_size, fraction: size.width }, `${query.path}.${path}.x`),
@@ -42,9 +44,14 @@ function resolve_position(point: Position, size: Size, query: LayoutQuery, path:
   );
 }
 
+// Unit records are scalar lengths; coordinate records and tuples are pairs.
+function is_position(value: Radius): value is PositionValue {
+  return value !== null && typeof value === 'object' && !('unit' in value);
+}
+
 // A scalar radius stays circular; a pair resolves against the corresponding axes.
 function resolve_radius(radius: Radius, size: Size, query: LayoutQuery) {
-  if (typeof radius === 'object' && 'x' in radius) {
+  if (is_position(radius)) {
     const point = resolve_position(radius, size, query, 'radius');
     nonnegative(point.x, 'radius.x'); nonnegative(point.y, 'radius.y');
     return point;
@@ -135,7 +142,7 @@ const Triangle = define_component<PolygonProps>('Triangle', props => new Polygon
   points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props,
 }));
 
-export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius,
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius, is_position,
   UnitLine, HLine, VLine, Dot, Triangle };
-export type { Position, Radius, RectProps, CircleProps, EllipseProps,
+export type { Position, PositionValue, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps };

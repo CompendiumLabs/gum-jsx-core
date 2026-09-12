@@ -1,8 +1,11 @@
 import './contracts';
 import './engine';
 import './jsx';
+import './math';
 import './text';
 import './shapes';
+import './points';
+import './arrows';
 import './box';
 import './flex';
 import './stack';

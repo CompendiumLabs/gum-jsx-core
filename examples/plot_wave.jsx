@@ -1,6 +1,6 @@
 // A sampled curve, uncertainty band, observations, and a measured legend.
-const wave = x => Math.sin(x) * Math.exp(-x / 9);
-const observations = linspace(0.4, 11.8, 15).map((x, i) => ({ x, y: wave(x) + 0.08 * Math.cos(i * 3) }));
+const wave = x => sin(x) * exp(-x / 9);
+const observations = linspace(0.4, 11.8, 15).map((x, i) => ({ x, y: wave(x) + 0.08 * cos(i * 3) }));
 return <Svg width={px(680)} height={px(420)}>
   <Plot title="A damped oscillation" xlabel="Time (s)" ylabel="Amplitude"
     xlim={[0, 12]} ylim={[-1.3, 1.3]} background="white"

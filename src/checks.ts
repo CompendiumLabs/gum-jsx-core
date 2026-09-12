@@ -15,4 +15,12 @@ function nonnegative(value: number, path: string): number {
   return value;
 }
 
-export { finite, nonnegative };
+// Bound generated data before allocating it, including products such as grids.
+function count_limit(value: number, path: string, max = 100000): number {
+  if (!Number.isInteger(value) || value < 0 || value > max) {
+    throw new RangeError(`${path} must be an integer from 0 to ${max}`);
+  }
+  return value;
+}
+
+export { finite, nonnegative, count_limit };

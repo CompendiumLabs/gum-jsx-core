@@ -2,7 +2,7 @@ import { finite } from './checks';
 import type { Element } from './element';
 import { place_fragment, transform_guides } from './fragment';
 import {
-  make_size, make_point, make_rect, make_insets, deflate_size, inflate_size, bounds_overflow,
+  make_size, make_point, make_rect, make_insets, deflate_size, inflate_size, bounds_overflow, read_point,
 } from './geometry';
 import type { Insets, Size } from './geometry';
 import { available, exact, make_request, deflate_request, finish_size } from './layout';
@@ -11,13 +11,19 @@ import type { LayoutQuery } from './pass';
 import type { ReferenceBox } from './units';
 
 type AlignmentValue = number | 'start' | 'center' | 'end' | 'stretch';
-type Alignment = AlignmentValue | Readonly<{ x?: AlignmentValue; y?: AlignmentValue }>;
+type Alignment = AlignmentValue | Readonly<{ x?: AlignmentValue; y?: AlignmentValue }>
+  | readonly [x: AlignmentValue, y: AlignmentValue];
 type ResolvedAlignment = Readonly<{ x: number | 'stretch'; y: number | 'stretch' }>;
 type FitMode = 'contain' | 'cover' | 'scale_down';
 
 // Alignment values are dimensionless: 0/start, 0.5/center, and 1/end.
 function resolve_alignment(align: Alignment = 'start', path = 'alignment'): ResolvedAlignment {
-  const axes = typeof align === 'object' ? align : { x: align, y: align };
+  const tuple = typeof align === 'object' && 'length' in align;
+  const axes = tuple ? read_point(align, path)
+    : typeof align === 'object' ? align : { x: align, y: align };
+  if (tuple && (axes.x === undefined || axes.y === undefined)) {
+    throw new TypeError(`${path} needs two alignment values`);
+  }
   function resolve(value: AlignmentValue = 'start'): number | 'stretch' {
     if (value === 'stretch') return value;
     const fraction = typeof value === 'number' ? value

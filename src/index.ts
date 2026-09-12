@@ -2,8 +2,13 @@ export { DEFAULTS } from './defaults';
 export {
   sans, mono, light, regular, bold,
   none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
-  e, pi, phi, r2d, d2r,
+  e, pi, tau, phi, r2d, d2r,
 } from './constants';
+export * from './math';
+export * from './arrays';
+export * from './vectors';
+export * from './random';
+export { interp, palette } from './colors';
 export {
   em, px, normalize_length, measure_length, resolve_length,
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
@@ -15,7 +20,7 @@ export {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
 } from './geometry';
-export type { Point, Size, Rect as PixelRect, Clip as ClipShape, Insets, InsetSpec } from './geometry';
+export type { Point, PointValue, Size, Rect as PixelRect, Clip as ClipShape, Insets, InsetSpec } from './geometry';
 export {
   natural, available, exact, make_request, deflate_request,
   resolve_sizing, prepare_request, finish_size, shape_size,
@@ -42,7 +47,7 @@ export { Svg } from './elems';
 export type { SvgProps } from './elems';
 export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
 export { UnitLine, HLine, VLine, Dot, Triangle } from './shapes';
-export type { Position, Radius, RectProps, CircleProps, EllipseProps,
+export type { Position, PositionValue, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps } from './shapes';
 export { Text, Span } from './text';
 export type { TextProps, SpanProps } from './text';
@@ -83,11 +88,11 @@ export type { PlotProps, BarPlotProps, LegendProps, LegendEntry, OuterLabelProps
 export { linear_ticks, format_tick } from './ticks';
 export { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './document';
 export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, BulletsProps, SlideProps } from './document';
-export { linspace, sample_curve, sample_points } from './sampling';
-export type { PointValue, ScalarFunction, SampleProps, Sample } from './sampling';
+export { sample_curve, sample_points } from './sampling';
+export type { ScalarFunction, SampleProps, Sample } from './sampling';
 export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './symbolic';
 export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
-  VectorSample, FieldProps, SymFieldProps } from './symbolic';
+  VectorSample, VectorSampleValue, FieldProps, SymFieldProps } from './symbolic';
 import { Axis as AxisElement } from './axis';
 import { Anchor as AnchorElement } from './placement';
 import type { Axis as LayoutAxis } from './layout';

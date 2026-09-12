@@ -21,6 +21,7 @@ const slate = '#1e252e';
 
 const e = Math.E;
 const pi = Math.PI;
+const tau = 2 * pi;
 const phi = (1 + Math.sqrt(5)) / 2;
 const r2d = 180 / Math.PI;
 const d2r = Math.PI / 180;
@@ -28,5 +29,5 @@ const d2r = Math.PI / 180;
 export {
   sans, mono, light, regular, bold,
   none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
-  e, pi, phi, r2d, d2r,
+  e, pi, tau, phi, r2d, d2r,
 };

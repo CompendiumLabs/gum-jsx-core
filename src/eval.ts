@@ -15,6 +15,11 @@ import { make_size, make_point, make_rect } from './geometry';
 import { make_fragment, place_fragment } from './fragment';
 import { draw_rect } from './drawing';
 import * as constants from './constants';
+import * as math from './math';
+import * as arrays from './arrays';
+import * as vectors from './vectors';
+import { interp, palette } from './colors';
+import { RNG } from './random';
 import { Graph } from './graph';
 import { Overlay, TransformBox, Rotate, Attach, Anchor } from './placement';
 import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './marks';
@@ -24,18 +29,21 @@ import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
 import { Plot, BarPlot, Legend, OuterLabel } from './plot';
 import { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './document';
 import { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './symbolic';
-import { linspace, sample_curve, sample_points } from './sampling';
+import { sample_curve, sample_points } from './sampling';
 import { linear_ticks, format_tick } from './ticks';
 import { spline1d, spline2d } from './curves';
 import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point } from './coordinates';
 
-type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string }>;
+type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>;
 
 // Evaluation constructs descriptions only. Component functions can return other elements.
 function evaluate(code: string, options: EvaluateOptions = {}): Element {
-  const { scope = {}, name = 'gum-next.jsx' } = options;
+  const { scope = {}, name = 'gum-next.jsx', seed } = options;
+  const rng = new RNG(seed);
   const bindings = {
-    ...constants,
+    ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG,
+    setSeed: (seed: number) => { rng.setSeed(seed); },
+    random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
     Svg, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
@@ -45,7 +53,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,
     TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
     SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
-    linspace, sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
+    sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
     em, px, define_element, define_component, element_children,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point,

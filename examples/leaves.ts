@@ -1,6 +1,7 @@
 import {
   define_element, em, px, resolve_length, make_size, make_rect,
   finish_size, bounds_overflow, make_fragment, draw_rect,
+  clamp, floor, ceil,
 } from '../src/index';
 import type { ElementProps, LayoutQuery, Length, Size } from '../src/index';
 
@@ -49,8 +50,8 @@ const Wrapping = define_element<LeafProps>('Wrapping', (props, query) => {
   const unit = resolve_length(em(1), { font_size: query.style.font_size });
   const { width } = query.request;
   const columns = width.kind === 'natural' || unit === 0 ? count
-    : Math.max(1, Math.min(count, Math.floor(width.value / unit)));
-  const rows = Math.ceil(count / columns);
+    : clamp(floor(width.value / unit), [1, count]);
+  const rows = ceil(count / columns);
   return paint_leaf(make_size(columns * unit, rows * unit), query);
 });
 

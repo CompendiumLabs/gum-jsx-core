@@ -2,10 +2,10 @@ import { finite } from './checks';
 import { drawing_ink, copy_drawing } from './drawing';
 import type { Drawing } from './drawing';
 import {
-  make_size, make_point, make_rect, make_clip, make_insets, make_transform,
+  make_size, make_point, make_rect, make_clip, make_insets, make_transform, read_point,
   union_rects, intersect_rects, transform_rect, bounds_overflow,
 } from './geometry';
-import type { Clip, Insets, Point, Rect, Size, Transform } from './geometry';
+import type { Clip, Insets, Point, PointValue, Rect, Size, Transform } from './geometry';
 
 // Named guides are vertical positions, including text baselines and a future math axis.
 type Guides = Readonly<Partial<Record<string, number>>>;
@@ -47,13 +47,14 @@ type FragmentSpec = Readonly<{
 
 // Placing a result preserves its identity and never asks for another measurement.
 function place_fragment(
-  fragment: Fragment, offset: Point = make_point(), transform?: Transform,
+  fragment: Fragment, offset: PointValue = make_point(), transform?: Transform,
 ): Placement {
   // Normalize external records once; results made here keep their shared identity.
   const owned = (fragment as Fragment & { [OWNED]?: true })[OWNED];
+  const point = read_point(offset, 'offset');
   return Object.freeze({
     fragment: owned ? fragment : make_fragment(fragment),
-    offset: make_point(offset.x, offset.y),
+    offset: make_point(point.x, point.y),
     ...(transform === undefined ? {} : { transform: make_transform(transform) }),
   });
 }

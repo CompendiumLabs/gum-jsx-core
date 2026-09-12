@@ -15,7 +15,7 @@ mkdirSync(output, { recursive: true });
 const names = ['rectangle', 'repeated', 'clipping', 'paragraph', 'typography', 'shapes', 'label',
   'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse',
   'stack', 'stack_hugging', 'stack_flex', 'stack_alignment',
-  'group', 'group_anchors', 'group_clip', 'graph_scatter', 'plot_wave', 'plot_bars', 'plot_field', 'plot_slide'];
+  'group', 'group_anchors', 'group_clip', 'graph_scatter', 'plot_wave', 'plot_bars', 'plot_field', 'plot_slide', 'math_helpers', 'arrow_caps'];
 const scenes: Scene[] = names.map(name => {
   const file = join(examples, `${name}.jsx`);
   return { name, element: evaluate(readFileSync(file, 'utf8'), { name: file }) };

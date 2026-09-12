@@ -1,6 +1,6 @@
 import { finite, nonnegative } from './checks';
-import { make_point, make_rect } from './geometry';
-import type { Point, Rect as PixelRect } from './geometry';
+import { make_point, make_rect, read_point } from './geometry';
+import type { Point, PointValue, Rect as PixelRect } from './geometry';
 import { copy_path, path_bounds } from './path';
 import type { PathCommand } from './path';
 import type { LineCap, LineJoin } from './style';
@@ -46,17 +46,19 @@ function copy_paint(paint: Paint): Paint {
 }
 
 // Drawing commands contain final geometry and paint; the renderer only serializes.
-function draw_rect(rect: PixelRect, paint: Paint, radius = make_point()): RectDraw {
+function draw_rect(rect: PixelRect, paint: Paint, radius: PointValue = make_point()): RectDraw {
   const { x, y, width, height } = rect;
-  const rx = Math.min(nonnegative(radius.x, 'radius.x'), width / 2);
-  const ry = Math.min(nonnegative(radius.y, 'radius.y'), height / 2);
+  const pair = read_point(radius, 'radius');
+  const rx = Math.min(nonnegative(pair.x, 'radius.x'), width / 2);
+  const ry = Math.min(nonnegative(pair.y, 'radius.y'), height / 2);
   return Object.freeze({
     kind: 'rect', rect: make_rect(x, y, width, height), radius: make_point(rx, ry),
     ...copy_paint(paint),
   });
 }
 
-function draw_ellipse(center: Point, radius: Point, paint: Paint): EllipseDraw {
+function draw_ellipse(center_value: PointValue, radius_value: PointValue, paint: Paint): EllipseDraw {
+  const center = read_point(center_value, 'center'), radius = read_point(radius_value, 'radius');
   nonnegative(radius.x, 'radius.x'); nonnegative(radius.y, 'radius.y');
   return Object.freeze({
     kind: 'ellipse', center: make_point(center.x, center.y),

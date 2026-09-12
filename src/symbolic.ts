@@ -21,8 +21,9 @@ type SymFillProps = Omit<FillProps, 'points' | 'boundary'> & Readonly<{
   ylim?: Limit; yvals?: readonly number[];
 }>;
 type VectorSample = Readonly<{ point: Point; vector: Point }>;
+type VectorSampleValue = Readonly<{ point: PointValue; vector: PointValue }>;
 type FieldProps = MarkProps & Readonly<{
-  vectors?: readonly VectorSample[]; scale?: number; normalize?: boolean;
+  vectors?: readonly VectorSampleValue[]; scale?: number; normalize?: boolean;
   head_size?: Length; head_width?: number;
   shape?: Element | ((sample: VectorSample, index: number) => Element); shape_height?: Length;
 }>;
@@ -95,7 +96,8 @@ const Field = define_element<FieldData, FieldProps>('Field', (props, query) => {
       const factor = scale / (normalize ? norm : 1);
       const to = finite_point({ x: from.x + vector.x * factor, y: from.y + vector.y * factor });
       if (!to) return [];
-      return [{ from, to, shape: typeof shape === 'function' ? shape(sample, index) : shape }];
+      return [{ from, to, shape: typeof shape === 'function'
+        ? shape(Object.freeze({ point: from, vector }), index) : shape }];
     }) };
   },
   data_bounds: props => mark_bounds(props, props.vectors.flatMap(vector => [vector.from, vector.to])),
@@ -120,4 +122,4 @@ const SymField = define_component<SymFieldProps>('SymField', ({ f, xlim = [-1, 1
 
 export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField };
 export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
-  VectorSample, FieldProps, SymFieldProps };
+  VectorSample, VectorSampleValue, FieldProps, SymFieldProps };

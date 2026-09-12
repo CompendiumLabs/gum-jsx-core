@@ -1,10 +1,10 @@
-import { finite } from './checks';
+import { count_limit } from './checks';
+import { linspace } from './arrays';
 import { copy_limit } from './coordinates';
 import type { Limit } from './coordinates';
-import { make_point } from './geometry';
-import type { Point } from './geometry';
+import { make_point, read_point } from './geometry';
+import type { Point, PointValue } from './geometry';
 
-type PointValue = Point | readonly [number, number];
 type ScalarFunction = number | ((value: number) => number);
 type SampleProps = Readonly<{
   f?: (value: number) => PointValue | null;
@@ -16,24 +16,12 @@ type SampleProps = Readonly<{
 type Sample = Readonly<{ t: number; point: Point | null }>;
 
 function sample_count(count: number, max = 100000): number {
-  if (!Number.isInteger(count) || count < 0 || count > max) {
-    throw new RangeError(`samples must be an integer from 0 to ${max}`);
-  }
-  return count;
-}
-
-function linspace(start: number, end: number, count = 101): readonly number[] {
-  finite(start, 'start'); finite(end, 'end'); sample_count(count);
-  return Object.freeze(Array.from({ length: count }, (_, i) => count < 2 ? start
-    : i === count - 1 ? end : start + (end - start) * i / (count - 1)));
+  return count_limit(count, 'samples', max);
 }
 
 function finite_point(value: PointValue | null): Point | null {
   if (value === null) return null;
-  if (typeof value !== 'object' || (Array.isArray(value) && value.length !== 2)) {
-    throw new TypeError('A sample must be {x,y}, [x,y], or null');
-  }
-  const x = 'x' in value ? value.x : value[0], y = 'y' in value ? value.y : value[1];
+  const { x, y } = read_point(value, 'sample');
   return Number.isFinite(x) && Number.isFinite(y) ? make_point(x, y) : null;
 }
 

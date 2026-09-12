@@ -1,8 +1,8 @@
 import { finite, nonnegative } from './checks';
 import { Element, element_children } from './element';
 import type { Child } from './element';
-import { make_point } from './geometry';
-import type { Point, Size } from './geometry';
+import { make_point, read_point } from './geometry';
+import type { Point, PointValue, Size } from './geometry';
 import { resolve_length } from './units';
 import type { Length } from './units';
 
@@ -35,10 +35,12 @@ function copy_coordinates(coord: Coordinates): Coordinates {
 
 // Missing and nonfinite samples never contaminate limits. Singleton data gets a
 // useful finite interval; an explicitly degenerate limit is instead a mistake.
-function point_bounds(points: readonly (Point | null)[]): DataBounds | null {
+function point_bounds(points: readonly (PointValue | null)[]): DataBounds | null {
   let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
-  for (const point of points) {
-    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+  for (const value of points) {
+    if (value === null) continue;
+    const point = read_point(value);
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
     xmin = Math.min(xmin, point.x); xmax = Math.max(xmax, point.x);
     ymin = Math.min(ymin, point.y); ymax = Math.max(ymax, point.y);
   }
@@ -96,12 +98,14 @@ function map_axis(value: number, limit: Limit, extent: number, flip = false): nu
   return (flip ? 1 - fraction : fraction) * extent;
 }
 
-function map_point(point: Point, coord: Coordinates, size: Size): Point {
+function map_point(value: PointValue, coord: Coordinates, size: Size): Point {
+  const point = read_point(value);
   return make_point(map_axis(point.x, coord.xlim, size.width, coord.flip_x),
     map_axis(point.y, coord.ylim, size.height, coord.flip_y));
 }
 
-function unmap_point(point: Point, coord: Coordinates, size: Size): Point {
+function unmap_point(value: PointValue, coord: Coordinates, size: Size): Point {
+  const point = read_point(value);
   if (!size.width || !size.height) throw new RangeError('Cannot invert a zero-sized coordinate frame');
   const x = point.x / size.width, y = point.y / size.height;
   return make_point(coord.xlim[0] + (coord.flip_x ? 1 - x : x) * (coord.xlim[1] - coord.xlim[0]),
