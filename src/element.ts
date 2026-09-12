@@ -76,11 +76,14 @@ function define_component<Input extends ElementProps>(name: string, build: (prop
 }
 
 // JSX fragments and conditional children flatten without acquiring layout policy.
+// Inline JSX spaces survive parsing for Text/Span; element-only containers ignore
+// blank strings along with null and boolean children. Nonbreaking spaces are text.
 function element_children(child: Child = []): readonly Element[] {
   const items: readonly Child[] = Array.isArray(child) ? child : [child];
   const result: Element[] = [];
   for (const item of items) {
     if (item === null || item === undefined || typeof item === 'boolean') continue;
+    if (typeof item === 'string' && /^[ \t\r\n]*$/.test(item)) continue;
     if (Array.isArray(item)) result.push(...element_children(item));
     else if (item instanceof Element) result.push(item);
     else throw new TypeError('Expected an element child');

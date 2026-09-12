@@ -436,7 +436,9 @@ The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
 12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
 and Svg hugs the row's height. See [stack.jsx](./examples/stack.jsx) for two such
 rows nested inside columns and a Box, at two viewport widths. For plain JSX text,
-use a single line or `text={...}` when source newlines should not become line breaks.
+outer blank lines and common indentation are removed automatically. Internal
+text newlines still become line breaks; keep each paragraph on one content line
+or use `text={...}` when source formatting should not introduce breaks.
 
 Without dimensions or flex weights, stacks hug natural content. This 52×32 row
 needs one query per element, including Svg:
@@ -594,9 +596,7 @@ the optional common-height figure policy remain later work.
 ```jsx
 <Svg width={px(360)} height={px(200)} font_size={px(18)} color="#203746">
   <Text width={px(320)} line_height={em(1.4)}>
-    {'A paragraph with '}
-    <Span font_weight={bold}>bold words</Span>
-    {' and '}<Span font_style="italic">italic words.</Span>
+    A paragraph with <Span font_weight={bold}>bold words</Span> and <Span font_style="italic">italic words.</Span>
   </Text>
 </Svg>
 ```
@@ -626,8 +626,25 @@ An inherited `line_height={px(20)}` remains 20px even in a larger span.
 Newlines include CRLF/CR and Unicode line/paragraph separators. A trailing newline
 adds a blank line; empty normal text is 0×0. Nonbreaking spaces remain nonbreaking;
 zero-width spaces permit a break without painting a glyph. JSX formatting-only
-whitespace is removed by the parser; use explicit string expressions when spaces
-or newlines matter. Automatic hyphenation, emergency word splitting, full paragraph
+multiline children are removed by the parser. Other literal JSX text loses outer
+blank lines and common indentation across the element's children, while internal
+breaks and same-line spaces around spans survive. Thus `<Text>Revenue</Text>`
+and the following have the same content and size:
+
+```jsx
+<Text>
+  Revenue
+</Text>
+```
+
+JavaScript strings in expressions and attribute values bypass JSX cleanup.
+For exact spaces or blank lines, use an explicit string with `whitespace="pre"`,
+such as `<Text whitespace="pre">{'  Revenue  \n'}</Text>`. The whitespace prop
+controls layout after parsing; it does not disable source normalization. Element
+containers and text stacks ignore blank strings between children. See the
+[JSX reference](../gum-next-docs/docs/text/JSX.md#jsx-whitespace) for more examples.
+
+Automatic hyphenation, emergency word splitting, full paragraph
 bidi, fallback font chains, and color emoji are outside this stage's coverage.
 Unknown families and missing glyphs produce errors instead of silent substitution.
 

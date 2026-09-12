@@ -50,8 +50,44 @@ type Piece = {
     text: string
 }
 
-function isWhitespace(s: any): boolean {
-    return (typeof s === 'string') && (s.replace(/\s/g, '') === '')
+// Find a shared indentation across the child list, including lines beginning
+// with an element/expression. Nested elements normalize their own text. Only
+// ASCII spaces/tabs are indentation: nonbreaking spaces are content.
+function jsxIndent(children: ASTNode[]): string {
+    let indent: string | undefined
+    for (const [index, child] of children.entries()) {
+        if (child.type != 'JSXText') continue
+        const lines: string[] = child.value.split(/\r\n?|\n/)
+        for (let i = 1; i < lines.length; i++) {
+            const beforeChild = i == lines.length - 1 && index < children.length - 1
+            if (/^[ \t]*$/.test(lines[i]) && !beforeChild) continue
+            const prefix = lines[i].match(/^[ \t]*/)![0]
+            if (indent == null) indent = prefix
+            else {
+                let length = 0
+                while (length < indent.length && indent[length] == prefix[length]) length++
+                indent = indent.slice(0, length)
+            }
+        }
+    }
+    return indent ?? ''
+}
+
+// Trim blank lines at the outside of the child list, keeping breaks inside text
+// even beside spans. Wholly blank multiline nodes just separate source tags.
+// The first source line begins beside a tag/expression; its spaces (and trailing
+// spaces on every line) can separate inline words, so never trim each node.
+function normalizeJSXText(value: string, indent: string, first: boolean, last: boolean): string {
+    const lines = value.split(/\r\n?|\n/)
+    if (lines.length == 1) return value
+    const blank = (line: string) => /^[ \t]*$/.test(line)
+    if (lines.every(blank)) return ''
+    let start = 0, end = lines.length
+    while (first && start < end && blank(lines[start])) start++
+    while (last && end > start && blank(lines[end - 1])) end--
+    return lines.slice(start, end).map((line, index) =>
+        start + index > 0 ? line.slice(indent.length) : line,
+    ).join('\n')
 }
 
 function isJSX(node: ASTNode | null): boolean {
@@ -117,10 +153,12 @@ function emitAttribute(code: string, attr: ASTNode): string {
 }
 
 // a jsx child as an argument, or null for one that is dropped (whitespace, comments)
-function emitChild(code: string, child: ASTNode): string | null {
+function emitChild(code: string, child: ASTNode, indent: string, first: boolean, last: boolean): string | null {
     switch (child.type) {
-        case 'JSXText':
-            return isWhitespace(child.value) ? null : JSON.stringify(child.value)
+        case 'JSXText': {
+            const text = normalizeJSXText(child.value, indent, first, last)
+            return text.length == 0 ? null : JSON.stringify(text)
+        }
         case 'JSXExpressionContainer':
             if (child.expression.type == 'JSXEmptyExpression') return null
             return transformNode(code, child.expression)
@@ -147,9 +185,14 @@ function layout(code: string, pieces: Piece[], from: number, to: number, join: s
 }
 
 function childPieces(code: string, children: ASTNode[]): Piece[] {
+    children = children.filter(child => !(child.type == 'JSXExpressionContainer'
+        && child.expression.type == 'JSXEmptyExpression'))
+    const content = children.filter(child => child.type != 'JSXText' || !/^[ \t\r\n]*$/.test(child.value))
+    const first = content[0], last = content.at(-1)
+    const indent = jsxIndent(children)
     const pieces: Piece[] = []
     for (const child of children) {
-        const text = emitChild(code, child)
+        const text = emitChild(code, child, indent, child == first, child == last)
         if (text != null) pieces.push({ start: child.start, end: child.end, text })
     }
     return pieces
@@ -194,8 +237,8 @@ function isClass(func: any): boolean {
 }
 
 function filterChildren(items: any[]): any[] {
-    // Formatting-only JSXText is discarded by emitChild. Explicit string
-    // expressions must survive, including spaces and blank literal lines.
+    // Multiline formatting-only JSXText is discarded by emitChild. Inline
+    // spaces and explicit strings must survive for text and inline spans.
     return items.flat(Infinity)
         .filter(item => (item != null) && (item !== false) && (item !== true))
 }

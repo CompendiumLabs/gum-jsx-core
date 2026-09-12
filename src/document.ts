@@ -40,6 +40,7 @@ function text_element(value: Child, style: StyleSpec = {}): Element {
 function text_children(value: Child = []): readonly Element[] {
   const values: readonly Child[] = Array.isArray(value) ? value : [value];
   return values.flatMap(item => item == null || typeof item === 'boolean' ? []
+    : typeof item === 'string' && /^[ \t\r\n]*$/.test(item) ? []
     : Array.isArray(item) ? text_children(item) : [text_element(item)]);
 }
 
@@ -81,7 +82,7 @@ const TitleFrame = define_element<BoxProps, TitleBoxProps>('TitleFrame', box_lay
 const Bullets = define_element<StackProps, BulletsProps>('Bullets', (p, q) => stack_layout(p, q, 'height'),
   { gap: em(0.5), align: 'stretch' }, {
     normalize: ({ items, marker = '•', indent = em(1.2), children, ...props }) => ({ ...props,
-      children: (items ?? (Array.isArray(children) ? children : [children])).map(item => new HStack({
+      children: (items ?? text_children(children)).map(item => new HStack({
         align: 'baseline', children: [new Text({ text: marker, width: indent }),
           new Box({ grow: 1, shrink: 1, basis: px(0), children: text_element(item) })],
       })),
