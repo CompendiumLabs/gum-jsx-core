@@ -24,7 +24,9 @@ function render_drawing(draw: Drawing): string {
     stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw;
   const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`
     + ` stroke-width="${stroke_width}" stroke-linecap="${stroke_linecap}"`
-    + ` stroke-linejoin="${stroke_linejoin}" stroke-miterlimit="${stroke_miterlimit}"`;
+    + ` stroke-linejoin="${stroke_linejoin}" stroke-miterlimit="${stroke_miterlimit}"`
+    + (draw.stroke_dasharray?.some(value => value > 0) ? ` stroke-dasharray="${draw.stroke_dasharray.join(' ')}"` : '')
+    + (draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : '');
   switch (draw.kind) {
     case 'rect': {
       const { radius } = draw;

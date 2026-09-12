@@ -21,6 +21,8 @@ type StyleSpec = Readonly<{
   stroke_linecap?: LineCap;
   stroke_linejoin?: LineJoin;
   stroke_miterlimit?: number;
+  stroke_dasharray?: readonly Length[];
+  opacity?: number;
 }>;
 type Style = Readonly<{
   font_size: number;
@@ -35,6 +37,8 @@ type Style = Readonly<{
   stroke_linecap: LineCap;
   stroke_linejoin: LineJoin;
   stroke_miterlimit: number;
+  stroke_dasharray: readonly NormalizedLength[];
+  opacity: number;
 }>;
 
 const DEFAULT_STYLE: Style = Object.freeze({
@@ -50,6 +54,7 @@ const DEFAULT_STYLE: Style = Object.freeze({
   stroke_linecap: 'butt',
   stroke_linejoin: 'miter',
   stroke_miterlimit: DEFAULTS.stroke_miterlimit,
+  stroke_dasharray: Object.freeze([]), opacity: 1,
 });
 
 // Resolve inherited font size before sizing. Paint lengths await shape geometry.
@@ -73,12 +78,20 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = '
   }
   nonnegative(line_height.value, `${path}.line_height`);
   const stroke_width = normalize_length(spec.stroke_width ?? inherited.stroke_width);
+  const opacity = finite(spec.opacity ?? inherited.opacity, 'opacity');
+  if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1');
+  const stroke_dasharray = Object.freeze((spec.stroke_dasharray ?? inherited.stroke_dasharray).map(value => {
+    const length = normalize_length(value);
+    nonnegative(length.value, 'stroke_dasharray');
+    return length;
+  }));
   return Object.freeze({
     font_size, font_family, font_weight, font_style, line_height, color,
     fill, stroke, stroke_width,
     stroke_linecap: spec.stroke_linecap ?? inherited.stroke_linecap,
     stroke_linejoin: spec.stroke_linejoin ?? inherited.stroke_linejoin,
     stroke_miterlimit: spec.stroke_miterlimit ?? inherited.stroke_miterlimit,
+    stroke_dasharray, opacity,
   });
 }
 
@@ -89,7 +102,9 @@ function resolve_paint(style: Style, size: Size, path: string): Paint {
   const stroke_width = nonnegative(resolve_length(
     style.stroke_width, basis, `${path}.stroke_width`,
   ), 'stroke_width');
-  return { fill, stroke, stroke_width, stroke_linecap, stroke_linejoin, stroke_miterlimit };
+  const stroke_dasharray = style.stroke_dasharray.map(value => resolve_length(value, basis, 'stroke_dasharray'));
+  return { fill, stroke, stroke_width, stroke_linecap, stroke_linejoin, stroke_miterlimit,
+    stroke_dasharray, opacity: style.opacity };
 }
 
 export { resolve_style, resolve_paint };

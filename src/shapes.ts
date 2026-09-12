@@ -1,7 +1,7 @@
 import { nonnegative } from './checks';
 import { DEFAULTS } from './defaults';
 import { draw_rect, draw_ellipse, draw_path } from './drawing';
-import { define_element, element_children } from './element';
+import { define_component, define_element, element_children } from './element';
 import type { ElementProps } from './element';
 import { make_fragment } from './fragment';
 import { make_size, make_point, make_rect } from './geometry';
@@ -11,7 +11,7 @@ import type { LayoutQuery } from './pass';
 import { map_path } from './path';
 import type { PathCommand, PathSegment } from './path';
 import { resolve_paint } from './style';
-import { resolve_length } from './units';
+import { px, resolve_length } from './units';
 import type { Length } from './units';
 
 type Position = Readonly<{ x: Length; y: Length }>;
@@ -119,6 +119,23 @@ const Path = define_element<PathProps>('Path', (props, query) => {
   return make_fragment({ size, draw: [draw_path(commands, paint)] });
 });
 
-export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius };
+const UnitLine = define_component<LineProps>('UnitLine', props => new Line({
+  from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props,
+}));
+const HLine = define_component<LineProps>('HLine', props => new Line({
+  from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props,
+}));
+const VLine = define_component<LineProps>('VLine', props => new Line({
+  from: { x: 0.5, y: 0 }, to: { x: 0.5, y: 1 }, ...props,
+}));
+const Dot = define_component<CircleProps>('Dot', props => new Circle({
+  width: px(6), height: px(6), fill: 'black', stroke: 'none', ...props,
+}));
+const Triangle = define_component<PolygonProps>('Triangle', props => new Polygon({
+  points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props,
+}));
+
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius,
+  UnitLine, HLine, VLine, Dot, Triangle };
 export type { Position, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps };

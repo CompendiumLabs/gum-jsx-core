@@ -1,4 +1,4 @@
-import { nonnegative } from './checks';
+import { finite, nonnegative } from './checks';
 import { make_point, make_rect } from './geometry';
 import type { Point, Rect as PixelRect } from './geometry';
 import { copy_path, path_bounds } from './path';
@@ -12,6 +12,8 @@ type Paint = Readonly<{
   stroke_linecap?: LineCap;
   stroke_linejoin?: LineJoin;
   stroke_miterlimit?: number;
+  stroke_dasharray?: readonly number[];
+  opacity?: number;
 }>;
 type RectDraw = Readonly<{ kind: 'rect'; rect: PixelRect; radius?: Point } & Paint>;
 type EllipseDraw = Readonly<{ kind: 'ellipse'; center: Point; radius: Point } & Paint>;
@@ -23,7 +25,7 @@ type Drawing = RectDraw | EllipseDraw | PathDraw;
 // Own paint records at the drawing boundary, including optional SVG stroke policy.
 function copy_paint(paint: Paint): Paint {
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
-    stroke_linejoin = 'miter', stroke_miterlimit = 4 } = paint;
+    stroke_linejoin = 'miter', stroke_miterlimit = 4, opacity = 1 } = paint;
   nonnegative(stroke_width, 'stroke_width');
   nonnegative(stroke_miterlimit, 'stroke_miterlimit');
   if (stroke_miterlimit < 1) throw new RangeError('stroke_miterlimit must be at least 1');
@@ -34,8 +36,12 @@ function copy_paint(paint: Paint): Paint {
   if (typeof fill !== 'string' || typeof stroke !== 'string') {
     throw new TypeError('Drawing paints must be strings');
   }
+  finite(opacity, 'opacity');
+  if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1');
+  const stroke_dasharray = Object.freeze((paint.stroke_dasharray ?? []).map(value => nonnegative(value, 'stroke_dasharray')));
   return Object.freeze({
     fill, stroke, stroke_width, stroke_linecap, stroke_linejoin, stroke_miterlimit,
+    stroke_dasharray, opacity,
   });
 }
 
@@ -82,6 +88,7 @@ function copy_drawing(draw: Drawing): Drawing {
 // Strokes straddle geometry. Curves use conservative bounds, enlarged for caps
 // and miter joins. Zero-area rects/ellipses paint nothing; a stroked line can.
 function drawing_ink(draw: Drawing): PixelRect | null {
+  if (draw.opacity === 0) return null;
   let bounds: PixelRect | null;
   switch (draw.kind) {
     case 'rect': bounds = draw.rect; break;

@@ -1,4 +1,4 @@
-# Stages 1–6(a) gallery
+# Core and plotting gallery
 
 Run `bun run gallery` from `gum-next-core` to regenerate the files in `rendered/`.
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
@@ -10,6 +10,29 @@ text neutral where needed for readability.
 
 The rendering commands below run from the workspace root using
 [gum-next-cli](../../gum-next-cli/README.md).
+
+The plotting slice adds data coordinates, measured axes and labels, and sampled
+geometry. The [overview](../../docs/PLOTTING.md) explains API choices and limits.
+
+| Example | What to inspect |
+|---|---|
+| [plot_wave.jsx](plot_wave.jsx) | A sampled line, uncertainty band, observations, and legend; also rendered at 420px wide. |
+| [plot_bars.jsx](plot_bars.jsx) | Categorical ticks, negative values, data-space widths, and functional styles. |
+| [graph_scatter.jsx](graph_scatter.jsx) | Reversed x limits, upright text, custom marker shapes, and independent axis parts. |
+| [plot_field.jsx](plot_field.jsx) | Vectors mapped through unequal axis scales, fixed-pixel arrowheads, and a parametric trajectory. |
+| [plot_slide.jsx](plot_slide.jsx) | A measured slide title, plot, and caption using ordinary text composition. |
+
+![Curve, band, points, and measured legend](rendered/plot_wave.png)
+![The same plot at a narrower width](rendered/plot_wave_narrow.png)
+![Negative categorical bars](rendered/plot_bars.png)
+![A vector field and trajectory](rendered/plot_field.png)
+![A slide containing a plot](rendered/plot_slide.png)
+
+Compare the [wide](rendered/plot_wave.tree) and [narrow](rendered/plot_wave_narrow.tree)
+trees: data geometry and the measured content rectangle change while 12px labels,
+7px observations, and 2.5px strokes keep their sizes. Source callbacks execute
+only during construction. The regression suite also checks resizing one source
+in the same pass without resampling or reshaping prepared labels.
 
 Stage 6(a) adds positioned Group canvases, using ordinary elements as children:
 

@@ -6,3 +6,6 @@ import './box';
 import './flex';
 import './stack';
 import './group';
+import './plot';
+import './sampling';
+import './plot_geometry';

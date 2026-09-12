@@ -37,10 +37,10 @@ type FitProps = ElementProps & Readonly<{
 // Clip a twice-wide stroke to the frame: exactly one border width remains
 // inside, even when corners are rounded or the border fills the entire box.
 // The clipped-away half is drawing construction, not layout overflow.
-function frame_border(size: Size, width: number, color: string, radius: Point): Fragment {
+function frame_border(size: Size, width: number, color: string, radius: Point, opacity = 1): Fragment {
   const rect = make_rect(0, 0, size.width, size.height);
-  const draw = draw_rect(rect, { fill: 'none', stroke: color, stroke_width: 2 * width }, radius);
-  return make_fragment({ name: 'Border', size, draw: [draw], ink: rect,
+  const draw = draw_rect(rect, { fill: 'none', stroke: color, stroke_width: 2 * width, opacity }, radius);
+  return make_fragment({ name: 'Border', size, draw: [draw], ink: opacity ? rect : null,
     clip: make_clip(rect, radius) });
 }
 
@@ -70,7 +70,7 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
   const radius = resolve_radius(props.radius ?? 0, size, query);
   const corners = make_clip(rect, radius).radius!;
   const draw = background === 'none' ? [] : [draw_rect(rect,
-    { fill: background, stroke: 'none', stroke_width: 0 }, corners)];
+    { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity }, corners)];
   const children = placement ? [placement] : [];
 
   // Overflow clipping applies inside the border, including the padding area.
@@ -85,7 +85,7 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
     children.splice(0, 1, place_fragment(clipped));
   }
   if (border_width > 0 && border_color !== 'none') {
-    children.push(place_fragment(frame_border(size, border_width, border_color, corners)));
+    children.push(place_fragment(frame_border(size, border_width, border_color, corners, query.style.opacity)));
   }
   return make_fragment({ size, content, guides, overflow, draw, children });
 }
@@ -124,5 +124,5 @@ const Fit = define_element<FitProps>('Fit', (props, query) => {
   });
 });
 
-export { Box, Frame, Fit };
+export { Box, Frame, Fit, box_layout };
 export type { BoxProps, FitProps };

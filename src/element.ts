@@ -4,6 +4,7 @@ import type { PositionSpec } from './group';
 import type { SizeSpec } from './layout';
 import type { LayoutQuery } from './pass';
 import type { StyleSpec } from './style';
+import type { DataBounds } from './coordinates';
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[];
 type ElementProps = SizeSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{ children?: Child }>;
@@ -11,6 +12,12 @@ type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragm
 type ElementType = Readonly<{
   name: string;
   layout: (element: Element, query: LayoutQuery) => Fragment;
+  // Graph containers inspect source geometry without measuring or cloning it.
+  data_bounds?: (element: Element) => DataBounds | null;
+}>;
+type ElementOptions<Props, Input> = Readonly<{
+  normalize?: (props: Input) => Props;
+  data_bounds?: (props: Readonly<Props>) => DataBounds | null;
 }>;
 
 // Snapshot source data while preserving immutable element identities in the DAG.
@@ -36,17 +43,34 @@ function copy_data<T>(value: T, active = new Set<object>()): T {
 
 // Snapshot optional defaults once; each instance overrides them with its own data.
 // Construction never measures and leaves parent-readable metadata in source props.
-function define_element<Props extends ElementProps = ElementProps>(
+function define_element<Props extends ElementProps = ElementProps, Input extends ElementProps = Props>(
   name: string, layout: LayoutMethod<Props>, defaults: Partial<Props> = {},
+  options: ElementOptions<Props, Input> = {},
 ) {
   const preset = copy_data(defaults);
   const type: ElementType = Object.freeze({
     name,
     layout: (element, query) => layout(element.props as Readonly<Props>, query),
+    ...(options.data_bounds ? {
+      data_bounds: (element: Element) => options.data_bounds!(element.props as Readonly<Props>),
+    } : {}),
   });
   return class extends Element<Props> {
-    constructor(props: Props = {} as Props) {
-      super(type, { ...preset, ...props });
+    constructor(props: Input = {} as Input) {
+      // Sampling and component expansion happen once, before immutable ownership.
+      // No callbacks or mutable external state survive in the source description.
+      super(type, { ...preset, ...(options.normalize ? options.normalize(props) : props) } as Props);
+    }
+  };
+}
+
+// A named construction-time component adopts an existing element's protocol and
+// immutable description. It introduces neither a layout wrapper nor callbacks.
+function define_component<Input extends ElementProps>(name: string, build: (props: Input) => Element) {
+  return class extends Element {
+    constructor(props: Input = {} as Input) {
+      const source = build(props);
+      super({ ...source.type, name }, source.props);
     }
   };
 }
@@ -83,5 +107,5 @@ class Element<Props extends ElementProps = ElementProps> {
   }
 }
 
-export { Element, define_element, element_children, content_child, copy_data };
-export type { Child, ElementProps, ElementType, LayoutMethod };
+export { Element, define_element, define_component, element_children, content_child, copy_data };
+export type { Child, ElementProps, ElementType, LayoutMethod, ElementOptions };

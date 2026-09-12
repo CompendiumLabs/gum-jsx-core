@@ -15,7 +15,7 @@ mkdirSync(output, { recursive: true });
 const names = ['rectangle', 'repeated', 'clipping', 'paragraph', 'typography', 'shapes', 'label',
   'hugging', 'card', 'nesting', 'box_clip', 'fitting', 'fill_rect', 'fill_ellipse',
   'stack', 'stack_hugging', 'stack_flex', 'stack_alignment',
-  'group', 'group_anchors', 'group_clip'];
+  'group', 'group_anchors', 'group_clip', 'graph_scatter', 'plot_wave', 'plot_bars', 'plot_field', 'plot_slide'];
 const scenes: Scene[] = names.map(name => {
   const file = join(examples, `${name}.jsx`);
   return { name, element: evaluate(readFileSync(file, 'utf8'), { name: file }) };
@@ -28,6 +28,8 @@ const stack = scenes.find(scene => scene.name === 'stack')!;
 scenes.push({ ...stack, name: 'stack_narrow', request: make_request({ width: exact(360) }) });
 const group = scenes.find(scene => scene.name === 'group')!;
 scenes.push({ ...group, name: 'group_narrow', request: make_request({ width: exact(400) }) });
+const plot = scenes.find(scene => scene.name === 'plot_wave')!;
+scenes.push({ ...plot, name: 'plot_wave_narrow', request: make_request({ width: exact(420) }) });
 
 for (const { name, element, request } of scenes) {
   const pass = new LayoutPass();

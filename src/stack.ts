@@ -184,5 +184,5 @@ const Spacer = define_element<ElementProps>('Spacer', (props, query) => {
   return make_fragment({ size: finish_size(make_size(), query.request, query.sizing) });
 }, { basis: 0, grow: 1 });
 
-export { HStack, VStack, Spacer };
+export { HStack, VStack, Spacer, stack_layout };
 export type { StackProps, StackAlign, StackJustify };

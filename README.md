@@ -2,7 +2,9 @@
 
 Stages 1–5 are implemented: units and sizing, immutable descriptions and fragments,
 layout passes, JSX, SVG rendering, measured text, shapes, Box composition, and stacks.
-Stage 6(a) adds positioned Group canvases; wrapping stacks are next in 6(b).
+Stage 6(a) adds positioned Group canvases. The next slice implements basic
+plotting and its composition, geometry, and text dependencies; wrapping rows
+and grids remain deferred. See the [plotting overview](../docs/PLOTTING.md).
 
 This README describes the implemented API; [contributor notes](#contributor-notes)
 cover how to work on it.
@@ -739,6 +741,67 @@ Zero-area rectangles/ellipses paint nothing; a zero-length round-capped line can
 paint a dot. Pixel strokes remain fixed when the layout box changes. An explicit
 placement transform still scales the completed drawing, including its strokes.
 
+## Graphs and plotting
+
+```jsx
+<Svg width={px(640)} height={px(400)}>
+  <Plot title="A sampled curve" xlabel="x" ylabel="sin(x)"
+    xlim={[0, 2 * pi]} ylim={[-1.2, 1.2]} background="white">
+    <SymLine fy={Math.sin} xlim={[0, 2 * pi]}
+      stroke={blue} stroke_width={px(2)} />
+  </Plot>
+</Svg>
+```
+
+Graph infers linear data limits from graphable children. Plot adds axes, a grid,
+measured margins, titles, and an optional legend. Both accept xlim/ylim or
+coord=[xmin,ymin,xmax,ymax], independent flips, and data-range padding. Directed
+limits can reverse either axis; explicit limits remain exact. Empty data uses
+[0,1]; constant data expands to a finite span. Both fill finite offers, naturally
+measure 480×320, and derive a missing axis from a 1.5 default aspect.
+
+New marks interpret numeric geometry as data inside Graph/Plot and as fractions
+outside. `space="local"` opts out; `space="data"` requires a graph. Existing
+Line/Polyline/Path retain local geometry; use CoordLine for a graph path. px/em
+positions stay local. Graph directly positions annotations by data x/y and
+ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
+
+| Capability | Elements / reference |
+|---|---|
+| Curves, points, fills, arrows | CoordLine, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
+| Plot composition | [Plot](../gum-next-docs/docs/text/Plot.md), Graph, Legend, OuterLabel |
+| Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
+| Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
+| Sampling | [Sampling](../gum-next-docs/docs/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
+| Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
+| Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
+
+Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
+[value,label] pairs. Plot accepts nested axis/tick/label/grid/title style objects,
+and per-axis option objects. It reserves space from measured axis overflow and
+title sizes. Data clips by default; axes and labels remain outside that clip.
+Standalone axes/meshes require their own lim for tick generation.
+
+Sampling, marker-shape/size functions, bar styles, and tick formatters run once
+at construction and produce immutable descriptions. Resizing reuses samples and
+prepared glyph measurements. Null/nonfinite samples create path gaps. Use fy for
+y=f(x), fx for x=f(y), f(t) for parametric points, or explicit arrays. samples
+defaults to 101. SymFill takes upper/lower functions or constants; SymField
+samples a grid and maps vector directions before drawing fixed-size heads.
+
+The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
+and [coordinate helpers](../gum-next-docs/docs/text/Coordinates.md) can also be
+used directly. New source normalization is available through define_element's
+fourth options argument; define_component adopts another element's source
+description without a layout wrapper. Neither stores callbacks in source data.
+
+This is a basic linear plotting API. Log/date scales, label collision avoidance,
+adaptive sampling, grouped/stacked bar automation, advanced arrowheads, and
+arbitrary prefixed styles remain deferred. Splines can overshoot samples; a
+sampler cannot identify discontinuities between two finite samples. See the
+[overview](../docs/PLOTTING.md) and [gallery](examples/README.md) for decisions,
+examples, and current limits.
+
 ## Rendering and inspection
 
 `render_svg(fragment, { title?, background?, id_prefix? })` consumes only fragments.
@@ -800,8 +863,8 @@ references explicitly; omitted references are indefinite. Exact allocations over
 preferred dimensions and min/max, but source sizing still has to resolve first.
 Do not round widths to improve cache hits: text break boundaries are observable.
 `query.prepare()` may depend on source, resolved style, and resources, never the
-current request, reference box, or path. Resource revisions invalidate the pass's
-layout and preparation caches. Reuse source identities to reuse fragments; equal
+current request, reference box, coordinate context, or path. Resource revisions
+invalidate the pass's layout and preparation caches. Reuse source identities to reuse fragments; equal
 props on two newly constructed elements do not give them a shared cache entry.
 
 When adding a public element, export it and its types in `src/index.ts`, add its JSX
@@ -813,7 +876,8 @@ standard elements. Update this README, the gallery README, and roadmap status.
 
 For runtime changes, run `bun run test` and `bun run typecheck` here. The core suite
 covers contracts and layout. The workspace's `bun run test` runs this core suite.
-At the completed 6(a) checkpoint, the core suite had 81 named contract/layout checks.
+The core suite has 106 named checks, including 25 plotting, sampling, geometry,
+and composition checks added after the 6(a) checkpoint.
 For public type changes, also verify
 declaration emission into a scratch directory:
 

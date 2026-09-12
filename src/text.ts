@@ -207,7 +207,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
       const matrix = [scale, 0, 0, scale, x, line.above] as const;
       const commands = transform_path(shape.commands, matrix);
       const ink = transform_rect(shape.ink, make_point(), matrix);
-      return draw_path(commands, { fill: style.color, stroke: 'none', stroke_width: 0 }, ink);
+      return draw_path(commands, { fill: style.color, stroke: 'none', stroke_width: 0, opacity: style.opacity }, ink);
     });
     const height = line.above + line.below;
     const fragment = make_fragment({
