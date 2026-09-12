@@ -15,6 +15,6 @@ const Repeated = define_element('Repeated', (props, query) => {
 
 return <Svg width={px(432)} height={px(144)}>
   <Repeated>
-    <Rect fill="#69b6a7" stroke="#203f50" stroke_width={px(3)} />
+    <Rect fill={blue} stroke={slate} stroke_width={px(3)} />
   </Repeated>
 </Svg>;

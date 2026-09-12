@@ -4,6 +4,10 @@ Run `bun run gallery` from `gum-next-core` to regenerate the files in `rendered/
 SVG and PNG are generated from the same immutable fragment. The PNG conversion
 uses `rsvg-convert`; no browser or old layout engine is involved.
 
+Use `blue` as the default example accent. For distinct items, use `blue`, `red`,
+`green`, `yellow`, then `purple`, in that order. Keep backgrounds and ordinary
+text neutral where needed for readability.
+
 The rendering commands below run from the workspace root using
 [gum-next-cli](../../gum-next-cli/README.md).
 
@@ -160,7 +164,7 @@ rendered as outlines with accessible labels, so PNG needs no installed fonts.
 
 ![Font metrics and line boxes](./rendered/typography.png)
 
-The blue-gray rectangles show allocated line boxes; green lines show measured
+The light-gray rectangles show allocated line boxes; blue lines show measured
 baselines. The tight-leading sample keeps its full 28px glyph size and records
 overflow. See its [tree](./rendered/typography.tree) for the separate ink bounds.
 

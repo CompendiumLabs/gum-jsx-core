@@ -13,9 +13,9 @@ const Labeled = define_element('Labeled', (props, query) => {
 
 return <Svg width={px(380)} height={px(96)} font_size={px(16)}>
   <Labeled>
-    <Circle width={em(2)} height={em(2)} fill="#63b49d" stroke="#267667" stroke_width={px(2)} />
-    <Text font_size={px(20)} color="#203746">
-      <Span font_weight={700}>Ready to compose</Span>{'\nShapes and text, independently sized.'}
+    <Circle width={em(2)} height={em(2)} fill={blue} stroke={slate} stroke_width={px(2)} />
+    <Text font_size={px(20)} color={slate}>
+      <Span font_weight={bold}>Ready to compose</Span>{'\nShapes and text, independently sized.'}
     </Text>
   </Labeled>
 </Svg>;

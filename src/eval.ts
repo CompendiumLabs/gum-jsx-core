@@ -13,6 +13,7 @@ import { available, exact, natural, make_request, finish_size, shape_size } from
 import { make_size, make_point, make_rect } from './geometry';
 import { make_fragment, place_fragment } from './fragment';
 import { draw_rect } from './drawing';
+import * as constants from './constants';
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string }>;
 
@@ -20,6 +21,7 @@ type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; nam
 function evaluate(code: string, options: EvaluateOptions = {}): Element {
   const { scope = {}, name = 'gum-next.jsx' } = options;
   const bindings = {
+    ...constants,
     Svg, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     move_to, line_to, quad_to, curve_to, close_path,

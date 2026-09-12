@@ -13,10 +13,10 @@ const ShapeGallery = define_element('ShapeGallery', (props, query) => {
   return make_fragment({ size, children });
 });
 
-return <Svg width={px(720)} height={px(396)} color="#203746" font_size={px(14)}
-  stroke="#267667" stroke_width={px(3)} fill="#bce1d4" stroke_linejoin="round">
+return <Svg width={px(720)} height={px(396)} color={slate} font_size={px(14)}
+  stroke={slate} stroke_width={px(3)} fill={blue} stroke_linejoin="round">
   <ShapeGallery>
-    <Text font_size={px(28)} font_weight={700}>Ordinary shapes, ordinary pixels</Text>
+    <Text font_size={px(28)} font_weight={bold}>Ordinary shapes, ordinary pixels</Text>
     <Rect /><Text>Rect</Text>
     <RoundedRect radius={px(16)} /><Text>RoundedRect · 16px</Text>
     <Circle /><Text>Circle · inscribed</Text>
@@ -24,7 +24,7 @@ return <Svg width={px(720)} height={px(396)} color="#203746" font_size={px(14)}
     <Line from={{x: 0, y: 0.8}} to={{x: 1, y: 0.2}} stroke_linecap="round" />
     <Text>Line · round caps</Text>
     <Polyline points={[{x: 0, y: 0.8}, {x: 0.3, y: 0.2}, {x: 0.6, y: 0.6}, {x: 1, y: 0.1}]}
-      fill="none" /><Text>Polyline</Text>
+      fill={none} /><Text>Polyline</Text>
     <Polygon points={[{x: 0, y: 0.7}, {x: 0.3, y: 0}, {x: 0.85, y: 0.15}, {x: 1, y: 1}]} />
     <Text>Polygon</Text>
     <Path commands={[move_to(0, 0.7), curve_to(0.25, -0.2, 0.65, 1.2, 1, 0.25),

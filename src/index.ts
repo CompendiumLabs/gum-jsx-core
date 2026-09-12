@@ -1,5 +1,10 @@
 export { DEFAULTS } from './defaults';
 export {
+  sans, mono, light, regular, bold,
+  none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
+  e, pi, phi, r2d, d2r,
+} from './constants';
+export {
   em, px, normalize_length, measure_length, resolve_length,
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 } from './units';

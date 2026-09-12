@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { evaluate, LayoutPass, render_svg, inspect_fragment, make_request, exact } from '../src/index';
+import { evaluate, LayoutPass, render_svg, inspect_fragment, make_request, exact, lightgray } from '../src/index';
 import type { Element, LayoutRequest } from '../src/index';
 import { protocol_demo } from '../examples/protocol';
 
@@ -32,7 +32,7 @@ scenes.push({ ...group, name: 'group_narrow', request: make_request({ width: exa
 for (const { name, element, request } of scenes) {
   const pass = new LayoutPass();
   const fragment = pass.layout(element, request);
-  const svg = render_svg(fragment, { background: '#f7f8fa', id_prefix: name });
+  const svg = render_svg(fragment, { background: lightgray, id_prefix: name });
   writeFileSync(join(output, `${name}.svg`), svg + '\n');
   writeFileSync(join(output, `${name}.tree`), inspect_fragment(fragment) + '\n');
   const raster = spawnSync('rsvg-convert', ['--format', 'png'], {

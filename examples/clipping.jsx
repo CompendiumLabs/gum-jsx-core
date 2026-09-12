@@ -16,5 +16,5 @@ const Clipping = define_element('Clipping', (props, query) => {
 });
 
 return <Svg width={px(320)} height={px(144)}>
-  <Clipping><Rect fill="#e78a56" stroke="none" /></Clipping>
+  <Clipping><Rect fill={blue} stroke={none} /></Clipping>
 </Svg>;

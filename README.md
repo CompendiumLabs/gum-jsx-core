@@ -214,6 +214,14 @@ JSX creates descriptions without doing layout:
 </Svg>
 ```
 
+Named constants are available both in evaluated JSX and as imports from
+`gum-next-core`: `sans`, `mono`, `light` (300), `regular` (400), `bold` (700),
+`none`, `white`, `black`, `blue`, `red`, `green`, `yellow`, `purple`, `gray`,
+`lightgray`, `darkgray`, `slate`, and `e`, `pi`, `phi`, `r2d`, `d2r`.
+For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
+Colors use the original Gum palette; see the
+[style reference](../gum-next-docs/docs/text/Style.md) for their exact values.
+
 `evaluate(code, { scope?, name? })` evaluates a bare JSX element or JavaScript that
 returns one. Function components, spreads, and JSX fragments work through the
 existing Acorn parser; no old element or layout engine is used. Extra scope values
@@ -585,7 +593,7 @@ the optional common-height figure policy remain later work.
 <Svg width={px(360)} height={px(200)} font_size={px(18)} color="#203746">
   <Text width={px(320)} line_height={em(1.4)}>
     {'A paragraph with '}
-    <Span font_weight={700}>bold words</Span>
+    <Span font_weight={bold}>bold words</Span>
     {' and '}<Span font_style="italic">italic words.</Span>
   </Text>
 </Svg>

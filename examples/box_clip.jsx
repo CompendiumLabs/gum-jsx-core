@@ -3,9 +3,9 @@
 <Svg>
   <Box padding={px(12)}>
     <Box width={px(220)} height={px(100)} padding={px(12)}
-      border_width={px(6)} border_color="#317969" background="#e9f5ef"
+      border_width={px(6)} border_color={blue} background={lightgray}
       radius={px(28)} align="center" clip>
-      <Square width={px(280)} fill="#f0bd79" stroke="#a46c31" stroke_width={px(2)} />
+      <Square width={px(280)} fill={red} stroke={green} stroke_width={px(2)} />
     </Box>
   </Box>
 </Svg>

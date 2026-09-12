@@ -1,14 +1,15 @@
 import {
   define_element, Rect, Svg, px, available, exact, make_request, make_size,
   make_point, finish_size, make_fragment, place_fragment,
+  blue, red, green, slate, none,
 } from '../src/index';
 import { Fixed, Expanding, Wrapping } from './leaves';
 
 // Five independent requests show packing, allocation, growth, and a wrap boundary.
-const fixed = new Fixed({ fill: '#64af9f' });
-const expanding = new Expanding({ fill: '#699fc8' });
-const wrapping = new Wrapping({ fill: '#e78a56', font_size: px(16) });
-const outline = new Rect({ fill: 'none', stroke: '#314a58', stroke_width: px(1) });
+const fixed = new Fixed({ fill: blue });
+const expanding = new Expanding({ fill: red });
+const wrapping = new Wrapping({ fill: green, font_size: px(16) });
+const outline = new Rect({ fill: none, stroke: slate, stroke_width: px(1) });
 
 const Protocol = define_element('Protocol', (_props, query) => {
   const size = finish_size(make_size(600, 144), query.request, query.sizing);
