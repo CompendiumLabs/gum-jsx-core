@@ -35,8 +35,9 @@ bun run gum gum-next-core/examples/hugging.jsx -f tree --stats
 bun run gum gum-next-core/examples/card.jsx --width 220 -o /tmp/card.png
 ```
 
-The CLI accepts a JSX file or stdin and emits SVG, PNG, tree, or JSON output.
-PNG uses the optional `rsvg-convert` command. See the CLI README for options and
+The CLI accepts a JSX file or stdin and defaults to kitty graphics on stdout.
+Use `--format` or an output filename to select SVG, PNG, tree, or JSON output.
+PNG uses [gum-next-png](../gum-next-png/README.md). See the CLI README for options and
 viewport behavior. The core's [gallery](./examples/README.md) contains source,
 SVG, PNG, and exact numerical trees.
 
@@ -776,7 +777,8 @@ is needed to run TypeScript sources. JSX examples are read as source by
 | Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/shapes.ts), [path.ts](./src/path.ts), [drawing.ts](./src/drawing.ts), [fragment.ts](./src/fragment.ts) |
 | Public API and JSX names | [index.ts](./src/index.ts), [eval.ts](./src/eval.ts) |
 | Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts) |
-| Command-line I/O and PNG conversion | [gum-next-cli](../gum-next-cli/README.md) |
+| Command-line I/O | [gum-next-cli](../gum-next-cli/README.md) |
+| PNG conversion | [gum-next-png](../gum-next-png/README.md) |
 
 “Keep the layout pass ice cold.” Add container behavior to the container or a pure
 helper. Shared ElementProps includes flex and position metadata for typing; their
@@ -802,8 +804,7 @@ are intentional protocol examples, while new composition examples should use the
 standard elements. Update this README, the gallery README, and roadmap status.
 
 For runtime changes, run `bun run test` and `bun run typecheck` here. The core suite
-covers contracts and layout. CLI behavior and optional PNG checks now live in
-`gum-next-cli/test/cli.ts`; the workspace's `bun run test` runs both suites.
+covers contracts and layout. The workspace's `bun run test` runs this core suite.
 At the completed 6(a) checkpoint, the core suite had 81 named contract/layout checks.
 For public type changes, also verify
 declaration emission into a scratch directory:
