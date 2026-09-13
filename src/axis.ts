@@ -10,9 +10,12 @@ import { make_request, shape_size } from './layout';
 import { arrow_draw, line_path } from './marks';
 import { Rotate } from './placement';
 import type { Side } from './placement';
+import { scope_props, merge_scoped } from './props';
+import type { Prefixed } from './props';
 import { resolve_style, resolve_paint } from './style';
 import type { StyleSpec } from './style';
 import { Text } from './text';
+import type { TextOptions } from './text';
 import { linear_ticks, format_tick } from './ticks';
 import { px, resolve_length } from './units';
 import type { Length } from './units';
@@ -20,15 +23,16 @@ import type { LayoutQuery } from './pass';
 
 type Tick = number | readonly [number, string | number | Element];
 type TickSpec = number | readonly Tick[];
-type AxisProps = ElementProps & Readonly<{
+type AxisOptions = ElementProps & Readonly<{
   lim?: Limit; ticks?: TickSpec; interval?: number; side?: Side; at?: number;
   tick_size?: Length; label_offset?: Length; rotate?: number;
   labels?: boolean; line?: boolean; arrow?: boolean;
   format?: (value: number, index: number) => string;
-  line_style?: StyleSpec; tick_style?: StyleSpec; label_style?: StyleSpec;
+  line_style?: StyleSpec; tick_style?: StyleSpec; label_style?: TextOptions;
 }>;
+type AxisProps = AxisOptions & Prefixed<'line' | 'tick', StyleSpec> & Prefixed<'label', TextOptions>;
 type AxisItem = Readonly<{ value: number; label: Element }>;
-type AxisData = Omit<AxisProps, 'ticks' | 'format'> & Readonly<{ items: readonly AxisItem[]; lim: Limit }>;
+type AxisData = Omit<AxisOptions, 'ticks' | 'format'> & Readonly<{ items: readonly AxisItem[]; lim: Limit }>;
 type LabelProps = Omit<AxisProps, 'ticks'> & Readonly<{ value?: number; label?: string | number | Element }>;
 type MeshProps = ElementProps & Readonly<{
   lim?: Limit; ticks?: TickSpec; interval?: number; direction?: 'x' | 'y';
@@ -47,7 +51,18 @@ function tick_values(ticks: TickSpec = 5, lim: Limit = [0, 1], interval?: number
   });
 }
 
-function axis_data({ ticks = 5, format = format_tick, ...props }: AxisProps): AxisData {
+function axis_props<Props extends AxisProps>(props: Props): Props {
+  return scope_props(props, ['line', 'tick', 'label'], ['line_height', 'tick_size', 'label_offset']);
+}
+
+// Normalize each specificity level before merging so flat and nested spellings
+// obey the same precedence, retaining unrelated fields of shared part options.
+function merge_axis_props(...layers: readonly (AxisProps | undefined)[]): AxisOptions {
+  return merge_scoped(layers, ['line', 'tick', 'label'], ['line_height', 'tick_size', 'label_offset']);
+}
+
+function axis_data(input: AxisProps): AxisData {
+  const { ticks = 5, format = format_tick, ...props } = axis_props(input);
   const lim = copy_limit(props.lim ?? [0, 1], 'lim');
   const items = tick_values(ticks, lim, props.interval).map((tick, i) => {
     const value = typeof tick === 'number' ? tick : tick[0];
@@ -146,7 +161,8 @@ class VLabels extends Labels {
 
 class Label extends Element<AxisData, LabelProps> {
   static data_bounds = Axis.data_bounds;
-  static normalize({ value = 0, label, children, ...props }: LabelProps): AxisData {
+  static normalize(input: LabelProps): AxisData {
+    const { value = 0, label, children, ...props } = axis_props(input);
     return axis_data({ ...props,
       ticks: [[value, label ?? (children === undefined ? format_tick(value)
         : children instanceof Element ? children : new Text({ ...props.label_style, children }))]],
@@ -217,5 +233,5 @@ class Mesh2D extends Element<ElementProps, Mesh2DProps> {
 }
 
 export { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
-  Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D, tick_values };
+  Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D, tick_values, merge_axis_props };
 export type { Tick, TickSpec, AxisProps, LabelProps, MeshProps, Mesh2DProps };

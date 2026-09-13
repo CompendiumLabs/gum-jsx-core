@@ -1,6 +1,7 @@
 // The existing parser depends only on Acorn and source-error helpers, not layout.
 import { runJSX } from './lib/parse';
 import { Element, define_element, define_component, element_children } from './element';
+import { prefix_split, prefix_join } from './props';
 import { Svg } from './elems';
 import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './shapes';
 import { UnitLine, HLine, VLine, Dot, Triangle } from './shapes';
@@ -55,7 +56,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
-    em, px, Element, define_element, define_component, element_children,
+    em, px, Element, define_element, define_component, element_children, prefix_split, prefix_join,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,

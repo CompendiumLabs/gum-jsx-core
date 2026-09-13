@@ -12,6 +12,8 @@ import type { Point, Size } from './geometry';
 import { exact, make_request, shape_size } from './layout';
 import type { LayoutQuery } from './pass';
 import type { PathCommand } from './path';
+import { scope_props } from './props';
+import type { Prefixed } from './props';
 import { Circle, is_position } from './shapes';
 import type { Position, PositionValue, Radius } from './shapes';
 import { resolve_paint, resolve_style } from './style';
@@ -30,7 +32,7 @@ type FillProps = MarkProps & Readonly<{
   boundary?: readonly (PositionValue | null)[] | number;
   direction?: 'vertical' | 'horizontal';
 }>;
-type ArrowProps = MarkProps & Readonly<{
+type ArrowProps = MarkProps & Prefixed<'head', StyleSpec> & Readonly<{
   from?: PositionValue; to?: PositionValue; points?: readonly PositionValue[];
   start_head?: boolean; end_head?: boolean; head_size?: Length; head_width?: number;
   head_style?: StyleSpec; curve?: boolean; tension?: number; radius?: Length;
@@ -294,6 +296,9 @@ function arrow_draw(points: readonly Point[], paint: Paint, head: Paint, length:
 }
 
 class Arrow extends Element<ArrowProps> {
+  static normalize(props: ArrowProps): ArrowProps {
+    return scope_props(props, ['head'], ['head_size', 'head_width']);
+  }
   static data_bounds(props: ArrowProps) {
     return mark_bounds(props, arrow_points(props));
   }

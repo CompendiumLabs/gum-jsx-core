@@ -1,5 +1,5 @@
-import { HAxis, VAxis, HMesh, VMesh } from './axis';
-import type { AxisProps, TickSpec } from './axis';
+import { HAxis, VAxis, HMesh, VMesh, merge_axis_props } from './axis';
+import type { AxisProps, MeshProps, TickSpec } from './axis';
 import { Bars } from './bars';
 import type { BarsProps } from './bars';
 import { box_layout } from './box';
@@ -21,27 +21,34 @@ import { Points } from './marks';
 import type { LayoutQuery } from './pass';
 import { Rotate } from './placement';
 import type { Side } from './placement';
+import { prefix_split, scope_props, merge_scoped } from './props';
+import type { Prefixed } from './props';
 import { Line, Rect } from './shapes';
 import { HStack, VStack } from './stack';
 import type { StyleSpec } from './style';
+import type { TextOptions } from './text';
 import { em, px, resolve_length } from './units';
 import type { Length } from './units';
 
 type LegendEntry = Readonly<{
   label: string | Element; color?: string; kind?: 'line' | 'point' | 'bar'; badge?: Element;
 }>;
-type LegendProps = BoxProps & Readonly<{
-  entries?: readonly LegendEntry[]; gap?: Length; badge_width?: Length; label_style?: StyleSpec;
+type LegendProps = BoxProps & Prefixed<'label', TextOptions> & Readonly<{
+  entries?: readonly LegendEntry[]; gap?: Length; badge_width?: Length; label_style?: TextOptions;
 }>;
-type PlotProps = GraphProps & Readonly<{
+type LegendOptions = Omit<LegendProps, 'entries' | 'children'>;
+type PlotProps = GraphProps & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
+  & Prefixed<'tick', StyleSpec> & Prefixed<'label' | 'title' | 'xlabel' | 'ylabel', TextOptions>
+  & Prefixed<'grid' | 'xgrid' | 'ygrid', MeshProps> & Prefixed<'legend', LegendOptions> & Readonly<{
   axis?: boolean; xaxis?: boolean | AxisProps; yaxis?: boolean | AxisProps;
   xticks?: TickSpec; yticks?: TickSpec; grid?: boolean;
   title?: string | Element; xlabel?: string | Element; ylabel?: string | Element;
   legend?: readonly LegendEntry[] | Element;
   margin?: InsetSpec; label_gap?: Length; background?: string; plot_background?: string;
   border_color?: string; border_width?: Length;
-  axis_style?: StyleSpec; tick_style?: StyleSpec; label_style?: StyleSpec;
-  title_style?: StyleSpec; grid_style?: StyleSpec;
+  axis_style?: AxisProps; tick_style?: StyleSpec; label_style?: TextOptions;
+  title_style?: TextOptions; xlabel_style?: TextOptions; ylabel_style?: TextOptions;
+  grid_style?: MeshProps; xgrid_style?: MeshProps; ygrid_style?: MeshProps; legend_style?: LegendOptions;
 }>;
 type PlotData = Omit<PlotProps, 'title' | 'xlabel' | 'ylabel' | 'legend'> & Readonly<{
   coordinates: Coordinates; axes: readonly Element[]; meshes: readonly Element[];
@@ -58,7 +65,8 @@ class Legend extends Element<BoxProps, LegendProps> {
   static data_bounds() {
     return null;
   }
-  static normalize({ entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props }: LegendProps): BoxProps {
+  static normalize(input: LegendProps): BoxProps {
+    const { entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props } = scope_props(input, ['label']);
     return { ...props,
       children: new VStack({ gap, children: entries.map(entry => {
         const color = entry.color ?? '#2563eb';
@@ -77,31 +85,42 @@ class Legend extends Element<BoxProps, LegendProps> {
 
 // Bounds, tick values, and label descriptions depend only on source data. Build
 // them once; every resize reuses these identities and only lays out their geometry.
-function plot_data({ title, xlabel, ylabel, legend, ...props }: PlotProps): PlotData {
+function plot_data(input: PlotProps): PlotData {
+  const [axisprops, xprops, yprops, legendprops, rest] = prefix_split(['axis', 'xaxis', 'yaxis', 'legend'],
+    input, ['axis_style', 'legend_style']);
+  const scoped = scope_props(rest, ['tick', 'label', 'title', 'xlabel', 'ylabel',
+    'grid', 'xgrid', 'ygrid'], ['label_gap']);
+  const { title, xlabel, ylabel, legend, xaxis, yaxis, axis_style, tick_style, label_style,
+    title_style, xlabel_style, ylabel_style, grid_style, xgrid_style, ygrid_style, legend_style, ...props } = scoped;
   const coordinates = infer_coordinates(props.children, { padding: 0.05, ...props });
   const axes: Element[] = [], meshes: Element[] = [];
-  const common = { ...props.axis_style, tick_style: props.tick_style, label_style: props.label_style };
+  const common = merge_axis_props({
+    ...(Object.hasOwn(scoped, 'tick_style') ? { tick_style } : {}),
+    ...(Object.hasOwn(scoped, 'label_style') ? { label_style } : {}),
+  }, axis_style, axisprops);
   for (const axis of ['x', 'y'] as const) {
-    const option = (axis === 'x' ? props.xaxis : props.yaxis) ?? props.axis ?? true;
-    const options = typeof option === 'object' ? option : {};
+    const option = (axis === 'x' ? xaxis : yaxis) ?? props.axis ?? true;
+    const options = merge_axis_props(common, typeof option === 'object' ? option : undefined,
+      axis === 'x' ? xprops : yprops);
     const lim = axis === 'x' ? coordinates.xlim : coordinates.ylim;
     const ticks = (axis === 'x' ? props.xticks : props.yticks) ?? options.ticks ?? 5;
-    const args = { ...common, ...options, lim, ticks };
+    const args = { ...options, lim, ticks };
     if (option) axes.push(axis === 'x' ? new HAxis(args) : new VAxis(args));
     if (props.grid ?? true) {
-      const args = { lim, ticks, interval: options.interval, ...props.grid_style };
+      const args = { interval: options.interval, ...grid_style,
+        ...(axis === 'x' ? xgrid_style : ygrid_style), lim, ticks };
       meshes.push(axis === 'x' ? new HMesh(args) : new VMesh(args));
     }
   }
-  // Callback-bearing axis options have been consumed by Axis constructors.
-  const { xaxis, yaxis, ...source } = props;
-  return { ...source, coordinates, axes, meshes,
+  // Callback-bearing options have been consumed by the part constructors.
+  return { ...props, coordinates, axes, meshes,
     title_element: title === undefined ? undefined : text_element(title,
-      { font_size: em(1.35), font_weight: 700, ...props.title_style }),
-    x_label: xlabel === undefined ? undefined : text_element(xlabel, props.label_style),
+      { font_size: em(1.35), font_weight: 700, ...title_style }),
+    x_label: xlabel === undefined ? undefined : text_element(xlabel, { ...label_style, ...xlabel_style }),
     y_label: ylabel === undefined ? undefined : new Rotate({ angle: -90,
-      children: text_element(ylabel, props.label_style) }),
-    legend_element: legend === undefined ? undefined : legend instanceof Element ? legend : new Legend({ entries: legend }),
+      children: text_element(ylabel, { ...label_style, ...ylabel_style }) }),
+    legend_element: legend === undefined ? undefined : legend instanceof Element ? legend
+      : new Legend({ ...merge_scoped<LegendOptions>([legend_style, legendprops], ['label']), entries: legend }),
   };
 }
 

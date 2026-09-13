@@ -41,6 +41,8 @@ export { Fonts } from './fonts';
 export type { FontProvider, MeasuredFont, GlyphShape, FontOptions, FontData } from './fonts';
 export { Element, define_element, define_component, element_children, content_child } from './element';
 export type { Child, ElementProps, ElementType, LayoutMethod, ElementOptions } from './element';
+export { prefix_split, prefix_join } from './props';
+export type { Prefixed } from './props';
 export { LayoutPass, LayoutError } from './pass';
 export type { LayoutQuery, LayoutContext, Resource } from './pass';
 export { Svg } from './elems';
@@ -50,7 +52,7 @@ export { UnitLine, HLine, VLine, Dot, Triangle } from './shapes';
 export type { Position, PositionValue, Radius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps } from './shapes';
 export { Text, Span } from './text';
-export type { TextProps, SpanProps } from './text';
+export type { TextProps, TextOptions, SpanProps } from './text';
 export { Box, Frame, Fit } from './box';
 export type { BoxProps, FitProps } from './box';
 export { HStack, VStack, Spacer } from './stack';

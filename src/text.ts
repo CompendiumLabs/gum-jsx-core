@@ -21,6 +21,8 @@ type TextProps = ElementProps & Readonly<{
   tab_size?: number;
   text_align?: 'left' | 'center' | 'right';
 }>;
+// Options for generated labels/captions; the owning component supplies content.
+type TextOptions = Omit<TextProps, 'text' | 'children'>;
 type SpanProps = StyleSpec & Readonly<{ children?: Child }>;
 type Run = { text: string; style: Style };
 type Metrics = Readonly<{ font: MeasuredFont; above: number; below: number }>;
@@ -235,4 +237,4 @@ class Span extends Element<SpanProps> {
 }
 
 export { Text, Span };
-export type { TextProps, SpanProps };
+export type { TextProps, TextOptions, SpanProps };

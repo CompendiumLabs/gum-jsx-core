@@ -10,20 +10,23 @@ import { graph_size } from './graph';
 import { exact, make_request } from './layout';
 import { HStack, VStack, stack_layout } from './stack';
 import type { StackProps } from './stack';
-import type { StyleSpec } from './style';
+import { scope_props } from './props';
+import type { Prefixed } from './props';
 import { Text, Span } from './text';
+import type { TextOptions } from './text';
 import { em, px } from './units';
 import type { Length } from './units';
 import { draw_rect } from './drawing';
 
 type TextStackProps = StackProps & Readonly<{ direction?: 'horizontal' | 'vertical' }>;
 type TextBoxProps = BoxProps & Readonly<{ text?: string }>;
-type TextFigureProps = BoxProps & Readonly<{
-  caption?: string | Element; caption_style?: StyleSpec; gap?: Length;
+type TextFigureProps = BoxProps & Prefixed<'caption', TextOptions> & Readonly<{
+  caption?: string | Element; caption_style?: TextOptions; gap?: Length;
 }>;
-type TitleBoxProps = BoxProps & Readonly<{ title?: string | Element; title_style?: StyleSpec; gap?: Length }>;
-type SlideProps = ElementProps & Readonly<{
-  title?: string | Element; title_style?: StyleSpec; padding?: InsetSpec;
+type TitleBoxProps = BoxProps & Prefixed<'title', TextOptions>
+  & Readonly<{ title?: string | Element; title_style?: TextOptions; gap?: Length }>;
+type SlideProps = ElementProps & Prefixed<'title', TextOptions> & Readonly<{
+  title?: string | Element; title_style?: TextOptions; padding?: InsetSpec;
   gap?: Length; background?: string; clip?: boolean;
 }>;
 type SlideData = SlideProps & Readonly<{ body: Element }>;
@@ -33,7 +36,7 @@ type BulletsProps = ElementProps & Readonly<{
 
 // Text composition converts text at construction, so reflow always sees the same
 // source elements. Existing figures and their parent-owned flex metadata survive.
-function text_element(value: Child, style: StyleSpec = {}): Element {
+function text_element(value: Child, style: TextOptions = {}): Element {
   return value instanceof Element && !(value instanceof Span)
     ? value : new Text({ ...style, children: value });
 }
@@ -82,7 +85,8 @@ class TextFrame extends TextBox {
 }
 
 class TextFigure extends Element<BoxProps, TextFigureProps> {
-  static normalize({ caption, caption_style, gap = em(0.5), children, ...props }: TextFigureProps): BoxProps {
+  static normalize(input: TextFigureProps): BoxProps {
+    const { caption, caption_style, gap = em(0.5), children, ...props } = scope_props(input, ['caption']);
     return { ...props,
       children: new VStack({ gap, align: 'stretch', children: [
         ...element_children(children), caption === undefined ? null : text_element(caption, caption_style),
@@ -94,7 +98,8 @@ class TextFigure extends Element<BoxProps, TextFigureProps> {
 
 class TitleBox extends Element<BoxProps, TitleBoxProps> {
   static defaults: Partial<BoxProps> = { padding: em(0.75) };
-  static normalize({ title, title_style, gap = em(0.6), children, ...props }: TitleBoxProps): BoxProps {
+  static normalize(input: TitleBoxProps): BoxProps {
+    const { title, title_style, gap = em(0.6), children, ...props } = scope_props(input, ['title']);
     return { ...props,
       children: new VStack({ gap, align: 'stretch', children: [
         title === undefined ? null : text_element(title, { font_weight: 700, ...title_style }),
@@ -131,7 +136,8 @@ class Slide extends Element<SlideData, SlideProps> {
   static data_bounds() {
     return null;
   }
-  static normalize({ title, title_style, gap = em(0.8), children, ...props }: SlideProps): SlideData {
+  static normalize(input: SlideProps): SlideData {
+    const { title, title_style, gap = em(0.8), children, ...props } = scope_props(input, ['title']);
     return { ...props,
       body: new VStack({ gap, align: 'stretch', children: [
         title === undefined ? null : text_element(title, { font_size: em(1.6), font_weight: 700, ...title_style }),

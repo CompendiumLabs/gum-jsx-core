@@ -1,6 +1,7 @@
 import './contracts';
 import './engine';
 import './element_classes';
+import './props';
 import './jsx';
 import './math';
 import './text';

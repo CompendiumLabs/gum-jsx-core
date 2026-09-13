@@ -881,7 +881,8 @@ See the [cap comparison](examples/arrow_caps.jsx) for thick straight, curved, an
 rounded arrows.
 
 Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
-[value,label] pairs. Plot accepts nested axis/tick/label/grid/title style objects,
+[value,label] pairs. Plot accepts scoped props such as `axis_stroke`,
+`xaxis_label_color`, and `title_font_size`, alongside nested part style objects
 and per-axis option objects. It reserves space from measured axis overflow and
 title sizes. Data clips by default; axes and labels remain outside that clip.
 Standalone axes/meshes require their own lim for tick generation.
@@ -902,11 +903,61 @@ define_component adopts another element's source
 description without a layout wrapper. Neither stores callbacks in source data.
 
 This is a basic linear plotting API. Log/date scales, label collision avoidance,
-adaptive sampling, grouped/stacked bar automation, advanced arrowheads, and
-arbitrary prefixed styles remain deferred. Splines can overshoot samples; a
+adaptive sampling, grouped/stacked bar automation, and advanced arrowheads
+remain deferred. Splines can overshoot samples; a
 sampler cannot identify discontinuities between two finite samples. See the
 [overview](../docs/PLOTTING.md) and [gallery](examples/README.md) for decisions,
 examples, and current limits.
+
+## Scoped component props
+
+Compound elements accept prefixed props for their generated parts. JSX accepts
+dashes or underscores; direct JavaScript uses underscores:
+
+```jsx
+<Plot title="Measurements" axis-stroke={slate}
+  xaxis-tick-size={px(8)} xaxis-label-color={blue}
+  title-font-size={em(1.4)} title-wrap={false} />
+```
+
+| Owner | Scopes | Accepted part options |
+|---|---|---|
+| Arrow | `head_` | StyleSpec; `head_size` and `head_width` keep their geometry meanings |
+| Axis, Scale, Label, Labels and directional variants | `line_`, `tick_`, `label_` | Line/tick styles; label TextOptions |
+| Plot, BarPlot | `axis_`, `xaxis_`, `yaxis_` | Axis props, including nested scopes such as `xaxis_label_color` |
+| Plot, BarPlot | `tick_`, `label_`, `title_`, `xlabel_`, `ylabel_` | Tick styles and generated text options |
+| Plot, BarPlot | `grid_`, `xgrid_`, `ygrid_`, `legend_` | Mesh/Legend options, including `legend_label_font_size` |
+| Legend | `label_` | Generated label TextOptions |
+| TitleBox, TitleFrame, Slide | `title_` | Generated title TextOptions |
+| TextFigure | `caption_` | Generated caption TextOptions |
+
+TextOptions includes styles, sizing, wrapping, whitespace, and text alignment;
+the owner supplies the text content. Existing `*_style` objects remain supported
+and accept the same options. Flat props override matching fields of the nested
+object at that scope. Plot merges common tick/label settings, common axis settings,
+the `xaxis`/`yaxis` option object, then the corresponding flat axis props. Part
+option records merge per field, preserving unrelated shared settings. Shared grid
+and label settings similarly supply defaults for x/y overrides. An explicit
+`xaxis={false}` stays disabled even when scoped props are present. Plot owns axis
+and grid domains; explicit `xticks`/`yticks` take precedence over axis tick options.
+
+Routing runs during construction, preserving source and child identities on
+resize. Supplied Element titles, captions, tick labels, and legends retain their
+own descriptions; scopes configure generated parts. Owner props such as
+`line_height`, `tick_size`, `label_offset`, and `label_gap` retain their meanings.
+
+`prefix_split(prefixes, props, keep?)` and `prefix_join(prefix, props)` are public
+helpers and JSX bindings for custom components. Splitting returns one object per
+prefix, followed by the remaining props, without mutating the input. The longest
+matching prefix wins; optional exact `keep` keys stay in the remaining props.
+Joining adds a prefix to each key. Values remain unmodified, including units and
+callbacks. `Prefixed<'label', TextOptions>` derives the corresponding TypeScript
+prop names and value types. See [Custom elements](../gum-next-docs/topics/text/CustomElements.md).
+
+Scopes are constructor-input syntax. `static defaults` still contains canonical
+source props and merges after normalization; for example Arrow defaults use
+`head_style`, not `head_fill`. Defaults that affect generated children belong in
+a component or normalizer, before those children are constructed.
 
 ## Rendering and inspection
 
