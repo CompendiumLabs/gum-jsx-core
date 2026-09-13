@@ -279,7 +279,7 @@ function arrow_draw(points: readonly Point[], paint: Paint, head: Paint, length:
   const distinct = points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y);
   const headed = distinct.length > 1 && length > 0;
   const start = headed && (props.start_head ?? false), end = headed && (props.end_head ?? true);
-  const width = start || end ? nonnegative(props.head_width ?? 0.65, 'head_width') : 0;
+  const width = start || end ? nonnegative(props.head_width ?? 1.3, 'head_width') : 0;
   const inset = start || end ? arrow_inset(paint, length, width) : 0;
   const shaft = start || end ? inset_route(distinct, start ? inset : 0, end ? inset : 0) : points;
   const path = props.curve ? spline_path(shaft, props.tension)

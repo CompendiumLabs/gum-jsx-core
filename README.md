@@ -222,7 +222,7 @@ Named constants are available both in evaluated JSX and as imports from
 `lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
 For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
-[style reference](../gum-next-docs/docs/text/Style.md) for their exact values.
+[style reference](../gum-next-docs/topics/text/Style.md) for their exact values.
 
 JSX attribute names also accept dashes: `font-size` becomes `font_size`, and
 `stroke-dasharray` becomes `stroke_dasharray`. This applies to built-in elements
@@ -298,7 +298,7 @@ source data belongs in props, with no ordinary instance field initializers.
 `Element` is available inside JSX as well as through imports. `define_element(name,
 layout, defaults?, options?)` remains a convenience using the same machinery; its
 defaults are captured at the factory call. Both forms support normalization and
-data bounds; see [Custom elements](../gum-next-docs/docs/text/CustomElements.md).
+data bounds; see [Custom elements](../gum-next-docs/topics/text/CustomElements.md).
 The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
@@ -675,7 +675,7 @@ For exact spaces or blank lines, use an explicit string with `whitespace="pre"`,
 such as `<Text whitespace="pre">{'  Revenue  \n'}</Text>`. The whitespace prop
 controls layout after parsing; it does not disable source normalization. Element
 containers and text stacks ignore blank strings between children. See the
-[JSX reference](../gum-next-docs/docs/text/JSX.md#jsx-whitespace) for more examples.
+[JSX reference](../gum-next-docs/topics/text/JSX.md#jsx-whitespace) for more examples.
 
 Automatic hyphenation, emergency word splitting, full paragraph
 bidi, fallback font chains, and color emoji are outside this stage's coverage.
@@ -774,7 +774,7 @@ allowed: `<Line from={[px(12), 0.5]} to={[1, 0.5]} />`. `zip(xs, ys)` can be pas
 directly as `points`. Callbacks and generated geometry retain named `{x,y}` records.
 TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengths;
 `Point` and `Position` remain record types. See the
-[point values reference](../gum-next-docs/docs/text/PointValues.md) and its runnable example.
+[point values reference](../gum-next-docs/topics/text/PointValues.md) and its runnable example.
 
 ```jsx
 <Path width={px(120)} height={px(60)} stroke_width={px(2)}
@@ -809,11 +809,11 @@ original public utility set is available alongside additional Math aliases,
 
 | Group | Reference and examples |
 |---|---|
-| Scalars, reductions, interpolation | [Math helpers](../gum-next-docs/docs/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
-| Sequences and arrays | [Arrays](../gum-next-docs/docs/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
-| Vector and complex arithmetic | [Vectors](../gum-next-docs/docs/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
-| Color interpolation | [Colors](../gum-next-docs/docs/text/Colors.md): interp, palette |
-| Reproducible samples | [Random](../gum-next-docs/docs/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
+| Scalars, reductions, interpolation | [Math helpers](../gum-next-docs/topics/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
+| Sequences and arrays | [Arrays](../gum-next-docs/topics/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
+| Vector and complex arithmetic | [Vectors](../gum-next-docs/topics/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
+| Color interpolation | [Colors](../gum-next-docs/topics/text/Colors.md): interp, palette |
+| Reproducible samples | [Random](../gum-next-docs/topics/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
 
 `range` excludes its stop; `linspace` includes its endpoint by default and keeps
 the existing 101-sample default. Pass false as its fourth argument for periodic
@@ -829,7 +829,7 @@ Each `evaluate` call owns a fresh random stream, defaulting to seed 42; pass
 share a separate host stream; `new RNG(seed)` creates an independent one.
 `integer` excludes its upper bound. Layout and rendering never consume random
 samples, so resizing preserves the data. See the
-[migration notes](../gum-next-docs/docs/text/Migration.md#numeric-helpers) for
+[migration notes](../gum-next-docs/topics/text/Migration.md#numeric-helpers) for
 differences from the original helpers.
 
 ## Graphs and plotting
@@ -860,10 +860,10 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Capability | Elements / reference |
 |---|---|
 | Curves, points, fills, arrows | CoordLine, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
-| Plot composition | [Plot](../gum-next-docs/docs/text/Plot.md), Graph, Legend, OuterLabel |
+| Plot composition | [Plot](../gum-next-docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
-| Sampling | [Sampling](../gum-next-docs/docs/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
+| Sampling | [Sampling](../gum-next-docs/topics/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
@@ -894,7 +894,7 @@ defaults to 101. SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
-and [coordinate helpers](../gum-next-docs/docs/text/Coordinates.md) can also be
+and [coordinate helpers](../gum-next-docs/topics/text/Coordinates.md) can also be
 used directly. `static normalize(input)` consumes raw input once before source
 defaults are merged; `Element<SourceProps, InputProps>` types the two separately.
 The same hook is available through define_element's fourth options argument.

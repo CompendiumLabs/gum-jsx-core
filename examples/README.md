@@ -15,7 +15,7 @@ The plotting slice adds data coordinates, measured axes and labels, and sampled
 geometry. The [overview](../../docs/PLOTTING.md) explains API choices and limits.
 
 Point inputs accept `[x,y]` as well as `{x,y}`. The math helper example feeds
-`zip(xs, ys)` directly to Points; the [point values example](../../gum-next-docs/docs/code/PointValues.jsx)
+`zip(xs, ys)` directly to Points; the [point values example](../../gum-next-docs/topics/code/PointValues.jsx)
 mixes both forms and shows callbacks using named coordinates.
 
 | Example | What to inspect |
