@@ -11,6 +11,7 @@ import './arrows';
 import './box';
 import './flex';
 import './stack';
+import './stack_align';
 import './group';
 import './plot';
 import './sampling';

@@ -6,7 +6,7 @@ import {
   natural, available, exact, make_request, deflate_request, resolve_sizing,
   prepare_request, finish_size, shape_size,
 } from '../src/index';
-import type { Length, SizeSpec } from '../src/index';
+import type { Length, SizeSpec, InsetSpec } from '../src/index';
 import { probes } from '../examples/contracts';
 
 // Test contracts at their boundaries and in small compositions, using literal results.
@@ -93,6 +93,71 @@ const tests: Record<string, () => void> = {
     assert.throws(() => resolve_insets({ top: 0.1 }, {
       path: 'root/Card', reference: { width: 100 },
     }), /root\/Card.padding.top/);
+  },
+
+  'inset shorthand objects and tuples retain their side order and length units'() {
+    const context = { font_size: 16, reference: { width: 200, height: 100 } };
+    const sides: readonly InsetSpec[] = [
+      { t: 0.1, b: px(3), l: 0.1, r: em(0.5) },
+      [0.1, px(3), 0.1, em(0.5)] as const,
+    ];
+    for (const spec of sides) {
+      assert.deepEqual(resolve_insets(spec, context), { left: 20, top: 10, right: 8, bottom: 3 });
+    }
+    const axes: readonly InsetSpec[] = [{ h: 0.1, v: em(0.5) }, [0.1, em(0.5)] as const];
+    for (const spec of axes) {
+      assert.deepEqual(resolve_insets(spec, context), { left: 20, top: 8, right: 20, bottom: 8 });
+    }
+    assert.deepEqual(resolve_insets({ h: px(3) }), { left: 3, top: 0, right: 3, bottom: 0 });
+    assert.deepEqual(resolve_insets({ v: px(4) }), { left: 0, top: 4, right: 0, bottom: 4 });
+    assert.deepEqual(resolve_insets({ t: px(1), r: px(2) }), { left: 0, top: 1, right: 2, bottom: 0 });
+    for (const spec of [0, {}, [0, 0], [0, 0, 0, 0]] satisfies InsetSpec[]) {
+      assert.deepEqual(resolve_insets(spec), make_insets());
+    }
+  },
+
+  'inset side names override aliases and axis defaults without losing explicit zero'() {
+    assert.deepEqual(resolve_insets({ h: px(10), v: px(20), l: px(1), t: px(2), r: px(3), b: px(4),
+      left: px(5), top: px(6), right: px(7), bottom: px(8) }),
+      { left: 5, top: 6, right: 7, bottom: 8 });
+    assert.deepEqual(resolve_insets({ h: px(10), v: px(20), l: 0, top: 0, b: px(4) }),
+      { left: 0, top: 0, right: 10, bottom: 4 });
+    assert.deepEqual(resolve_insets({ h: px(10), l: px(3), left: 0, right: undefined }),
+      { left: 0, top: 0, right: 10, bottom: 0 });
+  },
+
+  'inset shorthands preserve reference requirements and side-specific errors'() {
+    const context = { path: 'root/Card', reference: { width: 200 } };
+    assert.deepEqual(resolve_insets({ h: 0.1 }, context), { left: 20, top: 0, right: 20, bottom: 0 });
+    assert.deepEqual(resolve_insets([0.1, 0.2], { reference: { width: 0, height: 0 } }), make_insets());
+    for (const spec of [{ v: 0.1 }, [0, 0.1], [0.1, 0, 0, 0]] satisfies InsetSpec[]) {
+      assert.throws(() => resolve_insets(spec, context), /root\/Card.padding.top.*definite fraction reference/);
+    }
+    assert.throws(() => resolve_insets({ h: em(1) }, context), /root\/Card.padding.left.*definite font size/);
+    assert.throws(() => resolve_insets([0, px(-1), 0, 0], context), /root\/Card.padding.bottom.*nonnegative/);
+    assert.throws(() => resolve_insets({ t: NaN }, context), /root\/Card.padding.top.*finite/);
+    assert.throws(() => resolve_insets({ h: Infinity }, context, 'margin'), /root\/Card.margin.left.*finite/);
+    for (const spec of [[], [0], [0, 0, 0], [0, 0, 0, 0, 0], Array(2), Array(4), [0, undefined], [null, 0]]) {
+      assert.throws(() => resolve_insets(spec as InsetSpec, context),
+        /root\/Card.padding.*exactly two \[h, v\] or four \[t, b, l, r\]/);
+    }
+    for (const spec of [true, false, null, '8px']) {
+      assert.throws(() => resolve_insets(spec as unknown as InsetSpec, context), /root\/Card.padding.*expected a length/);
+    }
+  },
+
+  'resolving shorthand insets does not mutate or freeze caller-owned data'() {
+    const length = { value: 2, unit: 'px' as const };
+    const spec: [Length, Length] = [length, px(4)];
+    const object = { h: length, v: px(4) };
+    const tuple_result = resolve_insets(spec), object_result = resolve_insets(object);
+    assert.ok(Object.isFrozen(tuple_result) && Object.isFrozen(object_result));
+    assert.ok(!Object.isFrozen(spec) && !Object.isFrozen(object) && !Object.isFrozen(length));
+    length.value = 10;
+    spec[1] = px(20);
+    object.v = px(30);
+    assert.deepEqual(tuple_result, { left: 2, top: 4, right: 2, bottom: 4 });
+    assert.deepEqual(object_result, tuple_result);
   },
 
   'available offers are advisory and exact allocations preserve overflow'() {
@@ -223,3 +288,13 @@ for (const [name, test] of Object.entries(tests)) {
   console.log(`ok - ${name}`);
 }
 console.log(`${Object.keys(tests).length} contract checks passed.`);
+
+// Tuple arity and length values are checked for host TypeScript callers too.
+if (false) {
+  // @ts-expect-error Padding tuples require exactly two or four lengths.
+  const three: InsetSpec = [0, 0, 0];
+  // @ts-expect-error A side value must be a length, not a string.
+  const side: InsetSpec = { t: '8px' };
+  // @ts-expect-error An axis value must be a length, not a boolean.
+  const axis: InsetSpec = { h: true };
+}

@@ -16,7 +16,11 @@ type Insets = Readonly<{
   right: number;
   bottom: number;
 }>;
-type InsetSpec = Length | Readonly<Partial<Record<keyof Insets, Length>>>;
+type InsetSides = Readonly<Partial<Record<keyof Insets | 't' | 'b' | 'l' | 'r' | 'h' | 'v', Length>>>;
+// Tuple order follows Gum's horizontal/vertical and top/bottom/left/right forms.
+type InsetSpec = Length | InsetSides
+  | readonly [h: Length, v: Length]
+  | readonly [t: Length, b: Length, l: Length, r: Length];
 
 // Read the representation independently of units and finiteness. Plotting callers
 // must be able to preserve nonfinite samples as gaps until they build paths.
@@ -85,22 +89,35 @@ function resolve_insets(
   context: LengthContext = {},
   property = 'padding',
 ): Insets {
-  const sides = typeof spec === 'number' || 'unit' in spec
-    ? { left: spec, top: spec, right: spec, bottom: spec }
-    : spec;
   const { font_size, reference = {}, path = 'root' } = context;
-
-  function resolve_side(side: keyof Insets, fraction?: number): number {
-    const location = `${path}.${property}.${side}`;
-    const basis = { font_size, fraction };
-    return nonnegative(resolve_length(sides[side] ?? 0, basis, location), location);
+  if (typeof spec !== 'number' && (spec === null || typeof spec !== 'object')) {
+    throw new TypeError(`${path}.${property}: expected a length, side object, [h, v], or [t, b, l, r]`);
+  }
+  let sides: InsetSides;
+  if (typeof spec === 'number' || 'unit' in spec) {
+    sides = { left: spec, top: spec, right: spec, bottom: spec };
+  } else if (Array.isArray(spec)) {
+    if ((spec.length !== 2 && spec.length !== 4) || [...spec].some(value => value == null)) {
+      throw new TypeError(`${path}.${property}: arrays need exactly two [h, v] or four [t, b, l, r] lengths`);
+    }
+    sides = spec.length === 2 ? { h: spec[0], v: spec[1] }
+      : { t: spec[0], b: spec[1], l: spec[2], r: spec[3] };
+  } else {
+    sides = spec as InsetSides;
   }
 
+  function resolve_side(side: keyof Insets, length: Length | undefined, fraction?: number): number {
+    const location = `${path}.${property}.${side}`;
+    const basis = { font_size, fraction };
+    return nonnegative(resolve_length(length ?? 0, basis, location), location);
+  }
+
+  // Full names win over short names; individual sides win over axis defaults.
   return make_insets({
-    left: resolve_side('left', reference.width),
-    top: resolve_side('top', reference.height),
-    right: resolve_side('right', reference.width),
-    bottom: resolve_side('bottom', reference.height),
+    left: resolve_side('left', sides.left ?? sides.l ?? sides.h, reference.width),
+    top: resolve_side('top', sides.top ?? sides.t ?? sides.v, reference.height),
+    right: resolve_side('right', sides.right ?? sides.r ?? sides.h, reference.width),
+    bottom: resolve_side('bottom', sides.bottom ?? sides.b ?? sides.v, reference.height),
   });
 }
 

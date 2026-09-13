@@ -14,6 +14,7 @@ import { resolve_font_size, resolve_length } from './units';
 import type { Length, ReferenceBox } from './units';
 
 type StackAlign = AlignmentValue | 'baseline';
+type ResolvedStackAlign = number | 'stretch' | 'baseline';
 type StackJustify = Exclude<AlignmentValue, 'stretch'>
   | 'space_between' | 'space_around' | 'space_evenly';
 type StackProps = ElementProps & Readonly<{
@@ -28,13 +29,26 @@ type Item = {
   basis?: number;
   grow: number;
   shrink: number;
+  align: ResolvedStackAlign;
   fragment?: Fragment;
 };
+
+// Stack alignment is one cross-axis value, not Box's two-axis alignment.
+function stack_alignment(align: StackAlign, main: Axis, path: string): ResolvedStackAlign {
+  if (align === 'baseline') {
+    if (main !== 'width') throw new TypeError(`${path}: Baseline alignment is available on HStack`);
+    return align;
+  }
+  if (typeof align !== 'number' && typeof align !== 'string') {
+    throw new TypeError(`${path}: stack alignment needs a single alignment value`);
+  }
+  return resolve_alignment(align, path).x;
+}
 
 // Resolve parent-owned flex metadata with the child's local font and a stable
 // containing box. Trial allocations never become fractional reference lengths.
 function stack_item(element: Element, index: number, main: Axis,
-  query: LayoutQuery, reference: ReferenceBox): Item {
+  query: LayoutQuery, reference: ReferenceBox, align: ResolvedStackAlign): Item {
   const { props } = element;
   const path = `${query.path}/${element.type.name}[${index}]`;
   const font_size = resolve_font_size(props.font_size, query.style.font_size, `${path}.font_size`);
@@ -43,6 +57,8 @@ function stack_item(element: Element, index: number, main: Axis,
     : nonnegative(resolve_length(props.basis, { font_size, fraction: reference[main] },
       `${path}.basis`), `${path}.basis`);
   return { element, index, sizing, basis,
+    align: props.align_self === undefined ? align
+      : stack_alignment(props.align_self, main, `${path}.align_self`),
     grow: nonnegative(props.grow ?? 0, `${path}.grow`),
     shrink: nonnegative(props.shrink ?? 0, `${path}.shrink`) };
 }
@@ -78,21 +94,22 @@ function stack_guides(children: readonly Placement[]): Guides {
 // A measured cross axis is selected once, without percentage feedback or search.
 function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const cross = main === 'width' ? 'height' : 'width';
-  const align = props.align === 'baseline' ? 'baseline' : resolve_alignment(props.align ?? 'start').x;
-  if (align === 'baseline' && main !== 'width') {
-    throw new TypeError('Baseline alignment is available on HStack');
-  }
+  const align = stack_alignment(props.align ?? 'start', main, `${query.path}.align`);
   const reference = definite_reference(query.request, query.sizing);
   const gap = nonnegative(resolve_length(props.gap ?? 0, {
     font_size: query.style.font_size, fraction: reference[main],
   }, `${query.path}.gap`), `${query.path}.gap`);
   const items = element_children(props.children).map((element, index) =>
-    stack_item(element, index, main, query, reference));
+    stack_item(element, index, main, query, reference, align));
   const gaps = Math.max(0, items.length - 1) * gap;
+  const stretching = items.some(item => item.align === 'stretch');
 
   const offer = query.request[cross];
-  let cross_request: AxisRequest = align === 'stretch' && reference[cross] !== undefined
-    ? exact(reference[cross]) : offer.kind === 'exact' ? available(offer.value) : offer;
+  const cross_offer = offer.kind === 'exact' ? available(offer.value) : offer;
+  let cross_size = reference[cross];
+  function cross_request(item: Item): AxisRequest {
+    return item.align === 'stretch' && cross_size !== undefined ? exact(cross_size) : cross_offer;
+  }
   const size_axes = (length: number, breadth: number) => main === 'width'
     ? make_size(length, breadth) : make_size(breadth, length);
   const select_cross = (breadth: number) =>
@@ -100,9 +117,9 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
 
   // Only intrinsic bases require a probe. A stretching column also needs each
   // child's width before it can measure the heights for its final shared width.
-  const column_stretch = main === 'height' && align === 'stretch' && cross_request.kind !== 'exact';
+  const column_stretch = main === 'height' && stretching && cross_size === undefined;
   function measure(item: Item, request: AxisRequest): Fragment {
-    return query.child(item.element, make_request({ [main]: request, [cross]: cross_request }),
+    return query.child(item.element, make_request({ [main]: request, [cross]: cross_request(item) }),
       reference, item.index);
   }
   for (const item of items) {
@@ -113,10 +130,9 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
     }
   }
   if (column_stretch) {
-    const breadth = select_cross(Math.max(0, ...items.map(item => item.fragment!.size[cross])));
-    cross_request = exact(breadth);
+    cross_size = select_cross(Math.max(0, ...items.map(item => item.fragment!.size[cross])));
     for (const item of items) {
-      if (item.basis === undefined && item.fragment!.size[cross] !== breadth) {
+      if (item.align === 'stretch' && item.basis === undefined && item.fragment!.size[cross] !== cross_size) {
         item.fragment = measure(item, natural());
       }
     }
@@ -137,33 +153,38 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const sizes = distribute_flex(flex, Math.max(0, target - gaps));
   let fragments = items.map((item, index) => {
     const fragment = item.fragment;
-    const cross_fits = cross_request.kind !== 'exact' || fragment?.size[cross] === cross_request.value;
+    const offer = cross_request(item);
+    const cross_fits = offer.kind !== 'exact' || fragment?.size[cross] === offer.value;
     return fragment?.size[main] === sizes[index] && cross_fits ? fragment
       : measure(item, exact(sizes[index]));
   });
 
-  // A row's line count is now known. Stretch completed allocations to its chosen
-  // height; widths stay fixed, and text retains its measured glyphs and overflow.
-  if (align === 'stretch' && cross_request.kind !== 'exact') {
-    const breadth = select_cross(Math.max(0, ...fragments.map(fragment => fragment.size[cross])));
-    cross_request = exact(breadth);
-    fragments = fragments.map((fragment, index) => fragment.size[cross] === breadth ? fragment
-      : measure(items[index], exact(sizes[index])));
+  // Baselines may lie outside a child's allocation. Include both sides of the
+  // guide, but only for participating children. Other children retain their own
+  // alignment; a baseline participant without a guide uses its bottom edge.
+  const baselines = fragments.map(fragment => fragment.guides.baseline ?? fragment.size.height);
+  const baseline_items = items.filter(item => item.align === 'baseline');
+  const above = Math.max(0, ...baseline_items.map(item => baselines[item.index]));
+  const below = Math.max(0, ...baseline_items.map(item =>
+    fragments[item.index].size.height - baselines[item.index]));
+  const breadth = Math.max(above + below, 0, ...fragments.map(fragment => fragment.size[cross]));
+  const length = sizes.reduce((sum, size) => sum + size, gaps);
+  // A stretching column keeps the width selected before height allocation.
+  // Later growth in non-stretch children is overflow, not a new reflow cycle.
+  const size = finish_size(size_axes(length, cross_size ?? breadth), query.request, query.sizing);
+  // A row's width allocation and baseline group are now known. Stretch only
+  // participating children to its chosen height, without changing their widths.
+  if (stretching && cross_size === undefined) {
+    cross_size = size[cross];
+    fragments = fragments.map((fragment, index) =>
+      items[index].align !== 'stretch' || fragment.size[cross] === cross_size ? fragment
+        : measure(items[index], exact(sizes[index])));
   }
 
-  // Baselines may lie outside a child's allocation. Include both sides of the
-  // guide in the row's height; a child without a guide uses its bottom edge.
-  const baselines = fragments.map(fragment => fragment.guides.baseline ?? fragment.size.height);
-  const above = align === 'baseline' ? Math.max(0, ...baselines) : 0;
-  const below = align === 'baseline' ? Math.max(0, ...fragments.map((fragment, index) =>
-    fragment.size.height - baselines[index])) : 0;
-  const breadth = align === 'baseline' ? above + below
-    : Math.max(0, ...fragments.map(fragment => fragment.size[cross]));
-  const length = sizes.reduce((sum, size) => sum + size, gaps);
-  const size = finish_size(size_axes(length, breadth), query.request, query.sizing);
   const packing = pack_stack(props.justify ?? 'start', items.length, size[main] - length, gap);
   let position = packing.offset;
   const children = fragments.map((fragment, index) => {
+    const align = items[index].align;
     const offset = align === 'baseline' ? above - baselines[index]
       : (size[cross] - fragment.size[cross]) * (align === 'stretch' ? 0 : align);
     const point = main === 'width' ? make_point(position, offset) : make_point(offset, position);
@@ -172,7 +193,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   });
   const guides = stack_guides(children);
   return make_fragment({ size, children,
-    guides: align === 'baseline' && items.length ? { ...guides, baseline: above } : guides });
+    guides: baseline_items.length ? { ...guides, baseline: above } : guides });
 }
 
 class HStack extends Element<StackProps> {

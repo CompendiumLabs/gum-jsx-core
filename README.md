@@ -171,8 +171,21 @@ ratio on text or containers.
 
 ## Insets and fragments
 
-`resolve_insets` accepts a uniform length or named `{ left, top, right, bottom }`
-fields. Missing sides default to zero. Deflation floors inner dimensions at zero;
+`resolve_insets` accepts a uniform length or these shorthand forms. Each value is
+a length: `px()`, `em()`, or a raw fraction resolved against its corresponding axis.
+
+| Form | Meaning |
+|---|---|
+| `{ top, bottom, left, right }` | Individual side lengths. |
+| `{ t, b, l, r }` | Short names for the same sides. |
+| `{ h, v }` | Horizontal (left/right) and vertical (top/bottom) lengths. |
+| `[h, v]` | Two-entry horizontal/vertical tuple. |
+| `[t, b, l, r]` | Four-entry top/bottom/left/right tuple. |
+
+Object forms may be mixed: full side names override short names, which override
+`h`/`v`. Missing sides default to zero; an explicit zero overrides a broader
+default. Tuple order follows Gum, not CSS, and arrays require exactly two or four
+lengths. Inputs are not mutated. Deflation floors inner dimensions at zero;
 inflation preserves the full inset extent, including when it cannot fit.
 
 Box dimensions denote the border box, including padding and border. Padding and
@@ -320,8 +333,8 @@ alone does not establish that box.
 pass resolves shared style and sizing, runs the layout method, validates its size,
 and caches the fragment. Insets, placement, and decoration belong to elements.
 Element-specific properties are interpreted by the element's layout method.
-The direct stack parent interprets a child's `basis`, `grow`, and `shrink`; these
-properties introduce no policy in the layout pass and do not inherit.
+The direct stack parent interprets a child's `basis`, `grow`, `shrink`, and
+`align_self`; these properties introduce no policy in the layout pass and do not inherit.
 Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
 do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
@@ -373,7 +386,7 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | Prop | Meaning |
 |---|---|
 | `width`, `height`, `min_width`, etc. | The shared sizing policy, applied to the border box. |
-| `padding` | Uniform length or named sides; default zero. |
+| `padding` | Length, side/axis object, or `[h, v]` / `[t, b, l, r]`; default zero. |
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
@@ -489,15 +502,28 @@ needs one query per element, including Svg:
 | `align` | Cross-axis `"start"` (default), `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1. HStack also accepts `"baseline"`. |
 | `justify` | Main-axis `"start"` (default), `"center"`, `"end"`, a number from 0 to 1, `"space_between"`, `"space_around"`, or `"space_evenly"`. |
 
-Flex properties belong to the **direct child** of a stack. Put them on an enclosing
-Box when the Box is the item being allocated; they do not pass through wrappers.
+Flex and `align_self` properties belong to the **direct child** of a stack. Put
+them on an enclosing Box when the Box is the item being allocated; they do not
+pass through wrappers.
 
 | Child prop | Meaning |
 |---|---|
 | `basis` | Starting main-axis length. Otherwise use the child's preferred width/height, otherwise its measured natural size. |
 | `grow` | Nonnegative weight for surplus space, default **0**. |
 | `shrink` | Nonnegative shortage weight, default **0**; multiplied by the original basis. |
+| `align_self` | Override the parent's cross-axis `align` for this child. Same values; omitted or `undefined` uses the stack's `align`. |
 | `min_width`, `max_width`, etc. | Bounds on the stack's main-axis allocation to this item. |
+
+`align_self` positions the child vertically in HStack and horizontally in VStack.
+It is independent of a child container's own `align`, which positions its contents,
+and does not inherit. For example, a child can opt out of a stretching column:
+
+```jsx
+<VStack width={px(240)} align="stretch">
+  <Text>This child receives the column width.</Text>
+  <Text align-self="end">This child hugs its text at the right.</Text>
+</VStack>
+```
 
 The allocator reserves gaps, clamps bases, then distributes surplus or shortage
 among participating children. Growth uses `grow`; shrinkage uses `shrink × basis`.
@@ -525,19 +551,26 @@ offers pass inward for measurement. A natural main axis packs clamped bases;
 an own minimum can supply additional space to growing items.
 
 Text is measured at the selected width before the stack determines its height.
-For `align="stretch"`, a definite cross axis becomes an exact child request. On a
-hugging cross axis, a column selects its shared width and remeasures text heights
+For children whose effective alignment is `"stretch"`, a definite cross axis
+becomes an exact child request. On a hugging cross axis, a column selects its
+shared width and remeasures text heights
 before allocating vertical space; a row allocates widths and reflows text before
 selecting the shared height. Stretch may override a child's preferred cross size
 and cross limits, following the exact-request contract. The selected cross size
 is never fed back into percentage references. These are bounded measurement
-phases, with no aspect-fitting search or font scaling.
+phases, with no aspect-fitting search or font scaling. Only stretching children
+are remeasured at the selected cross size. A stretching column keeps its selected
+width if a non-stretching child later grows wider during height allocation;
+that excess is overflow, not another width-selection/reflow cycle.
 
-Baseline alignment uses each child's first `baseline` guide, falling back to its
-bottom edge. The row includes the largest extent above and below that guide.
+Baseline alignment uses each participating child's first `baseline` guide, falling
+back to its bottom edge. The row includes the group's largest extents above and
+below that guide, as well as other children's heights. A child can opt into or out
+of this group with `align_self`; baseline alignment is only available in horizontal
+stacks. Stretching siblings receive a height that includes the baseline group.
 Stacks propagate the first guided child's guides and the last textual child's
 `last_baseline`, shifted into the stack's coordinates. `justify` only positions
-completed main-axis slots; `align` positions their cross axes; `Text.text_align`
+completed main-axis slots; `align`/`align_self` position their cross axes; `Text.text_align`
 positions text inside its own allocation. Center/end can use negative offsets
 for overflowing content. Distributed spacing only adds positive free space to gaps.
 

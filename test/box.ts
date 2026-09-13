@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {
-  Box, Frame, Fit, Svg, Square, Rect, Text, Fonts, LayoutPass, evaluate,
+  Box, Frame, Fit, Svg, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
+  TextFigure, Legend, Slide, Fonts, LayoutPass, evaluate,
   px, em, make_request, exact, available, make_size, make_insets,
   render_svg, inspect_fragment,
 } from '../src/index';
-import type { FontProvider } from '../src/index';
+import type { FontProvider, InsetSpec, Length } from '../src/index';
 import { Fixed } from '../examples/leaves';
 
 function near(actual: number, expected: number): void {
@@ -58,6 +59,51 @@ const tests: Record<string, () => void> = {
     const outer = pass.layout(new Box({ padding: px(4), children: box }));
     assert.deepEqual(outer.size, { width: 76, height: 60 });
     assert.equal(outer.guides.baseline, 34);
+  },
+
+  'padding shorthands agree with named sides across box and document elements'() {
+    const pass = new LayoutPass();
+    const child = new Fixed({ content_width: px(40), content_height: px(20) });
+    const cases: readonly (readonly [InsetSpec, InsetSpec])[] = [
+      [{ h: 0.05, v: em(0.2) }, { left: 0.05, right: 0.05, top: em(0.2), bottom: em(0.2) }],
+      [[0.05, em(0.2)], { left: 0.05, right: 0.05, top: em(0.2), bottom: em(0.2) }],
+      [{ t: px(4), b: em(0.3), l: 0.05, r: px(5) }, { top: px(4), bottom: em(0.3), left: 0.05, right: px(5) }],
+      [[px(4), em(0.3), 0.05, px(5)], { top: px(4), bottom: em(0.3), left: 0.05, right: px(5) }],
+    ];
+    const context = { reference: { width: 240, height: 120 } };
+    for (const Container of [Box, Frame, TextBox, TextFrame, TitleBox, TitleFrame, TextFigure, Legend, Slide]) {
+      for (const [padding, named] of cases) {
+        const props = { font_size: px(20), children: child };
+        const source = new Container({ ...props, padding }), canonical = new Container({ ...props, padding: named });
+        for (const request of [make_request(), make_request({ width: exact(200), height: exact(100) })]) {
+          assert.deepEqual(pass.layout(source, request, context), pass.layout(canonical, request, context), Container.name);
+        }
+      }
+    }
+    const box = pass.layout(new Box({ padding: [px(4), px(6), px(3), px(5)], children: child }));
+    assert.deepEqual(box.size, { width: 48, height: 30 });
+    assert.deepEqual(box.content, { x: 3, y: 4, width: 40, height: 20 });
+    assert.deepEqual(box.children[0].offset, { x: 3, y: 4 });
+    assert.equal(box.guides.baseline, 20);
+  },
+
+  'padding shorthands work in JSX and source elements snapshot their inputs'() {
+    const pass = new LayoutPass();
+    for (const padding of ['{ h: px(3), v: px(4) }', '[px(3), px(4)]',
+      '{ t: px(4), b: px(4), l: px(3), r: px(3) }', '[px(4), px(4), px(3), px(3)]']) {
+      const source = evaluate(`<Svg><Box padding={${padding}}><Square width={px(20)} /></Box></Svg>`);
+      assert.deepEqual(pass.layout(source).size, { width: 26, height: 28 });
+    }
+    const length = { value: 3, unit: 'px' as const };
+    const tuple: [Length, Length] = [length, px(4)], object = { h: length, v: px(4) };
+    const a = new Box({ padding: tuple }), b = new Box({ padding: object });
+    length.value = 30;
+    tuple[1] = px(40);
+    object.v = px(50);
+    assert.deepEqual(pass.layout(a).size, { width: 6, height: 8 });
+    assert.deepEqual(pass.layout(b).size, { width: 6, height: 8 });
+    assert.ok(Object.isFrozen(a.props.padding) && Object.isFrozen(b.props.padding));
+    assert.equal(pass.layout(a), pass.layout(a));
   },
 
   'outer padding leaves inner sizing intact and stretch forwards exact allocations'() {
