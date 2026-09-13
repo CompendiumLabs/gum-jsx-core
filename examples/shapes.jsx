@@ -1,17 +1,19 @@
 // This gallery grid is a fixed test arrangement, not a layout container API.
-const ShapeGallery = define_element('ShapeGallery', (props, query) => {
-  const size = finish_size(make_size(720, 396), query.request, query.sizing);
-  const items = element_children(props.children);
-  const children = [place_fragment(query.child(items[0], make_request(), size), make_point(24, 20))];
-  items.slice(1).forEach((item, index) => {
-    const cell = floor(index / 2), label = index % 2;
-    const x = 32 + cell % 4 * 176, y = 92 + floor(cell / 4) * 156;
-    const request = label ? make_request() : make_request({ width: exact(128), height: exact(80) });
-    children.push(place_fragment(query.child(item, request, size, index + 1),
-      make_point(x, y + (label ? 98 : 0))));
-  });
-  return make_fragment({ size, children });
-});
+class ShapeGallery extends Element {
+  static layout(props, query) {
+    const size = finish_size(make_size(720, 396), query.request, query.sizing);
+    const items = element_children(props.children);
+    const children = [place_fragment(query.child(items[0], make_request(), size), make_point(24, 20))];
+    items.slice(1).forEach((item, index) => {
+      const cell = floor(index / 2), label = index % 2;
+      const x = 32 + cell % 4 * 176, y = 92 + floor(cell / 4) * 156;
+      const request = label ? make_request() : make_request({ width: exact(128), height: exact(80) });
+      children.push(place_fragment(query.child(item, request, size, index + 1),
+        make_point(x, y + (label ? 98 : 0))));
+    });
+    return make_fragment({ size, children });
+  }
+}
 
 return <Svg width={px(720)} height={px(396)} color={slate} font_size={px(14)}
   stroke={slate} stroke_width={px(3)} fill={blue} stroke_linejoin="round">

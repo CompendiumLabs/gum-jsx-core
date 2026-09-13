@@ -48,19 +48,12 @@ function define_element<Props extends ElementProps = ElementProps, Input extends
   options: ElementOptions<Props, Input> = {},
 ) {
   const preset = copy_data(defaults);
-  const type: ElementType = Object.freeze({
-    name,
-    layout: (element, query) => layout(element.props as Readonly<Props>, query),
-    ...(options.data_bounds ? {
-      data_bounds: (element: Element) => options.data_bounds!(element.props as Readonly<Props>),
-    } : {}),
-  });
-  return class extends Element<Props> {
-    constructor(props: Input = {} as Input) {
-      // Sampling and component expansion happen once, before immutable ownership.
-      // No callbacks or mutable external state survive in the source description.
-      super(type, { ...preset, ...(options.normalize ? options.normalize(props) : props) } as Props);
-    }
+  return class extends Element<Props, Input> {
+    static element_name = name;
+    static defaults = preset;
+    static layout = layout;
+    static normalize = options.normalize;
+    static data_bounds = options.data_bounds;
   };
 }
 
@@ -98,14 +91,62 @@ function content_child(child: Child = []): Element | undefined {
   return children[0];
 }
 
-class Element<Props extends ElementProps = ElementProps> {
+// Static hooks are captured once per class. A type descriptor operates on props,
+// so components can adopt it without retaining the source element's prototype.
+type ElementClass = Function & ElementOptions<ElementProps, ElementProps> & Readonly<{
+  element_name?: string;
+  defaults?: Partial<ElementProps>;
+  layout?: LayoutMethod<ElementProps>;
+}>;
+type ElementDefinition = Readonly<{
+  defaults: Readonly<ElementProps>;
+  type?: ElementType;
+  normalize?: (props: ElementProps) => ElementProps;
+}>;
+const definitions = new WeakMap<Function, ElementDefinition>();
+
+function element_definition(ctor: ElementClass): ElementDefinition {
+  const existing = definitions.get(ctor);
+  if (existing) return existing;
+  const parent = Object.getPrototypeOf(ctor);
+  const inherited = parent === Element || parent.prototype instanceof Element
+    ? element_definition(parent).defaults : {};
+  const defaults = copy_data({ ...inherited, ...(Object.hasOwn(ctor, 'defaults') ? ctor.defaults : {}) });
+  const { layout, normalize, data_bounds } = ctor;
+  const name = Object.hasOwn(ctor, 'element_name') ? ctor.element_name! : ctor.name;
+  if (typeof name !== 'string' || !name) throw new TypeError('Element name must be a nonempty string');
+  for (const [key, hook] of Object.entries({ layout, normalize, data_bounds })) {
+    if (hook !== undefined && typeof hook !== 'function') throw new TypeError(`${name}.${key} must be a function`);
+  }
+  const type: ElementType | undefined = layout && Object.freeze({
+    name,
+    layout: (element: Element, query: LayoutQuery) => layout.call(ctor, element.props, query),
+    ...(data_bounds ? { data_bounds: (element: Element) => data_bounds.call(ctor, element.props) } : {}),
+  });
+  const definition = Object.freeze({ defaults, type, normalize: normalize?.bind(ctor) });
+  definitions.set(ctor, definition);
+  return definition;
+}
+
+class Element<Props extends ElementProps = ElementProps, Input extends ElementProps = Props> {
   readonly type: ElementType;
   readonly props: Readonly<Props>;
 
   // Descriptions own their source data; all evaluation state belongs to a pass.
-  constructor(type: ElementType, props: Props) {
-    this.type = Object.freeze({ ...type });
-    this.props = copy_data(props);
+  constructor(...args: [props?: Input] | [type: ElementType, props: Props]) {
+    if (args.length === 2) {
+      // Explicit descriptors remain available for protocol adoption and low-level callers.
+      this.type = Object.freeze({ ...args[0] });
+      this.props = copy_data(args[1]);
+    } else {
+      const definition = element_definition(new.target as unknown as ElementClass);
+      if (!definition.type) throw new TypeError(`${new.target.name} must define static layout(props, query)`);
+      this.type = definition.type;
+      // Normalize raw input once, then apply source defaults, just like define_element.
+      const input = args[0] === undefined ? {} as Input : args[0];
+      const source = definition.normalize ? definition.normalize(input) : input;
+      this.props = copy_data({ ...definition.defaults, ...source } as Props);
+    }
     Object.freeze(this);
   }
 }

@@ -8,7 +8,7 @@ import { infer_coordinates } from './coordinates';
 import type { Coordinates } from './coordinates';
 import { text_element } from './document';
 import { draw_rect } from './drawing';
-import { define_element, Element, element_children } from './element';
+import { Element, element_children } from './element';
 import type { ElementProps } from './element';
 import { make_fragment, place_fragment } from './fragment';
 import type { Fragment, Placement } from './fragment';
@@ -53,10 +53,13 @@ type OuterLabelProps = ElementProps & Readonly<{
 }>;
 type OuterLabelData = ElementProps & Readonly<{ side?: Side; offset?: Length; label_element: Element }>;
 
-const Legend = define_element<BoxProps, LegendProps>('Legend', box_layout,
-  { padding: em(0.6), border_width: px(1), border_color: '#cbd5e1', background: 'white', radius: px(4) }, {
-    data_bounds: () => null,
-    normalize: ({ entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props }) => ({ ...props,
+class Legend extends Element<BoxProps, LegendProps> {
+  static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: '#cbd5e1', background: 'white', radius: px(4) };
+  static data_bounds() {
+    return null;
+  }
+  static normalize({ entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props }: LegendProps): BoxProps {
+    return { ...props,
       children: new VStack({ gap, children: entries.map(entry => {
         const color = entry.color ?? '#2563eb';
         const badge = entry.badge ?? (entry.kind === 'bar'
@@ -67,8 +70,10 @@ const Legend = define_element<BoxProps, LegendProps>('Legend', box_layout,
               to: { x: 1, y: 0.5 }, stroke: color, stroke_width: px(2) }));
         return new HStack({ gap: em(0.5), align: 'center', children: [badge, text_element(entry.label, label_style)] });
       }) }),
-    }),
-  });
+    };
+  }
+  static layout = box_layout;
+}
 
 // Bounds, tick values, and label descriptions depend only on source data. Build
 // them once; every resize reuses these identities and only lays out their geometry.
@@ -163,32 +168,51 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   return make_fragment({ size, content: area, draw, children });
 }
 
-const Plot = define_element<PlotData, PlotProps>('Plot', plot_layout,
-  { font_size: px(12), color: '#334155', stroke: '#64748b' }, { normalize: plot_data, data_bounds: () => null });
-const BarPlot = define_element<PlotData, BarPlotProps>('BarPlot', plot_layout,
-  { font_size: px(12), color: '#334155', stroke: '#64748b' }, { data_bounds: () => null,
-    normalize: ({ values, positions, bases, bar_width, styles, direction, radius, children, ...props }) => plot_data({
+class Plot extends Element<PlotData, PlotProps> {
+  static defaults: Partial<PlotData> = { font_size: px(12), color: '#334155', stroke: '#64748b' };
+  static normalize = plot_data;
+  static data_bounds() {
+    return null;
+  }
+  static layout = plot_layout;
+}
+
+class BarPlot extends Element<PlotData, BarPlotProps> {
+  static defaults: Partial<PlotData> = { font_size: px(12), color: '#334155', stroke: '#64748b' };
+  static data_bounds() {
+    return null;
+  }
+  static normalize({ values, positions, bases, bar_width, styles, direction, radius, children, ...props }: BarPlotProps): PlotData {
+    return plot_data({
       ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, radius,
         fill: props.fill ?? '#2563eb' }),
         ...element_children(children)],
-    }),
-  });
+    });
+  }
+  static layout = plot_layout;
+}
 
-const OuterLabel = define_element<OuterLabelData, OuterLabelProps>('OuterLabel', (props, query) => {
-  const size = shape_size(query.request, query.sizing), { side = 'bottom' } = props;
-  if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown label side');
-  const label = query.child(props.label_element, make_request(), size, 0, { coordinates: null });
-  const offset = resolve_length(props.offset ?? em(1),
-    { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'offset');
-  const x = side === 'left' ? -offset - label.size.width : side === 'right' ? size.width + offset
-    : (size.width - label.size.width) / 2;
-  const y = side === 'top' ? -offset - label.size.height : side === 'bottom' ? size.height + offset
-    : (size.height - label.size.height) / 2;
-  return make_fragment({ size, children: [place_fragment(label, make_point(x, y))] });
-}, {}, { data_bounds: () => null, normalize: ({ label, children, rotate, ...props }) => {
-  const element = text_element(label ?? children);
-  return { ...props, label_element: rotate ? new Rotate({ angle: rotate, children: element }) : element };
-} });
+class OuterLabel extends Element<OuterLabelData, OuterLabelProps> {
+  static data_bounds() {
+    return null;
+  }
+  static normalize({ label, children, rotate, ...props }: OuterLabelProps): OuterLabelData {
+    const element = text_element(label ?? children);
+    return { ...props, label_element: rotate ? new Rotate({ angle: rotate, children: element }) : element };
+  }
+  static layout(props: OuterLabelData, query: LayoutQuery) {
+    const size = shape_size(query.request, query.sizing), { side = 'bottom' } = props;
+    if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown label side');
+    const label = query.child(props.label_element, make_request(), size, 0, { coordinates: null });
+    const offset = resolve_length(props.offset ?? em(1),
+      { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'offset');
+    const x = side === 'left' ? -offset - label.size.width : side === 'right' ? size.width + offset
+      : (size.width - label.size.width) / 2;
+    const y = side === 'top' ? -offset - label.size.height : side === 'bottom' ? size.height + offset
+      : (size.height - label.size.height) / 2;
+    return make_fragment({ size, children: [place_fragment(label, make_point(x, y))] });
+  }
+}
 
 export { Plot, BarPlot, Legend, OuterLabel };
 export type { PlotProps, BarPlotProps, LegendProps, LegendEntry, OuterLabelProps };

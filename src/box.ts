@@ -3,7 +3,7 @@ import { layout_content, resolve_alignment, align_offset, fit_scale, definite_re
 import type { Alignment, FitMode } from './composition';
 import { DEFAULTS } from './defaults';
 import { draw_rect } from './drawing';
-import { define_element, content_child } from './element';
+import { Element, content_child } from './element';
 import type { ElementProps } from './element';
 import { make_fragment, place_fragment, transform_guides } from './fragment';
 import type { Fragment } from './fragment';
@@ -90,39 +90,47 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
   return make_fragment({ size, content, guides, overflow, draw, children });
 }
 
-const Box = define_element<BoxProps>('Box', box_layout);
-const Frame = define_element<BoxProps>('Frame', (props, query) =>
-  box_layout({ ...props, border_width: props.border_width ?? px(DEFAULTS.stroke_width) }, query));
+class Box extends Element<BoxProps> {
+  static layout = box_layout;
+}
 
-const Fit = define_element<FitProps>('Fit', (props, query) => {
-  const { mode = 'contain', align = 'center', clip = false } = props;
-  const alignment = resolve_alignment(align);
-  if (alignment.x === 'stretch' || alignment.y === 'stretch') {
-    throw new TypeError('Fit uses uniform scaling; choose start, center, or end alignment');
+class Frame extends Element<BoxProps> {
+  static layout(props: BoxProps, query: LayoutQuery) {
+    return box_layout({ ...props, border_width: props.border_width ?? px(DEFAULTS.stroke_width) }, query);
   }
-  const child = content_child(props.children);
-  // Fit deliberately occupies finite offers, establishing those axes before
-  // measuring its child naturally. Unoffered axes follow the scaled child.
-  const reference = { ...definite_reference(query.request, query.sizing) };
-  for (const axis of ['width', 'height'] as const) {
-    const offer = query.request[axis];
-    if (offer.kind !== 'natural') reference[axis] = offer.value;
+}
+
+class Fit extends Element<FitProps> {
+  static layout(props: FitProps, query: LayoutQuery) {
+    const { mode = 'contain', align = 'center', clip = false } = props;
+    const alignment = resolve_alignment(align);
+    if (alignment.x === 'stretch' || alignment.y === 'stretch') {
+      throw new TypeError('Fit uses uniform scaling; choose start, center, or end alignment');
+    }
+    const child = content_child(props.children);
+    // Fit deliberately occupies finite offers, establishing those axes before
+    // measuring its child naturally. Unoffered axes follow the scaled child.
+    const reference = { ...definite_reference(query.request, query.sizing) };
+    for (const axis of ['width', 'height'] as const) {
+      const offer = query.request[axis];
+      if (offer.kind !== 'natural') reference[axis] = offer.value;
+    }
+    const fragment = child ? query.child(child, make_request(), reference) : undefined;
+    const measured = fragment?.size ?? make_size();
+    const initial = fit_scale(measured, reference, mode);
+    const target = make_size(reference.width ?? measured.width * initial,
+      reference.height ?? measured.height * initial);
+    const size = finish_size(target, query.request, query.sizing);
+    const scale = fit_scale(measured, size, mode);
+    const scaled = make_size(measured.width * scale, measured.height * scale);
+    const offset = align_offset(size, scaled, alignment);
+    const children = fragment ? [place_fragment(fragment, offset, [scale, 0, 0, scale, 0, 0])] : [];
+    return make_fragment({
+      size, children, guides: transform_guides(fragment?.guides ?? {}, offset.y, scale),
+      ...(clip ? { clip: make_rect(0, 0, size.width, size.height) } : {}),
+    });
   }
-  const fragment = child ? query.child(child, make_request(), reference) : undefined;
-  const measured = fragment?.size ?? make_size();
-  const initial = fit_scale(measured, reference, mode);
-  const target = make_size(reference.width ?? measured.width * initial,
-    reference.height ?? measured.height * initial);
-  const size = finish_size(target, query.request, query.sizing);
-  const scale = fit_scale(measured, size, mode);
-  const scaled = make_size(measured.width * scale, measured.height * scale);
-  const offset = align_offset(size, scaled, alignment);
-  const children = fragment ? [place_fragment(fragment, offset, [scale, 0, 0, scale, 0, 0])] : [];
-  return make_fragment({
-    size, children, guides: transform_guides(fragment?.guides ?? {}, offset.y, scale),
-    ...(clip ? { clip: make_rect(0, 0, size.width, size.height) } : {}),
-  });
-});
+}
 
 export { Box, Frame, Fit, box_layout };
 export type { BoxProps, FitProps };

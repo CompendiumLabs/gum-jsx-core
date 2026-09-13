@@ -2,7 +2,7 @@
 import LineBreaker from 'linebreak';
 import { DEFAULTS } from './defaults';
 import { draw_path } from './drawing';
-import { define_element } from './element';
+import { Element } from './element';
 import type { Child, ElementProps } from './element';
 import type { FontProvider, GlyphShape, MeasuredFont } from './fonts';
 import { make_fragment, place_fragment } from './fragment';
@@ -226,8 +226,13 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   return make_fragment({ size, guides, label: prepared.text, children });
 }
 
-const Text = define_element<TextProps>('Text', text_layout);
-const Span = define_element<SpanProps>('Span', text_layout);
+class Text extends Element<TextProps> {
+  static layout = text_layout;
+}
+
+class Span extends Element<SpanProps> {
+  static layout = text_layout;
+}
 
 export { Text, Span };
 export type { TextProps, SpanProps };

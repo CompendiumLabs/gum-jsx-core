@@ -55,7 +55,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
-    em, px, define_element, define_component, element_children,
+    em, px, Element, define_element, define_component, element_children,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,

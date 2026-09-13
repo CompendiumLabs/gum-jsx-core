@@ -1,6 +1,7 @@
+import type { LayoutQuery } from './pass';
+import type { ElementProps } from './element';
 import { finite } from './checks';
-import { define_component, define_element } from './element';
-import type { Element } from './element';
+import { Element, define_component } from './element';
 import { make_fragment, place_fragment } from './fragment';
 import { make_point } from './geometry';
 import type { Point } from './geometry';
@@ -70,23 +71,8 @@ const SymFill = define_component<SymFillProps>('SymFill', ({ upper = 1, lower = 
 
 // Vector directions are mapped before head construction, so non-square graph
 // frames orient arrows correctly while head dimensions remain fixed in pixels.
-const Field = define_element<FieldData, FieldProps>('Field', (props, query) => {
-  const { size, point, paint, length } = mark_context(props, query);
-  const draw = [], children = [];
-  for (const [index, vector] of props.vectors.entries()) {
-    const a = point(vector.from), b = point(vector.to);
-    if (vector.shape) {
-      const width = Math.hypot(b.x - a.x, b.y - a.y), height = length(props.shape_height ?? px(8));
-      const fragment = query.child(vector.shape, make_request({ width: exact(width), height: exact(height) }),
-        { width, height }, index, { coordinates: null });
-      const angle = Math.atan2(b.y - a.y, b.x - a.x), c = Math.cos(angle), s = Math.sin(angle);
-      children.push(place_fragment(fragment, a, [c, s, -s, c, s * height / 2, -c * height / 2]));
-    } else draw.push(...arrow_draw([a, b], paint, { ...paint, fill: paint.stroke, stroke: 'none' },
-      length(props.head_size ?? px(5)), { head_width: props.head_width }));
-  }
-  return make_fragment({ size, draw, children });
-}, {}, {
-  normalize: ({ vectors = [], scale = 1, normalize = false, shape, ...props }) => {
+class Field extends Element<FieldData, FieldProps> {
+  static normalize({ vectors = [], scale = 1, normalize = false, shape, ...props }: FieldProps): FieldData {
     finite(scale, 'scale');
     return { ...props, vectors: vectors.flatMap((sample, index) => {
       const from = finite_point(sample.point), vector = finite_point(sample.vector);
@@ -99,9 +85,27 @@ const Field = define_element<FieldData, FieldProps>('Field', (props, query) => {
       return [{ from, to, shape: typeof shape === 'function'
         ? shape(Object.freeze({ point: from, vector }), index) : shape }];
     }) };
-  },
-  data_bounds: props => mark_bounds(props, props.vectors.flatMap(vector => [vector.from, vector.to])),
-});
+  }
+  static data_bounds(props: FieldData) {
+    return mark_bounds(props, props.vectors.flatMap(vector => [vector.from, vector.to]));
+  }
+  static layout(props: FieldData, query: LayoutQuery) {
+    const { size, point, paint, length } = mark_context(props, query);
+    const draw = [], children = [];
+    for (const [index, vector] of props.vectors.entries()) {
+      const a = point(vector.from), b = point(vector.to);
+      if (vector.shape) {
+        const width = Math.hypot(b.x - a.x, b.y - a.y), height = length(props.shape_height ?? px(8));
+        const fragment = query.child(vector.shape, make_request({ width: exact(width), height: exact(height) }),
+          { width, height }, index, { coordinates: null });
+        const angle = Math.atan2(b.y - a.y, b.x - a.x), c = Math.cos(angle), s = Math.sin(angle);
+        children.push(place_fragment(fragment, a, [c, s, -s, c, s * height / 2, -c * height / 2]));
+      } else draw.push(...arrow_draw([a, b], paint, { ...paint, fill: paint.stroke, stroke: 'none' },
+        length(props.head_size ?? px(5)), { head_width: props.head_width }));
+    }
+    return make_fragment({ size, draw, children });
+  }
+}
 
 const SymField = define_component<SymFieldProps>('SymField', ({ f, xlim = [-1, 1], ylim = [-1, 1],
   xvals, yvals, samples = 11, ...props }) => {

@@ -1,7 +1,7 @@
 import { nonnegative } from './checks';
 import { DEFAULTS } from './defaults';
 import { draw_rect, draw_ellipse, draw_path } from './drawing';
-import { define_component, define_element, element_children } from './element';
+import { Element, define_component, element_children } from './element';
 import type { ElementProps } from './element';
 import { make_fragment } from './fragment';
 import { make_size, make_point, make_rect, read_point } from './geometry';
@@ -69,40 +69,54 @@ function rect_layout(props: RectProps, query: LayoutQuery, radius: Radius = 0) {
   return make_fragment({ size, draw: [draw_rect(rect, paint, corners)] });
 }
 
-const Rect = define_element<RectProps>('Rect', rect_layout);
-const RoundedRect = define_element<RectProps>('RoundedRect', (props, query) =>
-  rect_layout(props, query, DEFAULTS.rounded_radius));
+class Rect extends Element<RectProps> {
+  static layout = rect_layout;
+}
+
+class RoundedRect extends Element<RectProps> {
+  static layout(props: RectProps, query: LayoutQuery) {
+    return rect_layout(props, query, DEFAULTS.rounded_radius);
+  }
+}
 
 // Like Circle, Square keeps its geometry square inside a nonsquare allocation.
-const Square = define_element<RectProps>('Square', (props, query) => {
-  const { size, paint } = shape_context(props, query, 1);
-  const side = Math.min(size.width, size.height);
-  const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side);
-  const radius = resolve_radius(props.radius ?? 0, make_size(side, side), query);
-  return make_fragment({ size, draw: [draw_rect(rect, paint, radius)] });
-});
+class Square extends Element<RectProps> {
+  static layout(props: RectProps, query: LayoutQuery) {
+    const { size, paint } = shape_context(props, query, 1);
+    const side = Math.min(size.width, size.height);
+    const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side);
+    const radius = resolve_radius(props.radius ?? 0, make_size(side, side), query);
+    return make_fragment({ size, draw: [draw_rect(rect, paint, radius)] });
+  }
+}
 
-const Circle = define_element<CircleProps>('Circle', (props, query) => {
-  const { size, paint } = shape_context(props, query, 1);
-  const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
-  const radius = resolve_radius(props.radius ?? 0.5, size, query);
-  return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] });
-});
+class Circle extends Element<CircleProps> {
+  static layout(props: CircleProps, query: LayoutQuery) {
+    const { size, paint } = shape_context(props, query, 1);
+    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
+    const radius = resolve_radius(props.radius ?? 0.5, size, query);
+    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] });
+  }
+}
 
-const Ellipse = define_element<EllipseProps>('Ellipse', (props, query) => {
-  const { size, paint } = shape_context(props, query);
-  const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
-  const radius = resolve_radius(props.radius ?? { x: 0.5, y: 0.5 }, size, query);
-  return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] });
-});
+class Ellipse extends Element<EllipseProps> {
+  static layout(props: EllipseProps, query: LayoutQuery) {
+    const { size, paint } = shape_context(props, query);
+    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center');
+    const radius = resolve_radius(props.radius ?? { x: 0.5, y: 0.5 }, size, query);
+    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] });
+  }
+}
 
-const Line = define_element<LineProps>('Line', (props, query) => {
-  const { size, paint } = shape_context(props, query);
-  const from = resolve_position(props.from ?? { x: 0, y: 0 }, size, query, 'from');
-  const to = resolve_position(props.to ?? { x: 1, y: 1 }, size, query, 'to');
-  const commands: PathCommand[] = [{ kind: 'M', ...from }, { kind: 'L', ...to }];
-  return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
-});
+class Line extends Element<LineProps> {
+  static layout(props: LineProps, query: LayoutQuery) {
+    const { size, paint } = shape_context(props, query);
+    const from = resolve_position(props.from ?? { x: 0, y: 0 }, size, query, 'from');
+    const to = resolve_position(props.to ?? { x: 1, y: 1 }, size, query, 'to');
+    const commands: PathCommand[] = [{ kind: 'M', ...from }, { kind: 'L', ...to }];
+    return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
+  }
+}
 
 // Closing is a path command, so the same point handling serves both primitives.
 function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false) {
@@ -115,16 +129,24 @@ function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false) {
   return make_fragment({ size, draw: [draw_path(commands, paint)] });
 }
 
-const Polyline = define_element<PolylineProps>('Polyline', poly_layout);
-const Polygon = define_element<PolygonProps>('Polygon', (props, query) =>
-  poly_layout(props, query, true));
+class Polyline extends Element<PolylineProps> {
+  static layout = poly_layout;
+}
 
-const Path = define_element<PathProps>('Path', (props, query) => {
-  const { size, paint } = shape_context(props, query);
-  const commands = map_path(props.commands ?? [], (x, y) =>
-    resolve_position({ x, y }, size, query, 'commands'));
-  return make_fragment({ size, draw: [draw_path(commands, paint)] });
-});
+class Polygon extends Element<PolygonProps> {
+  static layout(props: PolygonProps, query: LayoutQuery) {
+    return poly_layout(props, query, true);
+  }
+}
+
+class Path extends Element<PathProps> {
+  static layout(props: PathProps, query: LayoutQuery) {
+    const { size, paint } = shape_context(props, query);
+    const commands = map_path(props.commands ?? [], (x, y) =>
+      resolve_position({ x, y }, size, query, 'commands'));
+    return make_fragment({ size, draw: [draw_path(commands, paint)] });
+  }
+}
 
 const UnitLine = define_component<LineProps>('UnitLine', props => new Line({
   from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props,

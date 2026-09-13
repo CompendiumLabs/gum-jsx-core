@@ -4,8 +4,8 @@ import type { GeometrySpace } from './coordinates';
 import { arc_path, rounded_path, spline_path } from './curves';
 import { draw_path } from './drawing';
 import type { Paint } from './drawing';
-import { define_element, element_children } from './element';
-import type { Element, ElementProps } from './element';
+import { Element, element_children } from './element';
+import type { ElementProps } from './element';
 import { make_fragment, place_fragment } from './fragment';
 import { make_point, read_point } from './geometry';
 import type { Point, Size } from './geometry';
@@ -95,62 +95,85 @@ function line_path(points: readonly Point[], closed = false): PathCommand[] {
   return path;
 }
 
-const CoordLine = define_element<CoordLineProps>('CoordLine', (props, query) => {
-  const { size, point, paint } = mark_context(props, query);
-  const commands = finite_runs(props.points ?? []).flatMap(run => line_path(run.map(point), props.closed));
-  return make_fragment({ size, draw: [draw_path(commands, paint)] });
-}, {}, { data_bounds: props => mark_bounds(props, props.points ?? []) });
-
-const Spline = define_element<SplineProps>('Spline', (props, query) => {
-  const { size, point, paint } = mark_context(props, query);
-  const commands = finite_runs(props.points ?? []).flatMap(run =>
-    spline_path(run.map(point), props.tension, props.closed));
-  return make_fragment({ size, draw: [draw_path(commands, paint)] });
-}, {}, { data_bounds: props => mark_bounds(props, props.points ?? []) });
-
-const RoundedLine = define_element<RoundedLineProps>('RoundedLine', (props, query) => {
-  const { size, point, paint, length } = mark_context(props, query);
-  const commands = finite_runs(props.points ?? []).flatMap(run =>
-    rounded_path(run.map(point), length(props.radius ?? px(8))));
-  return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
-}, {}, { data_bounds: props => mark_bounds(props, props.points ?? []) });
-
-const Segments = define_element<SegmentsProps>('Segments', (props, query) => {
-  const { size, point, paint } = mark_context(props, query);
-  const commands = (props.segments ?? []).flatMap(segment => {
-    if (segment.length !== 2) throw new TypeError('Each segment needs two endpoints');
-    return line_path(segment.map(point));
-  });
-  return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
-}, {}, { data_bounds: props => mark_bounds(props, (props.segments ?? []).flat()) });
-
-const Arc = define_element<ArcProps>('Arc', (props, query) => {
-  const { size, point, paint, length, coord } = mark_context(props, query);
-  const center = props.center ?? { x: 0.5, y: 0.5 }, radius = props.radius ?? 0.5;
-  const paired = is_position(radius);
-  const pair = paired ? read_point(radius, 'radius') : { x: radius, y: radius };
-  const origin = point(center);
-  function delta(value: Length, axis: 'x' | 'y'): number {
-    if (coord && typeof value === 'number') {
-      nonnegative(value, 'radius');
-      const lim = axis === 'x' ? coord.xlim : coord.ylim;
-      return value / (lim[1] - lim[0]) * (axis === 'x' ? size.width : size.height)
-        * ((axis === 'x' ? coord.flip_x : coord.flip_y) ? -1 : 1);
-    }
-    return paired
-      ? nonnegative(resolve_length(value, { font_size: query.style.font_size,
-        fraction: axis === 'x' ? size.width : size.height }, 'radius'), 'radius') : length(value);
+class CoordLine extends Element<CoordLineProps> {
+  static data_bounds(props: CoordLineProps) {
+    return mark_bounds(props, props.points ?? []);
   }
-  const commands = arc_path(origin, make_point(delta(pair.x, 'x'), delta(pair.y, 'y')), props.start, props.end);
-  return make_fragment({ size, draw: [draw_path(commands, paint)] });
-}, {}, { data_bounds: props => {
-  const c = read_point(props.center ?? { x: 0.5, y: 0.5 }, 'center'), r = props.radius ?? 0.5;
-  const pair = is_position(r) ? read_point(r, 'radius') : { x: r, y: r };
-  return typeof c.x === 'number' && typeof c.y === 'number'
-    && typeof pair.x === 'number' && typeof pair.y === 'number' ? mark_bounds(props, [
-      { x: c.x - pair.x, y: c.y - pair.y }, { x: c.x + pair.x, y: c.y + pair.y },
-    ]) : null;
-} });
+  static layout(props: CoordLineProps, query: LayoutQuery) {
+    const { size, point, paint } = mark_context(props, query);
+    const commands = finite_runs(props.points ?? []).flatMap(run => line_path(run.map(point), props.closed));
+    return make_fragment({ size, draw: [draw_path(commands, paint)] });
+  }
+}
+
+class Spline extends Element<SplineProps> {
+  static data_bounds(props: SplineProps) {
+    return mark_bounds(props, props.points ?? []);
+  }
+  static layout(props: SplineProps, query: LayoutQuery) {
+    const { size, point, paint } = mark_context(props, query);
+    const commands = finite_runs(props.points ?? []).flatMap(run =>
+      spline_path(run.map(point), props.tension, props.closed));
+    return make_fragment({ size, draw: [draw_path(commands, paint)] });
+  }
+}
+
+class RoundedLine extends Element<RoundedLineProps> {
+  static data_bounds(props: RoundedLineProps) {
+    return mark_bounds(props, props.points ?? []);
+  }
+  static layout(props: RoundedLineProps, query: LayoutQuery) {
+    const { size, point, paint, length } = mark_context(props, query);
+    const commands = finite_runs(props.points ?? []).flatMap(run =>
+      rounded_path(run.map(point), length(props.radius ?? px(8))));
+    return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
+  }
+}
+
+class Segments extends Element<SegmentsProps> {
+  static data_bounds(props: SegmentsProps) {
+    return mark_bounds(props, (props.segments ?? []).flat());
+  }
+  static layout(props: SegmentsProps, query: LayoutQuery) {
+    const { size, point, paint } = mark_context(props, query);
+    const commands = (props.segments ?? []).flatMap(segment => {
+      if (segment.length !== 2) throw new TypeError('Each segment needs two endpoints');
+      return line_path(segment.map(point));
+    });
+    return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] });
+  }
+}
+
+class Arc extends Element<ArcProps> {
+  static data_bounds(props: ArcProps) {
+    const c = read_point(props.center ?? { x: 0.5, y: 0.5 }, 'center'), r = props.radius ?? 0.5;
+    const pair = is_position(r) ? read_point(r, 'radius') : { x: r, y: r };
+    return typeof c.x === 'number' && typeof c.y === 'number'
+      && typeof pair.x === 'number' && typeof pair.y === 'number' ? mark_bounds(props, [
+        { x: c.x - pair.x, y: c.y - pair.y }, { x: c.x + pair.x, y: c.y + pair.y },
+      ]) : null;
+  }
+  static layout(props: ArcProps, query: LayoutQuery) {
+    const { size, point, paint, length, coord } = mark_context(props, query);
+    const center = props.center ?? { x: 0.5, y: 0.5 }, radius = props.radius ?? 0.5;
+    const paired = is_position(radius);
+    const pair = paired ? read_point(radius, 'radius') : { x: radius, y: radius };
+    const origin = point(center);
+    function delta(value: Length, axis: 'x' | 'y'): number {
+      if (coord && typeof value === 'number') {
+        nonnegative(value, 'radius');
+        const lim = axis === 'x' ? coord.xlim : coord.ylim;
+        return value / (lim[1] - lim[0]) * (axis === 'x' ? size.width : size.height)
+          * ((axis === 'x' ? coord.flip_x : coord.flip_y) ? -1 : 1);
+      }
+      return paired
+        ? nonnegative(resolve_length(value, { font_size: query.style.font_size,
+          fraction: axis === 'x' ? size.width : size.height }, 'radius'), 'radius') : length(value);
+    }
+    const commands = arc_path(origin, make_point(delta(pair.x, 'x'), delta(pair.y, 'y')), props.start, props.end);
+    return make_fragment({ size, draw: [draw_path(commands, paint)] });
+  }
+}
 
 // Both boundaries share indices. A gap in either splits the entire filled region.
 function fill_pairs(props: FillProps): readonly (readonly [Position, Position] | null)[] {
@@ -186,13 +209,23 @@ function fill_layout(props: FillProps, query: LayoutQuery) {
   flush();
   return make_fragment({ size, draw: [draw_path(commands, paint)] });
 }
-const fill_options = { data_bounds: (props: FillProps) => mark_bounds(props,
-  fill_pairs(props).flatMap(pair => pair ? [...pair] : [])) };
-const Fill = define_element<FillProps>('Fill', fill_layout, { fill: '#dbeafe', stroke: 'none' }, fill_options);
-const VFill = define_element<FillProps>('VFill', fill_layout,
-  { fill: '#dbeafe', stroke: 'none', direction: 'vertical' }, fill_options);
-const HFill = define_element<FillProps>('HFill', fill_layout,
-  { fill: '#dbeafe', stroke: 'none', direction: 'horizontal' }, fill_options);
+
+class Fill extends Element<FillProps> {
+  static defaults: Partial<FillProps> = { fill: '#dbeafe', stroke: 'none' };
+  static data_bounds(props: FillProps) {
+    return mark_bounds(props,
+      fill_pairs(props).flatMap(pair => pair ? [...pair] : []));
+  }
+  static layout = fill_layout;
+}
+
+class VFill extends Fill {
+  static defaults: Partial<FillProps> = { direction: 'vertical' };
+}
+
+class HFill extends Fill {
+  static defaults: Partial<FillProps> = { direction: 'horizontal' };
+}
 
 function arrow_head(tip: Point, angle: number, length: number, width = 0.65, open = false): PathCommand[] {
   nonnegative(width, 'head_width');
@@ -260,57 +293,79 @@ function arrow_draw(points: readonly Point[], paint: Paint, head: Paint, length:
   return draw;
 }
 
-const Arrow = define_element<ArrowProps>('Arrow', (props, query) => {
-  const { size, point, paint, length } = mark_context(props, query);
-  const head = resolve_paint(resolve_style({ fill: paint.stroke, stroke: 'none', ...props.head_style },
-    query.style), size, query.path);
-  return make_fragment({ size, draw: arrow_draw(arrow_points(props).map(point), paint, head,
-    length(props.head_size ?? px(9)), props, length(props.radius ?? 0)) });
-}, {}, { data_bounds: props => mark_bounds(props, arrow_points(props)) });
+class Arrow extends Element<ArrowProps> {
+  static data_bounds(props: ArrowProps) {
+    return mark_bounds(props, arrow_points(props));
+  }
+  static layout(props: ArrowProps, query: LayoutQuery) {
+    const { size, point, paint, length } = mark_context(props, query);
+    const head = resolve_paint(resolve_style({ fill: paint.stroke, stroke: 'none', ...props.head_style },
+      query.style), size, query.path);
+    return make_fragment({ size, draw: arrow_draw(arrow_points(props).map(point), paint, head,
+      length(props.head_size ?? px(9)), props, length(props.radius ?? 0)) });
+  }
+}
 
-const ArrowHead = define_element<ArrowHeadProps>('ArrowHead', (props, query) => {
-  const { size, point, paint, length } = mark_context(props, query);
-  const commands = arrow_head(point(props.tip ?? { x: 1, y: 0.5 }),
-    finite(props.angle ?? 0, 'angle') * Math.PI / 180, length(props.head_size ?? px(9)),
-    props.head_width, props.open);
-  return make_fragment({ size, draw: [draw_path(commands, props.open ? { ...paint, fill: 'none' } : paint)] });
-}, { fill: 'black' }, { data_bounds: props => mark_bounds(props, [props.tip ?? { x: 1, y: 0.5 }]) });
+class ArrowHead extends Element<ArrowHeadProps> {
+  static defaults: Partial<ArrowHeadProps> = { fill: 'black' };
+  static data_bounds(props: ArrowHeadProps) {
+    return mark_bounds(props, [props.tip ?? { x: 1, y: 0.5 }]);
+  }
+  static layout(props: ArrowHeadProps, query: LayoutQuery) {
+    const { size, point, paint, length } = mark_context(props, query);
+    const commands = arrow_head(point(props.tip ?? { x: 1, y: 0.5 }),
+      finite(props.angle ?? 0, 'angle') * Math.PI / 180, length(props.head_size ?? px(9)),
+      props.head_width, props.open);
+    return make_fragment({ size, draw: [draw_path(commands, props.open ? { ...paint, fill: 'none' } : paint)] });
+  }
+}
 
-const Ray = define_element<RayProps>('Ray', (props, query) => {
-  const { size, point, paint, length } = mark_context(props, query);
-  const origin = point(props.origin ?? { x: 0.5, y: 0.5 });
-  const angle = finite(props.angle ?? 0, 'angle') * Math.PI / 180, distance = length(props.length ?? 0.5);
-  const end = make_point(origin.x + distance * Math.cos(angle), origin.y + distance * Math.sin(angle));
-  return make_fragment({ size, draw: [draw_path(line_path([origin, end]), { ...paint, fill: 'none' })] });
-}, {}, { data_bounds: props => mark_bounds(props, [props.origin ?? { x: 0.5, y: 0.5 }]) });
+class Ray extends Element<RayProps> {
+  static data_bounds(props: RayProps) {
+    return mark_bounds(props, [props.origin ?? { x: 0.5, y: 0.5 }]);
+  }
+  static layout(props: RayProps, query: LayoutQuery) {
+    const { size, point, paint, length } = mark_context(props, query);
+    const origin = point(props.origin ?? { x: 0.5, y: 0.5 });
+    const angle = finite(props.angle ?? 0, 'angle') * Math.PI / 180, distance = length(props.length ?? 0.5);
+    const end = make_point(origin.x + distance * Math.cos(angle), origin.y + distance * Math.sin(angle));
+    return make_fragment({ size, draw: [draw_path(line_path([origin, end]), { ...paint, fill: 'none' })] });
+  }
+}
 
-const Points = define_element<PointsData, PointsProps>('Points', (props, query) => {
-  const { size, point } = mark_context(props, query);
-  const children = props.markers.map((marker, index) => {
-    const paired = is_position(marker.size);
-    const pair = paired
-      ? read_point(marker.size, 'point_size') : { x: marker.size, y: marker.size };
-    const dimension = (value: Length, fraction: number) => nonnegative(resolve_length(value,
-      { font_size: query.style.font_size, fraction }, 'point_size'), 'point_size');
-    const width = dimension(pair.x, paired ? size.width : Math.min(size.width, size.height));
-    const height = dimension(pair.y, paired ? size.height : Math.min(size.width, size.height));
-    const fragment = query.child(marker.shape, make_request({ width: exact(width), height: exact(height) }),
-      { width, height }, index, { coordinates: null });
-    const center = point(marker.point);
-    return place_fragment(fragment, make_point(center.x - width / 2, center.y - height / 2));
-  });
-  return make_fragment({ size, children });
-}, { fill: 'black', stroke: 'none' }, {
-  normalize: ({ points = [], point_size = px(6), shape = new Circle(), ...props }) => ({ ...props,
-    markers: points.flatMap((value, index) => {
-      const point = finite_runs([value])[0]?.[0];
-      return point ? [{ point,
-        size: typeof point_size === 'function' ? point_size(point, index) : point_size,
-        shape: typeof shape === 'function' ? shape(point, index) : shape }] : [];
-    }),
-  }),
-  data_bounds: props => mark_bounds(props, props.markers.map(marker => marker.point)),
-});
+class Points extends Element<PointsData, PointsProps> {
+  static defaults: Partial<PointsData> = { fill: 'black', stroke: 'none' };
+  static normalize({ points = [], point_size = px(6), shape = new Circle(), ...props }: PointsProps): PointsData {
+    return { ...props,
+      markers: points.flatMap((value, index) => {
+        const point = finite_runs([value])[0]?.[0];
+        return point ? [{ point,
+          size: typeof point_size === 'function' ? point_size(point, index) : point_size,
+          shape: typeof shape === 'function' ? shape(point, index) : shape }] : [];
+      }),
+    };
+  }
+  static data_bounds(props: PointsData) {
+    return mark_bounds(props, props.markers.map(marker => marker.point));
+  }
+  static layout(props: PointsData, query: LayoutQuery) {
+    const { size, point } = mark_context(props, query);
+    const children = props.markers.map((marker, index) => {
+      const paired = is_position(marker.size);
+      const pair = paired
+        ? read_point(marker.size, 'point_size') : { x: marker.size, y: marker.size };
+      const dimension = (value: Length, fraction: number) => nonnegative(resolve_length(value,
+        { font_size: query.style.font_size, fraction }, 'point_size'), 'point_size');
+      const width = dimension(pair.x, paired ? size.width : Math.min(size.width, size.height));
+      const height = dimension(pair.y, paired ? size.height : Math.min(size.width, size.height));
+      const fragment = query.child(marker.shape, make_request({ width: exact(width), height: exact(height) }),
+        { width, height }, index, { coordinates: null });
+      const center = point(marker.point);
+      return place_fragment(fragment, make_point(center.x - width / 2, center.y - height / 2));
+    });
+    return make_fragment({ size, children });
+  }
+}
 
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, finite_runs, line_path, arrow_draw };

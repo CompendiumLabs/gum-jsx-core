@@ -272,10 +272,34 @@ Opaque resources belong to the pass. The pass resolves the local font size and
 inherited paint before preparing requests or running the element's layout method.
 Paint defaults are an unfilled shape with a black 1px stroke.
 
-`define_element(name, layout, defaults?)` returns a constructor for a custom element.
-Optional defaults are snapshotted once, then overridden by each instance's props.
-They become ordinary immutable source data, visible to parents; Spacer uses this
-for its flex defaults. The layout function receives readonly props and a frozen query:
+Extend `Element<Props>` and define `static layout(props, query)` for a new primitive.
+The inherited constructor accepts props, derives the class name, merges optional
+`static defaults`, and owns the resulting immutable description. No constructor
+or descriptor wiring is needed. Related elements can inherit behavior and override
+just their defaults:
+
+```ts
+class SmallRect extends Rect {
+  static defaults: Partial<RectProps> = {
+    width: px(32), height: px(16), fill: 'tomato',
+  };
+}
+const tile = new SmallRect({ width: px(48) });
+```
+
+Defaults merge across the class hierarchy and are snapshotted on first use.
+Instance props override them, including explicit `undefined`. Static hook references
+are captured at the same time; configure classes before constructing instances.
+Use `static element_name` for an explicit diagnostic name, or preserve class names
+when minifying. Defaults become ordinary source data visible to parents; Spacer
+uses this for its flex defaults. The base constructor freezes the instance, so
+source data belongs in props, with no ordinary instance field initializers.
+
+`Element` is available inside JSX as well as through imports. `define_element(name,
+layout, defaults?, options?)` remains a convenience using the same machinery; its
+defaults are captured at the factory call. Both forms support normalization and
+data bounds; see [Custom elements](../gum-next-docs/docs/text/CustomElements.md).
+The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
 |---|---|
@@ -871,8 +895,10 @@ samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
 and [coordinate helpers](../gum-next-docs/docs/text/Coordinates.md) can also be
-used directly. New source normalization is available through define_element's
-fourth options argument; define_component adopts another element's source
+used directly. `static normalize(input)` consumes raw input once before source
+defaults are merged; `Element<SourceProps, InputProps>` types the two separately.
+The same hook is available through define_element's fourth options argument.
+define_component adopts another element's source
 description without a layout wrapper. Neither stores callbacks in source data.
 
 This is a basic linear plotting API. Log/date scales, label collision avoidance,
@@ -933,7 +959,7 @@ is needed to run TypeScript sources. JSX examples are read as source by
 
 “Keep the layout pass ice cold.” Add container behavior to the container or a pure
 helper. Shared ElementProps includes flex and position metadata for typing; their
-presence does not make them engine policies. Use `define_element` for new elements,
+presence does not make them engine policies. Extend `Element` for new primitives,
 keep source data immutable, and place the returned fragments. Opaque objects and
 font providers belong in pass resources. No measuring in constructors, rebuilding
 children during queries, implicit margin wrappers, or layout inside the serializer.

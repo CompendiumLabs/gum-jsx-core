@@ -1,8 +1,8 @@
 import { nonnegative } from './checks';
 import { definite_reference, resolve_alignment } from './composition';
 import type { AlignmentValue } from './composition';
-import { define_element, element_children } from './element';
-import type { Element, ElementProps } from './element';
+import { Element, element_children } from './element';
+import type { ElementProps } from './element';
 import { distribute_flex } from './flex';
 import { make_fragment, place_fragment, transform_guides } from './fragment';
 import type { Fragment, Guides, Placement } from './fragment';
@@ -175,14 +175,26 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
     guides: align === 'baseline' && items.length ? { ...guides, baseline: above } : guides });
 }
 
-const HStack = define_element<StackProps>('HStack', (props, query) => stack_layout(props, query, 'width'));
-const VStack = define_element<StackProps>('VStack', (props, query) => stack_layout(props, query, 'height'));
+class HStack extends Element<StackProps> {
+  static layout(props: StackProps, query: LayoutQuery) {
+    return stack_layout(props, query, 'width');
+  }
+}
+
+class VStack extends Element<StackProps> {
+  static layout(props: StackProps, query: LayoutQuery) {
+    return stack_layout(props, query, 'height');
+  }
+}
 
 // The defaults live in the description, so parents treat Spacer like any item.
-const Spacer = define_element<ElementProps>('Spacer', (props, query) => {
-  if (element_children(props.children).length) throw new TypeError('Spacer has no content children');
-  return make_fragment({ size: finish_size(make_size(), query.request, query.sizing) });
-}, { basis: 0, grow: 1 });
+class Spacer extends Element<ElementProps> {
+  static defaults: Partial<ElementProps> = { basis: 0, grow: 1 };
+  static layout(props: ElementProps, query: LayoutQuery) {
+    if (element_children(props.children).length) throw new TypeError('Spacer has no content children');
+    return make_fragment({ size: finish_size(make_size(), query.request, query.sizing) });
+  }
+}
 
 export { HStack, VStack, Spacer, stack_layout };
 export type { StackProps, StackAlign, StackJustify };

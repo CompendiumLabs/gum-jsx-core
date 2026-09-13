@@ -1,8 +1,8 @@
 import { resolve_alignment } from './composition';
 import { coordinate_length, infer_coordinates } from './coordinates';
 import type { Coordinates, CoordinateSpec } from './coordinates';
-import { define_element, element_children } from './element';
-import type { Element, ElementProps } from './element';
+import { Element, element_children } from './element';
+import type { ElementProps } from './element';
 import { make_fragment, place_fragment } from './fragment';
 import { make_point, make_rect } from './geometry';
 import type { Size } from './geometry';
@@ -41,13 +41,18 @@ function graph_children(elements: readonly Element[], query: LayoutQuery, size: 
   });
 }
 
-const Graph = define_element<GraphProps>('Graph', (props, query) => {
-  const size = graph_size(query);
-  const coordinates = query.prepare('coordinates', () => infer_coordinates(props.children, props));
-  const children = graph_children(element_children(props.children), query, size, coordinates);
-  const area = make_rect(0, 0, size.width, size.height);
-  return make_fragment({ size, children, content: area, clip: props.clip ? area : undefined });
-}, {}, { data_bounds: () => null });
+class Graph extends Element<GraphProps> {
+  static data_bounds() {
+    return null;
+  }
+  static layout(props: GraphProps, query: LayoutQuery) {
+    const size = graph_size(query);
+    const coordinates = query.prepare('coordinates', () => infer_coordinates(props.children, props));
+    const children = graph_children(element_children(props.children), query, size, coordinates);
+    const area = make_rect(0, 0, size.width, size.height);
+    return make_fragment({ size, children, content: area, clip: props.clip ? area : undefined });
+  }
+}
 
 export { Graph, graph_size, graph_children };
 export type { GraphProps };

@@ -2,7 +2,7 @@ import { finite, nonnegative } from './checks';
 import { copy_limit, infer_coordinates, map_axis } from './coordinates';
 import type { Limit } from './coordinates';
 import { draw_path } from './drawing';
-import { define_element, Element } from './element';
+import { Element } from './element';
 import type { ElementProps } from './element';
 import { make_fragment, place_fragment } from './fragment';
 import { make_point } from './geometry';
@@ -102,24 +102,66 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
   return make_fragment({ size, draw, children });
 }
 
-const options = { normalize: axis_data, data_bounds: () => null };
-const Axis = define_element<AxisData, AxisProps>('Axis', axis_layout, {}, options);
-const HAxis = define_element<AxisData, AxisProps>('HAxis', axis_layout, { side: 'bottom' }, options);
-const VAxis = define_element<AxisData, AxisProps>('VAxis', axis_layout, { side: 'left' }, options);
-const Scale = define_element<AxisData, AxisProps>('Scale', (p, q) => axis_layout(p, q, 'scale'), {}, options);
-const HScale = define_element<AxisData, AxisProps>('HScale', (p, q) => axis_layout(p, q, 'scale'), { side: 'bottom' }, options);
-const VScale = define_element<AxisData, AxisProps>('VScale', (p, q) => axis_layout(p, q, 'scale'), { side: 'left' }, options);
-const Labels = define_element<AxisData, AxisProps>('Labels', (p, q) => axis_layout(p, q, 'labels'), {}, options);
-const HLabels = define_element<AxisData, AxisProps>('HLabels', (p, q) => axis_layout(p, q, 'labels'), { side: 'bottom' }, options);
-const VLabels = define_element<AxisData, AxisProps>('VLabels', (p, q) => axis_layout(p, q, 'labels'), { side: 'left' }, options);
+class Axis extends Element<AxisData, AxisProps> {
+  static normalize = axis_data;
+  static data_bounds() { return null; }
+  static layout = axis_layout;
+}
 
-const label_options = { data_bounds: () => null,
-  normalize: ({ value = 0, label, children, ...props }: LabelProps) => axis_data({ ...props,
-    ticks: [[value, label ?? (children === undefined ? format_tick(value)
-      : children instanceof Element ? children : new Text({ ...props.label_style, children }))]] }) };
-const Label = define_element<AxisData, LabelProps>('Label', (p, q) => axis_layout(p, q, 'labels'), {}, label_options);
-const HLabel = define_element<AxisData, LabelProps>('HLabel', (p, q) => axis_layout(p, q, 'labels'), { side: 'bottom' }, label_options);
-const VLabel = define_element<AxisData, LabelProps>('VLabel', (p, q) => axis_layout(p, q, 'labels'), { side: 'left' }, label_options);
+class HAxis extends Axis {
+  static defaults: Partial<AxisData> = { side: 'bottom' };
+}
+
+class VAxis extends Axis {
+  static defaults: Partial<AxisData> = { side: 'left' };
+}
+
+class Scale extends Axis {
+  static layout(props: AxisData, query: LayoutQuery) {
+    return axis_layout(props, query, 'scale');
+  }
+}
+
+class HScale extends Scale {
+  static defaults: Partial<AxisData> = { side: 'bottom' };
+}
+
+class VScale extends Scale {
+  static defaults: Partial<AxisData> = { side: 'left' };
+}
+
+class Labels extends Axis {
+  static layout(props: AxisData, query: LayoutQuery) {
+    return axis_layout(props, query, 'labels');
+  }
+}
+
+class HLabels extends Labels {
+  static defaults: Partial<AxisData> = { side: 'bottom' };
+}
+
+class VLabels extends Labels {
+  static defaults: Partial<AxisData> = { side: 'left' };
+}
+
+class Label extends Element<AxisData, LabelProps> {
+  static data_bounds = Axis.data_bounds;
+  static normalize({ value = 0, label, children, ...props }: LabelProps): AxisData {
+    return axis_data({ ...props,
+      ticks: [[value, label ?? (children === undefined ? format_tick(value)
+        : children instanceof Element ? children : new Text({ ...props.label_style, children }))]],
+    });
+  }
+  static layout = Labels.layout;
+}
+
+class HLabel extends Label {
+  static defaults: Partial<AxisData> = { side: 'bottom' };
+}
+
+class VLabel extends Label {
+  static defaults: Partial<AxisData> = { side: 'left' };
+}
 
 function mesh_data({ ticks = 5, ...props }: MeshProps): MeshData {
   const lim = copy_limit(props.lim ?? [0, 1]);
@@ -140,22 +182,39 @@ function mesh_layout(props: MeshData, query: LayoutQuery) {
   return make_fragment({ size, draw: [draw_path(commands,
     { ...resolve_paint(query.style, size, query.path), fill: 'none' })] });
 }
-const mesh_options = { normalize: mesh_data, data_bounds: () => null };
-const Mesh = define_element<MeshData, MeshProps>('Mesh', mesh_layout, { stroke: '#e2e8f0' }, mesh_options);
-const HMesh = define_element<MeshData, MeshProps>('HMesh', mesh_layout,
-  { direction: 'x', stroke: '#e2e8f0' }, mesh_options);
-const VMesh = define_element<MeshData, MeshProps>('VMesh', mesh_layout,
-  { direction: 'y', stroke: '#e2e8f0' }, mesh_options);
 
-const Mesh2D = define_element<ElementProps, Mesh2DProps>('Mesh2D', (props, query) => {
-  const size = shape_size(query.request, query.sizing);
-  const children = (props.children as readonly Element[]).map((child, i) =>
-    place_fragment(query.child(child, query.request, size, i)));
-  return make_fragment({ size, children });
-}, {}, { data_bounds: () => null, normalize: ({ xlim, ylim, xticks, yticks, ...props }) => ({ ...props,
-  children: [new HMesh({ lim: xlim, ticks: xticks, stroke: props.stroke ?? '#e2e8f0' }),
-    new VMesh({ lim: ylim, ticks: yticks, stroke: props.stroke ?? '#e2e8f0' })],
-}) });
+class Mesh extends Element<MeshData, MeshProps> {
+  static defaults: Partial<MeshData> = { stroke: '#e2e8f0' };
+  static normalize = mesh_data;
+  static data_bounds = Axis.data_bounds;
+  static layout = mesh_layout;
+}
+
+class HMesh extends Mesh {
+  static defaults: Partial<MeshData> = { direction: 'x' };
+}
+
+class VMesh extends Mesh {
+  static defaults: Partial<MeshData> = { direction: 'y' };
+}
+
+class Mesh2D extends Element<ElementProps, Mesh2DProps> {
+  static data_bounds() {
+    return null;
+  }
+  static normalize({ xlim, ylim, xticks, yticks, ...props }: Mesh2DProps): ElementProps {
+    return { ...props,
+      children: [new HMesh({ lim: xlim, ticks: xticks, stroke: props.stroke ?? '#e2e8f0' }),
+        new VMesh({ lim: ylim, ticks: yticks, stroke: props.stroke ?? '#e2e8f0' })],
+    };
+  }
+  static layout(props: ElementProps, query: LayoutQuery) {
+    const size = shape_size(query.request, query.sizing);
+    const children = (props.children as readonly Element[]).map((child, i) =>
+      place_fragment(query.child(child, query.request, size, i)));
+    return make_fragment({ size, children });
+  }
+}
 
 export { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D, tick_values };

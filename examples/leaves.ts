@@ -1,5 +1,5 @@
 import {
-  define_element, em, px, resolve_length, make_size, make_rect,
+  Element, em, px, resolve_length, make_size, make_rect,
   finish_size, bounds_overflow, make_fragment, draw_rect,
   clamp, floor, ceil,
 } from '../src/index';
@@ -23,36 +23,42 @@ function paint_leaf(content: Size, query: LayoutQuery) {
 }
 
 // A fixed leaf refuses to reflow, but still obeys its allocated size.
-const Fixed = define_element<LeafProps>('Fixed', (props, query) => {
-  const { font_size } = query.style;
-  const width = resolve_length(props.content_width ?? px(96), {
-    font_size, fraction: query.reference.width,
-  }, `${query.path}.content_width`);
-  const height = resolve_length(props.content_height ?? px(20), {
-    font_size, fraction: query.reference.height,
-  }, `${query.path}.content_height`);
-  return paint_leaf(make_size(width, height), query);
-});
+class Fixed extends Element<LeafProps> {
+  static layout(props: LeafProps, query: LayoutQuery) {
+    const { font_size } = query.style;
+    const width = resolve_length(props.content_width ?? px(96), {
+      font_size, fraction: query.reference.width,
+    }, `${query.path}.content_width`);
+    const height = resolve_length(props.content_height ?? px(20), {
+      font_size, fraction: query.reference.height,
+    }, `${query.path}.content_height`);
+    return paint_leaf(make_size(width, height), query);
+  }
+}
 
 // An expanding leaf accepts each offered axis independently.
-const Expanding = define_element('Expanding', (_props, query) => {
-  const { width, height } = query.request;
-  return paint_leaf(make_size(
-    width.kind === 'natural' ? 16 : width.value,
-    height.kind === 'natural' ? 16 : height.value,
-  ), query);
-});
+class Expanding extends Element {
+  static layout(_props: ElementProps, query: LayoutQuery) {
+    const { width, height } = query.request;
+    return paint_leaf(make_size(
+      width.kind === 'natural' ? 16 : width.value,
+      height.kind === 'natural' ? 16 : height.value,
+    ), query);
+  }
+}
 
 // Equal 1em cells stand in for wrapping text, including a sharp width boundary.
-const Wrapping = define_element<LeafProps>('Wrapping', (props, query) => {
-  const count = props.count ?? 6;
-  if (!Number.isInteger(count) || count < 1) throw new Error('count must be a positive integer');
-  const unit = resolve_length(em(1), { font_size: query.style.font_size });
-  const { width } = query.request;
-  const columns = width.kind === 'natural' || unit === 0 ? count
-    : clamp(floor(width.value / unit), [1, count]);
-  const rows = ceil(count / columns);
-  return paint_leaf(make_size(columns * unit, rows * unit), query);
-});
+class Wrapping extends Element<LeafProps> {
+  static layout(props: LeafProps, query: LayoutQuery) {
+    const count = props.count ?? 6;
+    if (!Number.isInteger(count) || count < 1) throw new Error('count must be a positive integer');
+    const unit = resolve_length(em(1), { font_size: query.style.font_size });
+    const { width } = query.request;
+    const columns = width.kind === 'natural' || unit === 0 ? count
+      : clamp(floor(width.value / unit), [1, count]);
+    const rows = ceil(count / columns);
+    return paint_leaf(make_size(columns * unit, rows * unit), query);
+  }
+}
 
 export { Fixed, Expanding, Wrapping };

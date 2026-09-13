@@ -1,5 +1,6 @@
+import type { ElementProps } from './element';
 import { finite, nonnegative } from './checks';
-import { define_element } from './element';
+import { Element } from './element';
 import { draw_rect } from './drawing';
 import { make_fragment } from './fragment';
 import { make_point, make_rect } from './geometry';
@@ -65,18 +66,38 @@ function bars_layout(props: BarsData, query: LayoutQuery) {
   return make_fragment({ size, draw });
 }
 
-const bounds = (props: BarsData) => mark_bounds(props, props.bars.flatMap(bar => bar_corners(bar, props.direction)));
-const defaults = { fill: '#2563eb', stroke: 'none' };
-const options = { normalize: bars_data, data_bounds: bounds };
-const Bars = define_element<BarsData, BarsProps>('Bars', bars_layout, defaults, options);
-const VBars = define_element<BarsData, BarsProps>('VBars', bars_layout, { ...defaults, direction: 'vertical' }, options);
-const HBars = define_element<BarsData, BarsProps>('HBars', bars_layout, { ...defaults, direction: 'horizontal' }, options);
-const single = { data_bounds: bounds,
-  normalize: ({ value = 1, position = 0, base = 0, bar_width = 0.8, ...props }: BarProps) =>
-    bars_data({ ...props, values: [value], positions: [position], bases: base, bar_width }) };
-const Bar = define_element<BarsData, BarProps>('Bar', bars_layout, defaults, single);
-const VBar = define_element<BarsData, BarProps>('VBar', bars_layout, { ...defaults, direction: 'vertical' }, single);
-const HBar = define_element<BarsData, BarProps>('HBar', bars_layout, { ...defaults, direction: 'horizontal' }, single);
+class Bars extends Element<BarsData, BarsProps> {
+  static defaults: Partial<BarsData> = { fill: '#2563eb', stroke: 'none' };
+  static normalize = bars_data;
+  static data_bounds(props: BarsData) {
+    return mark_bounds(props, props.bars.flatMap(bar => bar_corners(bar, props.direction)));
+  }
+  static layout = bars_layout;
+}
+
+class VBars extends Bars {
+  static defaults: Partial<BarsData> = { direction: 'vertical' };
+}
+
+class HBars extends Bars {
+  static defaults: Partial<BarsData> = { direction: 'horizontal' };
+}
+class Bar extends Element<BarsData, BarProps> {
+  static defaults = Bars.defaults;
+  static data_bounds = Bars.data_bounds;
+  static normalize({ value = 1, position = 0, base = 0, bar_width = 0.8, ...props }: BarProps): BarsData {
+    return bars_data({ ...props, values: [value], positions: [position], bases: base, bar_width });
+  }
+  static layout = bars_layout;
+}
+
+class VBar extends Bar {
+  static defaults: Partial<BarsData> = { direction: 'vertical' };
+}
+
+class HBar extends Bar {
+  static defaults: Partial<BarsData> = { direction: 'horizontal' };
+}
 
 export { Bar, VBar, HBar, Bars, VBars, HBars };
 export type { PerBar, BarProps, BarsProps };
