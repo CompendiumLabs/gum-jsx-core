@@ -6,7 +6,7 @@ import {
   render_svg, inspect_fragment,
 } from '../src/index'
 import type { FontProvider, InsetSpec, Length } from '../src/index'
-import { Fixed } from '../examples/leaves'
+import { Fixed } from './fixtures/leaves'
 
 function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`)

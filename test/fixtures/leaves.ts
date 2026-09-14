@@ -2,8 +2,8 @@ import {
   Element, em, px, resolve_length, make_size, make_rect,
   finish_size, bounds_overflow, make_fragment, draw_rect,
   clamp, floor, ceil,
-} from '../src/index'
-import type { ElementProps, LayoutQuery, Length, Size } from '../src/index'
+} from '../../src/index'
+import type { ElementProps, LayoutQuery, Length, Size } from '../../src/index'
 
 type LeafProps = ElementProps & Readonly<{
   content_width?: Length

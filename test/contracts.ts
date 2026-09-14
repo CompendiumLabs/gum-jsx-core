@@ -7,7 +7,7 @@ import {
   prepare_request, finish_size, shape_size,
 } from '../src/index'
 import type { Length, SizeSpec, InsetSpec } from '../src/index'
-import { probes } from '../examples/contracts'
+import { probes } from './fixtures/contracts'
 
 // Test contracts at their boundaries and in small compositions, using literal results.
 const tests: Record<string, () => void> = {

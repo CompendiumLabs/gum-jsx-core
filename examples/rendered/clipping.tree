@@ -1,7 +1,0 @@
-Svg 320×144 @(0,0) ink=16,32,268,76 overflow=right:24,bottom:10 clipped
-  Clipping 320×144 @(0,0) ink=16,32,268,76 overflow=right:24,bottom:10
-    Rect 80×60 @(16,32) ink=0,0,80,60
-    Clip 40×40 @(128,32) ink=0,0,40,40 overflow=right:40,bottom:20 clipped
-      Rect 80×60 @(0,0) ink=0,0,80,60
-    Clip 40×40 @(224,32) matrix(1.5,0.4,-0.4,1.5,0,0) ink=0,0,40,40 overflow=right:40,bottom:20 clipped
-      Rect 80×60 @(0,0) ink=0,0,80,60

@@ -25,33 +25,32 @@ Runtime dependencies are `acorn`, `acorn-jsx`, `fontkit`, and `linebreak`.
 development dependencies. Runtime code lives in `src/`, with `src/index.ts` as
 the package entry point. The JSX parser and its source-error helpers live in
 `src/lib/`, declarations in `src/types/`, and the six bundled IBM Plex faces in
-`src/fonts/` with their OFL license. Tests, tools, and examples live in the
-top-level `test/`, `scripts/`, and `examples/` directories. No files or packages
-from the old core checkout are needed.
+`src/fonts/` with their OFL license. Tests and tools live in `test/` and `scripts/`;
+runnable examples live in [gum-next-docs](../gum-next-docs/README.md).
+No files or packages from the old core checkout are needed.
 
 The rendering command now lives in [gum-next-cli](../gum-next-cli/README.md).
 From the workspace root, render an example with:
 
 ```sh
-bun run gum gum-next-core/examples/hugging.jsx -f tree --stats
-bun run gum gum-next-core/examples/card.jsx --width 220 -o /tmp/card.png
+bun run gum gum-next-docs/elements/code/Frame.jsx -f tree --stats
+bun run gum gum-next-docs/elements/code/Box.jsx --width 220 -o /tmp/card.png
 ```
 
 The CLI accepts a JSX file or stdin and defaults to kitty graphics on stdout.
 Use `--format` or an output filename to select SVG, PNG, tree, or JSON output.
 PNG uses [gum-next-png](../gum-next-png/README.md). See the CLI README for options and
-viewport behavior. The core's [gallery](./examples/README.md) contains source,
-SVG, PNG, and exact numerical trees.
+viewport behavior. The [docs collections](../gum-next-docs/README.md) contain
+runnable sources and explanations; use the CLI for SVG, PNG, or numerical trees.
 
 Core development tools remain available from this directory:
 
 ```sh
 bun run probe
 bun run probe hugging_box
-bun run gallery
 ```
 
-The stage 1 [contract probes](./examples/contracts.ts) remain executable:
+The stage 1 [contract probes](./test/fixtures/contracts.ts) remain executable:
 
 | Probe | Expected result |
 |---|---|
@@ -342,8 +341,8 @@ A layout method finishes its measured size with `finish_size` or `shape_size`, t
 returns `make_fragment(...)`. The pass validates its result against the request and
 size policy; an incorrect exact size is an error. Fixed content can draw its natural
 geometry inside a smaller allocated frame and record overflow. See the synthetic
-[fixed, expanding, and wrapping leaves](./examples/leaves.ts) and the custom parent
-in [repeated.jsx](./examples/repeated.jsx). These fixtures exercise custom layout
+[fixed, expanding, and wrapping leaves](./test/fixtures/leaves.ts) and the custom parent
+in [repeated.jsx](../gum-next-docs/topics/code/repeated.jsx). These fixtures exercise custom layout
 policies independently of Text and the standard containers.
 
 Natural queries and constrained queries use this same method. Cache entries are
@@ -374,7 +373,8 @@ This is a complete 100×100 document, with no manual placement or root dimension
 
 Square reports 64×64. Box adds 16px padding and a 2px border on each side; Svg
 adopts its 100×100 result. Each element receives one layout query. See the
-[source, image, and tree](./examples/README.md) for this and the framed paragraph.
+[Box](../gum-next-docs/elements/text/Box.md) and
+[Frame](../gum-next-docs/elements/text/Frame.md) examples for related composition.
 
 Box has at most one content element; put text in an ordinary `Text` child. It
 hugs measured content unless its own sizing or an exact request fixes an axis.
@@ -468,8 +468,9 @@ unless their own sizing or an exact request requires more space.
 <Svg width={px(400)}>
   <HStack width={1} gap={px(12)} align="center">
     <Text width={px(80)}>Label</Text>
-    <Text grow={1} shrink={1}
-      text="A paragraph gets the remaining width and reflows to find its height." />
+    <Text grow={1} shrink={1}>
+      A paragraph gets the remaining width and reflows to find its height.
+    </Text>
     <Square width={px(40)} fill="#317969" stroke="none" />
   </HStack>
 </Svg>
@@ -477,11 +478,11 @@ unless their own sizing or an exact request requires more space.
 
 The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
 12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
-and Svg hugs the row's height. See [stack.jsx](./examples/stack.jsx) for two such
-rows nested inside columns and a Box, at two viewport widths. For plain JSX text,
+and Svg hugs the row's height. See [HStack](../gum-next-docs/elements/text/HStack.md)
+for a runnable mixed row; try different viewport widths. For plain JSX text,
 outer blank lines and common indentation are removed automatically. Internal
 text newlines still become line breaks; keep each paragraph on one content line
-or use `text={...}` when source formatting should not introduce breaks.
+or use a string expression child when source formatting should not introduce breaks.
 
 Without dimensions or flex weights, stacks hug natural content. This 52×32 row
 needs one query per element, including Svg:
@@ -597,8 +598,9 @@ axis or fit within two available axes; exact axes take precedence, as for shapes
     <Rect fill="#edf4f1" stroke="none" />
     <Circle x={0.25} y={0.5} anchor="center" width={px(60)}
       fill="#317969" stroke="none" />
-    <Text x={0.5} y={0.5} anchor={{ y: 'center' }} width={0.4}
-      text="A label in its own region." />
+    <Text x={0.5} y={0.5} anchor={{ y: 'center' }} width={0.4}>
+      A label in its own region.
+    </Text>
   </Group>
 </Svg>
 ```
@@ -653,7 +655,9 @@ its region. Use a positioned `Fit` when the intent is to scale a completed drawi
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
 See the [Group implementation](./src/elems/group.ts) and the
-[canvas, anchors, and clipping examples](./examples/README.md). Stage 6(a) covers
+[canvas](../gum-next-docs/elements/text/Group.md),
+[anchors](../gum-next-docs/topics/text/group_anchors.md), and
+[clipping](../gum-next-docs/topics/text/group_clip.md) examples. Stage 6(a) covers
 this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
 the optional common-height figure policy remain later work.
 
@@ -668,7 +672,7 @@ the optional common-height figure policy remain later work.
 ```
 
 `Text` accepts strings, numbers, nested arrays, conditional children, and inline
-`Span` elements. `text="..."` is a convenience alternative to children. Spans inherit
+`Span` elements. Use string expression children to preserve exact whitespace. Spans inherit
 font family, weight, style, size, line height, and `color`; they introduce no boxes
 or word breaks. A standalone `Span` can also be measured as text. Other graphics
 belong beside Text through composition. Inline spans have style props, not sizing
@@ -910,7 +914,7 @@ Clearance uses the resolved shaft stroke, cap style, and head width after data
 mapping. Original head tips, unheaded endpoints, and inferred limits stay fixed.
 Short terminal segments are consumed without reversing the shaft; if the whole
 route is consumed, only the heads remain. Field arrows share the same rule.
-See the [cap comparison](examples/arrow_caps.jsx) for thick straight, curved, and
+See the [cap comparison](../gum-next-docs/topics/code/arrow_caps.jsx) for thick straight, curved, and
 rounded arrows.
 
 Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
@@ -939,7 +943,7 @@ This is a basic linear plotting API. Log/date scales, label collision avoidance,
 adaptive sampling, grouped/stacked bar automation, and advanced arrowheads
 remain deferred. Splines can overshoot samples; a
 sampler cannot identify discontinuities between two finite samples. See the
-[overview](../docs/PLOTTING.md) and [gallery](examples/README.md) for decisions,
+[overview](../docs/PLOTTING.md) and [docs](../gum-next-docs/README.md) for decisions,
 examples, and current limits.
 
 ## Scoped component props
@@ -1067,10 +1071,10 @@ props on two newly constructed elements do not give them a shared cache entry.
 
 When adding a public element, export it and its types in `src/index.ts`, add its JSX
 binding in `src/eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
-examples to `scripts/gallery.ts` and regenerate their SVG/PNG/tree artifacts;
-inspect both the images and numerical trees. The early custom placement fixtures
+paired Markdown/JSX examples to `gum-next-docs` and run its content check;
+inspect CLI-generated images and numerical trees. The custom placement examples
 are intentional protocol examples, while new composition examples should use the
-standard elements. Update this README, the gallery README, and roadmap status.
+standard elements. Update this README, the docs README, and roadmap status.
 
 For runtime changes, run `bun run test` and `bun run typecheck` here. The core suite
 covers contracts and layout. The workspace's `bun run test` runs this core suite.
@@ -1083,8 +1087,8 @@ declaration emission into a scratch directory:
 bun tsc --noEmit false --declaration --emitDeclarationOnly --outDir /tmp/gum-next-types
 ```
 
-The checked-in gallery can be regenerated with `bun scripts/gallery.ts` here
-(`rsvg-convert` is required). Use `pass.stats` and counting font providers for
+The docs examples render through the workspace CLI and gum-next-edit's docs view.
+Use `pass.stats` and counting font providers for
 measurement-cost regressions. Natural hugging and Group examples generally query
 each child once; flex/reflow/stretch may require additional queries. Counted layouts,
 cache hits, and prepared glyph reuse are distinct. Preserve the opposing-clamp and

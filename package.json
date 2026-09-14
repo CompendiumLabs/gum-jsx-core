@@ -20,7 +20,6 @@
   "scripts": {
     "test": "bun test/run.ts",
     "typecheck": "tsc --noEmit",
-    "gallery": "bun scripts/gallery.ts",
     "probe": "bun scripts/probe.ts"
   }
 }

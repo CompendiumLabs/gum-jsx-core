@@ -3,8 +3,8 @@ import {
   make_size, make_point, make_rect, resolve_insets, inflate_size, bounds_overflow,
   natural, available, exact, make_request, deflate_request, resolve_sizing,
   prepare_request, finish_size, shape_size,
-} from '../src/index'
-import type { Fragment, LayoutRequest, Size } from '../src/index'
+} from '../../src/index'
+import type { Fragment, LayoutRequest, Size } from '../../src/index'
 
 // These probes use measured stand-ins. Real elements and drawing arrive in stage 2.
 function units() {

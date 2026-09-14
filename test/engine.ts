@@ -7,7 +7,7 @@ import {
   transform_rect, draw_rect, render_svg, inspect_fragment,
 } from '../src/index'
 import type { ElementProps } from '../src/index'
-import { Fixed, Expanding, Wrapping } from '../examples/leaves'
+import { Fixed, Expanding, Wrapping } from './fixtures/leaves'
 
 const tests: Record<string, () => void> = {
   'construction snapshots nested source data without measuring'() {
