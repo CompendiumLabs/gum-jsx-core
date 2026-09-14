@@ -1,5 +1,5 @@
-import type { Fragment } from './fragment';
-import type { Insets, Point } from './geometry';
+import type { Fragment } from './engine/fragment';
+import type { Insets, Point } from './engine/geometry';
 
 // Keep numerical layout output exact; inspection must not round away a boundary.
 function overflow_text(insets: Insets): string {

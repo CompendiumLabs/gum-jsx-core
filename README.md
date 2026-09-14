@@ -100,7 +100,7 @@ are allocated. Deflating an offer does not change that reference.
 
 Resolve `font_size` first using `resolve_font_size(value, inherited)`. Both its
 relative forms refer to the inherited size. Subsequent em lengths and line height
-use the resolved local font size. Defaults live in [defaults.ts](./src/defaults.ts):
+use the resolved local font size. Defaults live in [defaults.ts](./src/engine/defaults.ts):
 16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
 
@@ -192,7 +192,7 @@ Box dimensions denote the border box, including padding and border. Padding and
 border deflate the child's space. External spacing is another Box's padding;
 each layer owns its size, style, and child reference box.
 
-The [fragment schema](./src/fragment.ts) contains only the result for one request:
+The [fragment schema](./src/engine/fragment.ts) contains only the result for one request:
 
 - `size`: the allocated rectangle, based at the local origin.
 - `content`: optional usable content rectangle; Box exposes the space inside its insets.
@@ -580,8 +580,8 @@ its basis, weights, or bounds like any other stack child. For a fixed spacer, us
 `<Spacer basis={px(20)} grow={0}/>`; its default zero basis takes precedence over
 a preferred main-axis dimension.
 
-The pure [flex allocator](./src/flex.ts) accepts resolved pixel bases and bounds and
-returns immutable sizes. The [stack implementation](./src/stack.ts) owns child queries,
+The pure [flex allocator](./src/lib/flex.ts) accepts resolved pixel bases and bounds and
+returns immutable sizes. The [stack implementation](./src/elems/stack.ts) owns child queries,
 text reflow, guides, and placement. LayoutPass remains independent of both policies.
 
 ## Positioned groups
@@ -652,7 +652,7 @@ fonts and strokes remain pixel-sized when the canvas changes; text reflows withi
 its region. Use a positioned `Fit` when the intent is to scale a completed drawing.
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
-See the [Group implementation](./src/group.ts) and the
+See the [Group implementation](./src/elems/group.ts) and the
 [canvas, anchors, and clipping examples](./examples/README.md). Stage 6(a) covers
 this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
 the optional common-height figure policy remain later work.
@@ -1025,17 +1025,25 @@ old API. Run `bun install` at the workspace root to link the packages. No build
 is needed to run TypeScript sources. JSX examples are read as source by
 `evaluate`, so they do not need React or its JSX runtime.
 
+Source modules are grouped by responsibility: `src/elems/` contains concrete
+Elements and element compositions, while `src/lib/` contains reusable helpers
+for math, sampling, layout composition, props, and JSX parsing. `src/engine/`
+contains the shared Element and layout contracts, layout pass, geometry, units,
+styles, drawing data, and font adapter. The source root contains only the public
+API (`index.ts`), JSX evaluation (`eval.ts`), SVG rendering (`svg.ts`), and fragment
+inspection (`inspect.ts`). Package consumers should import from `gum-next-core`.
+
 | Responsibility | Start here |
 |---|---|
-| Length syntax, reference resolution, and defaults | [units.ts](./src/units.ts), [defaults.ts](./src/defaults.ts), [style.ts](./src/style.ts) |
-| Requests, shared sizing, and geometry | [layout.ts](./src/layout.ts), [geometry.ts](./src/geometry.ts), [composition.ts](./src/composition.ts) |
-| Immutable descriptions and element factory | [element.ts](./src/element.ts) |
-| Queries, caches, resources, and diagnostics | [pass.ts](./src/pass.ts) |
-| Box, root Svg, and explicit fitting | [box.ts](./src/box.ts), [elems.ts](./src/elems.ts) |
-| Stack queries versus pure flex allocation | [stack.ts](./src/stack.ts), [flex.ts](./src/flex.ts) |
-| Positioned canvas and direct-child metadata | [group.ts](./src/group.ts) |
-| Text preparation/reflow and font adapter | [text.ts](./src/text.ts), [fonts.ts](./src/fonts.ts) |
-| Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/shapes.ts), [path.ts](./src/path.ts), [drawing.ts](./src/drawing.ts), [fragment.ts](./src/fragment.ts) |
+| Length syntax, reference resolution, and defaults | [units.ts](./src/engine/units.ts), [defaults.ts](./src/engine/defaults.ts), [style.ts](./src/engine/style.ts) |
+| Requests, shared sizing, and geometry | [layout.ts](./src/engine/layout.ts), [geometry.ts](./src/engine/geometry.ts), [composition.ts](./src/lib/composition.ts) |
+| Immutable descriptions and element factory | [element.ts](./src/engine/element.ts) |
+| Queries, caches, resources, and diagnostics | [pass.ts](./src/engine/pass.ts) |
+| Box, root Svg, and explicit fitting | [box.ts](./src/elems/box.ts), [Svg](./src/elems/svg.ts) |
+| Stack queries versus pure flex allocation | [stack.ts](./src/elems/stack.ts), [flex.ts](./src/lib/flex.ts) |
+| Positioned canvas and direct-child metadata | [group.ts](./src/elems/group.ts) |
+| Text preparation/reflow and font adapter | [text.ts](./src/elems/text.ts), [fonts.ts](./src/engine/fonts.ts) |
+| Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/elems/shapes.ts), [path.ts](./src/engine/path.ts), [drawing.ts](./src/engine/drawing.ts), [fragment.ts](./src/engine/fragment.ts) |
 | Public API and JSX names | [index.ts](./src/index.ts), [eval.ts](./src/eval.ts) |
 | Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts) |
 | Command-line I/O | [gum-next-cli](../gum-next-cli/README.md) |

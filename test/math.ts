@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import * as core from '../src/index';
-import * as math from '../src/math';
-import * as arrays from '../src/arrays';
-import * as vectors from '../src/vectors';
-import * as colors from '../src/colors';
+import * as math from '../src/lib/math';
+import * as arrays from '../src/lib/arrays';
+import * as vectors from '../src/lib/vectors';
+import * as colors from '../src/lib/colors';
 import {
   range, linspace, repeat, enumerate, zip, meshgrid, lingrid, reshape, split, concat, slice,
   sum, prod, mean, min, max, minimum, maximum, cumsum, norm, normalize,

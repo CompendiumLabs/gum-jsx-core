@@ -1,7 +1,7 @@
-import type { Drawing } from './drawing';
-import type { Fragment } from './fragment';
-import type { Rect } from './geometry';
-import { path_data } from './path';
+import type { Drawing } from './engine/drawing';
+import type { Fragment } from './engine/fragment';
+import type { Rect } from './engine/geometry';
+import { path_data } from './engine/path';
 
 type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string }>;
 const IDENTITY = [1, 0, 0, 1, 0, 0] as const;

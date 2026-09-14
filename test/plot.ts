@@ -4,7 +4,7 @@ import {
   LayoutPass, define_element, make_fragment, shape_size, make_request, exact, px,
   infer_coordinates, map_point, unmap_point, linear_ticks, render_svg, evaluate,
 } from '../src/index';
-import type { Fragment, FontProvider, PathDraw } from '../src/index';
+import type { Fragment, FontProvider, PathDraw, CoordinateSpec } from '../src/index';
 
 function find(fragment: Fragment, name: string): Fragment {
   if (fragment.name === name) return fragment;
@@ -31,6 +31,62 @@ const tests: Record<string, () => void> = {
     assert.throws(() => infer_coordinates(line, { ylim: [4, 4] }), /endpoints must differ/);
     assert.throws(() => infer_coordinates(line, { xlim: [0, Infinity] }), /finite/);
     assert.throws(() => infer_coordinates(line, { padding: -1 }), /nonnegative/);
+  },
+
+  'data padding shares Box shorthand forms across Graph, Plot, and BarPlot'() {
+    const line = new CoordLine({ points: [[10, 30], [20, 50]] });
+    const forms: CoordinateSpec['padding'][] = [
+      [0.2, 0.4], { h: 0.2, v: 0.4 }, [0.4, 0.4, 0.2, 0.2],
+      { t: 0.4, b: 0.4, l: 0.2, r: 0.2 }, { x: 0.2, y: 0.4 },
+    ];
+    const canonical = { top: 0.4, bottom: 0.4, left: 0.2, right: 0.2 };
+    const pass = new LayoutPass();
+    for (const padding of forms) {
+      const coord = infer_coordinates(line, { padding });
+      assert.deepEqual(coord.xlim, [8, 22]);
+      assert.deepEqual(coord.ylim, [22, 58]);
+      for (const Container of [Graph, Plot, BarPlot]) {
+        const props = { values: [10, 20], children: line };
+        assert.deepEqual(pass.layout(new Container({ ...props, padding }), fixed),
+          pass.layout(new Container({ ...props, padding: canonical }), fixed), Container.name);
+      }
+    }
+    const jsx = evaluate('<Svg><BarPlot values={[10, 20]} padding={[0.2, 0.4]} /></Svg>');
+    const named = evaluate('<Svg><BarPlot values={[10, 20]} padding={{h: 0.2, v: 0.4}} /></Svg>');
+    assert.deepEqual(pass.layout(jsx), pass.layout(named));
+  },
+
+  'asymmetric data padding follows screen sides and preserves explicit limits'() {
+    const line = new CoordLine({ points: [[10, 30], [20, 50]] });
+    const padding = [0.2, 0.4, 0.2, 0.6] as const;
+    const coord = infer_coordinates(line, { padding });
+    assert.deepEqual(coord.xlim, [8, 26]);
+    assert.deepEqual(coord.ylim, [22, 54]);
+    const flipped = infer_coordinates(line, { padding, flip_x: true, flip_y: false });
+    assert.deepEqual(flipped.xlim, [4, 22]);
+    assert.deepEqual(flipped.ylim, [26, 58]);
+    assert.deepEqual(infer_coordinates(line, { padding: { h: 0.6, v: 0.4, l: 0.3, t: 0.2, left: 0.2 } }), coord);
+    assert.deepEqual(infer_coordinates(line, { padding: { h: 0.2, l: 0 } }).xlim, [10, 22]);
+    const explicit = infer_coordinates(line, { padding, xlim: [20, 10] });
+    assert.deepEqual(explicit.xlim, [20, 10]);
+    assert.deepEqual(explicit.ylim, coord.ylim);
+    assert.deepEqual(infer_coordinates(line, { padding, coord: [20, 50, 10, 30] }).ylim, [50, 30]);
+  },
+
+  'data padding rejects malformed tuples and nonnumeric or negative fractions'() {
+    for (const padding of [[], [0], [0, 0, 0], [0, 0, 0, 0, 0], Array(2), [0, undefined]]) {
+      assert.throws(() => infer_coordinates([], { padding: padding as CoordinateSpec['padding'] }), /exactly two.*or four/);
+    }
+    for (const padding of [[0, -0.1], { t: -0.1 }, { r: Infinity }, { h: NaN }, [px(2), 0]]) {
+      assert.throws(() => infer_coordinates([], { padding: padding as CoordinateSpec['padding'] }), /padding\..*(finite|nonnegative)/);
+    }
+    const tuple: [number, number] = [0.2, 0.4];
+    const plot = new BarPlot({ values: [10, 20], padding: tuple });
+    const before = plot.props.coordinates;
+    tuple[0] = 1;
+    assert.deepEqual(plot.props.coordinates, before);
+    assert.deepEqual(plot.props.padding, [0.2, 0.4]);
+    assert.ok(Object.isFrozen(plot.props.padding));
   },
 
   'coordinate mapping and inverse support directed limits, flips, and zero-frame diagnostics'() {
