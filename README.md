@@ -900,10 +900,10 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
-`Attach` uses `at` to select a point along the content edge and `attachment_anchor`
+`Attach` uses `at` to select a point along the content edge and `child_anchor`
 to select the attachment's own point along that edge; both default to 0.5. The
-wrapper's own `anchor` remains independent. Use `attachment-anchor` in JSX or
-`attachment_anchor` in host props; this replaces the earlier `Attach.align` name.
+wrapper's own `anchor` remains independent. Use `child-anchor` in JSX or
+`child_anchor` in host props; this replaces the earlier `Attach.align` name.
 
 Arrow shafts retreat at headed ends to hide the cap behind the triangular tip.
 Clearance uses the resolved shaft stroke, cap style, and head width after data

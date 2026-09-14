@@ -16,7 +16,7 @@ type OverlayProps = ElementProps & Readonly<{ clip?: boolean }>;
 type RotateProps = ElementProps & Readonly<{ angle?: number; origin?: Alignment; resize?: boolean }>;
 type TransformBoxProps = ElementProps & Readonly<{ matrix?: Transform; resize?: boolean }>;
 type AttachProps = ElementProps & Readonly<{
-  attachment?: Element; side?: Side; offset?: Length; at?: number; attachment_anchor?: number;
+  attachment?: Element; side?: Side; offset?: Length; at?: number; child_anchor?: number;
 }>;
 type AnchorProps = ElementProps & Readonly<{ align?: Alignment }>;
 
@@ -84,17 +84,17 @@ class Attach extends Element<AttachProps> {
   static layout(props: AttachProps, query: LayoutQuery) {
     const { size, placement, guides } = layout_content(content_child(props.children), query);
     const children = placement ? [placement] : [];
-    const { side = 'bottom', at = 0.5, attachment_anchor = 0.5 } = props;
+    const { side = 'bottom', at = 0.5, child_anchor = 0.5 } = props;
     if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown attachment side');
-    finite(at, 'at'); finite(attachment_anchor, 'attachment_anchor');
+    finite(at, 'at'); finite(child_anchor, 'child_anchor');
     const offset = resolve_length(props.offset ?? 0,
       { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'offset');
     if (props.attachment) {
       const item = query.child(props.attachment, make_request(), size, 1);
       const horizontal = side === 'top' || side === 'bottom';
-      const x = horizontal ? size.width * at - item.size.width * attachment_anchor
+      const x = horizontal ? size.width * at - item.size.width * child_anchor
         : side === 'left' ? -offset - item.size.width : size.width + offset;
-      const y = !horizontal ? size.height * at - item.size.height * attachment_anchor
+      const y = !horizontal ? size.height * at - item.size.height * child_anchor
         : side === 'top' ? -offset - item.size.height : size.height + offset;
       children.push(place_fragment(item, make_point(x, y)));
     }
