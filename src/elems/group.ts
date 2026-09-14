@@ -9,7 +9,7 @@ import type { LayoutQuery } from '../engine/pass'
 import { resolve_font_size, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
-type AnchorValue = Exclude<AlignmentValue, 'stretch'>
+type AnchorValue = Exclude<AlignmentValue, 'stretch' | 'fill'>
 type Anchor = AnchorValue | Readonly<{ x?: AnchorValue; y?: AnchorValue }>
   | readonly [x: AnchorValue, y: AnchorValue]
 type PositionSpec = Readonly<{ x?: Length; y?: Length; anchor?: Anchor }>
@@ -43,7 +43,7 @@ class Group extends Element<GroupProps> {
         resolve_length(y, { font_size, fraction: size.height }, `${path}.y`),
       )
       const align = resolve_alignment(anchor, `${path}.anchor`)
-      if (align.x === 'stretch' || align.y === 'stretch') {
+      if (typeof align.x !== 'number' || typeof align.y !== 'number') {
         throw new TypeError(`${path}.anchor selects a point; use width and height to size the child`)
       }
 

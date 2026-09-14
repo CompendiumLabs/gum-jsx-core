@@ -1,5 +1,5 @@
 import { nonnegative } from '../lib/checks'
-import { definite_reference, resolve_alignment } from '../lib/composition'
+import { aligned_request, definite_reference, fills_axis, resolve_alignment } from '../lib/composition'
 import type { AlignmentValue } from '../lib/composition'
 import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -14,8 +14,8 @@ import { resolve_font_size, resolve_length } from '../engine/units'
 import type { Length, ReferenceBox } from '../engine/units'
 
 type StackAlign = AlignmentValue | 'baseline'
-type ResolvedStackAlign = number | 'stretch' | 'baseline'
-type StackJustify = Exclude<AlignmentValue, 'stretch'>
+type ResolvedStackAlign = number | 'stretch' | 'fill' | 'baseline'
+type StackJustify = Exclude<AlignmentValue, 'stretch' | 'fill'>
   | 'space_between' | 'space_around' | 'space_evenly'
 type StackProps = ElementProps & Readonly<{
   gap?: Length
@@ -53,13 +53,21 @@ function stack_item(element: Element, index: number, main: Axis,
   const path = `${query.path}/${element.type.name}[${index}]`
   const font_size = resolve_font_size(props.font_size, query.style.font_size, `${path}.font_size`)
   const sizing = resolve_sizing(props, { font_size, reference, path })
-  const basis = props.basis === undefined ? sizing[main].preferred
+  const grow = nonnegative(props.grow ?? 0, `${path}.grow`)
+  // Unsized growth divides a finite budget from zero. Natural measurement,
+  // an explicit auto basis, and fit width retain content-based starting sizes.
+  const zero_basis = props.basis === undefined && grow > 0
+    && query.request[main].kind !== 'natural' && sizing[main].mode !== 'fit'
+  if (typeof props.basis === 'string' && props.basis !== 'auto') {
+    throw new TypeError(`${path}.basis: expected a length or "auto"`)
+  }
+  const basis = props.basis === undefined || props.basis === 'auto'
+    ? sizing[main].preferred ?? (zero_basis ? 0 : undefined)
     : nonnegative(resolve_length(props.basis, { font_size, fraction: reference[main] },
       `${path}.basis`), `${path}.basis`)
-  return { element, index, sizing, basis,
+  return { element, index, sizing, basis, grow,
     align: props.align_self === undefined ? align
       : stack_alignment(props.align_self, main, `${path}.align_self`),
-    grow: nonnegative(props.grow ?? 0, `${path}.grow`),
     shrink: nonnegative(props.shrink ?? 0, `${path}.shrink`) }
 }
 
@@ -73,7 +81,7 @@ function pack_stack(justify: StackJustify, count: number, free: number, gap: num
     return { offset: justify === 'space_around' ? space / 2 : space, gap: gap + space }
   }
   const align = resolve_alignment(justify).x
-  if (align === 'stretch') throw new TypeError('Use grow to distribute stack space')
+  if (typeof align !== 'number') throw new TypeError('Use grow to distribute stack space')
   return { offset: free * align, gap }
 }
 
@@ -88,7 +96,7 @@ function stack_guides(children: readonly Placement[]): Guides {
     ? { last_baseline: last.offset.y + baseline } : {}) }
 }
 
-// Both axes use the same packing and allocation. Text makes the stretch order
+// Both axes use the same packing and allocation. Text makes the fill/stretch order
 // significant: a column establishes its shared width before allocating heights;
 // a row allocates widths before finding the height of its reflowed children.
 // A measured cross axis is selected once, without percentage feedback or search.
@@ -102,13 +110,18 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const items = element_children(props.children).map((element, index) =>
     stack_item(element, index, main, query, reference, align))
   const gaps = Math.max(0, items.length - 1) * gap
-  const stretching = items.some(item => item.align === 'stretch')
+  const fills = (item: Item) => item.align !== 'baseline' && fills_axis(item.align, item.sizing[cross])
+  const stretching = items.some(fills)
 
   const offer = query.request[cross]
   const cross_offer = offer.kind === 'exact' ? available(offer.value) : offer
   let cross_size = reference[cross]
   function cross_request(item: Item): AxisRequest {
-    return item.align === 'stretch' && cross_size !== undefined ? exact(cross_size) : cross_offer
+    return aligned_request(cross_offer, cross_size, item.align === 'baseline' ? 0 : item.align, item.sizing[cross])
+  }
+  function cross_fits(item: Item, fragment?: Fragment): boolean {
+    const request = cross_request(item)
+    return request.kind !== 'exact' || fragment?.size[cross] === request.value
   }
   const size_axes = (length: number, breadth: number) => main === 'width'
     ? make_size(length, breadth) : make_size(breadth, length)
@@ -132,7 +145,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   if (column_stretch) {
     cross_size = select_cross(Math.max(0, ...items.map(item => item.fragment!.size[cross])))
     for (const item of items) {
-      if (item.align === 'stretch' && item.basis === undefined && item.fragment!.size[cross] !== cross_size) {
+      if (fills(item) && item.basis === undefined && !cross_fits(item, item.fragment)) {
         item.fragment = measure(item, natural())
       }
     }
@@ -153,9 +166,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const sizes = distribute_flex(flex, Math.max(0, target - gaps))
   let fragments = items.map((item, index) => {
     const fragment = item.fragment
-    const offer = cross_request(item)
-    const cross_fits = offer.kind !== 'exact' || fragment?.size[cross] === offer.value
-    return fragment?.size[main] === sizes[index] && cross_fits ? fragment
+    return fragment?.size[main] === sizes[index] && cross_fits(item, fragment) ? fragment
       : measure(item, exact(sizes[index]))
   })
 
@@ -172,12 +183,12 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   // A stretching column keeps the width selected before height allocation.
   // Later growth in non-stretch children is overflow, not a new reflow cycle.
   const size = finish_size(size_axes(length, cross_size ?? breadth), query.request, query.sizing)
-  // A row's width allocation and baseline group are now known. Stretch only
+  // A row's width allocation and baseline group are now known. Fill/stretch
   // participating children to its chosen height, without changing their widths.
   if (stretching && cross_size === undefined) {
     cross_size = size[cross]
     fragments = fragments.map((fragment, index) =>
-      items[index].align !== 'stretch' || fragment.size[cross] === cross_size ? fragment
+      !fills(items[index]) || cross_fits(items[index], fragment) ? fragment
         : measure(items[index], exact(sizes[index])))
   }
 
@@ -186,7 +197,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const children = fragments.map((fragment, index) => {
     const align = items[index].align
     const offset = align === 'baseline' ? above - baselines[index]
-      : (size[cross] - fragment.size[cross]) * (align === 'stretch' ? 0 : align)
+      : (size[cross] - fragment.size[cross]) * (typeof align === 'number' ? align : 0)
     const point = main === 'width' ? make_point(position, offset) : make_point(offset, position)
     position += sizes[index] + packing.gap
     return place_fragment(fragment, point)

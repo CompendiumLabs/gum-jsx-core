@@ -1,7 +1,7 @@
 import type { LayoutQuery } from '../engine/pass'
 import { Box, box_layout } from './box'
 import type { BoxProps } from './box'
-import { Element, element_children } from '../engine/element'
+import { Element, content_child, element_children } from '../engine/element'
 import type { Child, ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point, make_rect, resolve_insets, deflate_size } from '../engine/geometry'
@@ -36,9 +36,14 @@ type BulletsProps = ElementProps & Readonly<{
 
 // Text composition converts text at construction, so reflow always sees the same
 // source elements. Existing figures and their parent-owned flex metadata survive.
+function has_content_element(value: Child): boolean {
+  return Array.isArray(value) ? value.some(has_content_element)
+    : value instanceof Element && !(value instanceof Span)
+}
+
 function text_element(value: Child, style: TextOptions = {}): Element {
-  return value instanceof Element && !(value instanceof Span)
-    ? value : new Text({ ...style, children: value })
+  return has_content_element(value) ? content_child(value)!
+    : new Text({ ...style, children: value })
 }
 
 function text_children(value: Child = []): readonly Element[] {
@@ -67,13 +72,13 @@ class TextRow extends TextStack {
 }
 
 class TextCol extends TextStack {
-  static defaults: Partial<TextStackProps> = { align: 'stretch' }
+  static defaults: Partial<TextStackProps> = { width: 'fill', align: 'fill' }
   static layout(props: TextStackProps, query: LayoutQuery) {
     return stack_layout(props, query, 'height')
   }
 }
 class TextBox extends Element<BoxProps, TextBoxProps> {
-  static defaults: Partial<BoxProps> = { padding: em(0.6) }
+  static defaults: Partial<BoxProps> = { width: 'fill', align: { x: 'fill' }, padding: em(0.6) }
   static normalize({ text, ...props }: TextBoxProps): BoxProps {
     return { ...props, children: text !== undefined ? new Text({ text }) : text_element(props.children) }
   }

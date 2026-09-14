@@ -12,8 +12,10 @@ type AxisRequest =
 type LayoutRequest = Readonly<Record<Axis, AxisRequest>>
 
 type SizeKey = Axis | `min_${Axis}` | `max_${Axis}`
-type SizeSpec = Readonly<Partial<Record<SizeKey, Length>> & { aspect?: number }>
-type AxisSizing = Readonly<{ preferred?: number; min: number; max: number }>
+type SizeMode = 'fill' | 'fit'
+type SizeSpec = Readonly<Partial<Record<Exclude<SizeKey, 'width'>, Length>>
+  & { width?: Length | SizeMode; aspect?: number }>
+type AxisSizing = Readonly<{ preferred?: number; mode?: SizeMode; min: number; max: number }>
 type Sizing = Readonly<Record<Axis, AxisSizing> & { aspect?: number }>
 
 const NATURAL = Object.freeze({ kind: 'natural' })
@@ -59,8 +61,9 @@ function deflate_request(request: LayoutRequest, insets: Insets): LayoutRequest 
   })
 }
 
-// Resolve against the established parent box, never a temporary child offer.
-function resolve_sizing(spec: SizeSpec = {}, context: LengthContext = {}): Sizing {
+// Fractions use the established parent box. Fill instead selects the actual
+// offered width, once, before own limits introduce any measurement budgets.
+function resolve_sizing(spec: SizeSpec = {}, context: LengthContext & { request?: LayoutRequest } = {}): Sizing {
   const { font_size, reference = {}, path = 'root' } = context
 
   function resolve_axis(axis: Axis): AxisSizing {
@@ -69,16 +72,23 @@ function resolve_sizing(spec: SizeSpec = {}, context: LengthContext = {}): Sizin
       const length = spec[key]
       if (length === undefined) return undefined
       const location = `${path}.${key}`
+      if (typeof length === 'string') {
+        throw new TypeError(`${location}: expected a length${key === 'width' ? ', "fill", or "fit"' : ''}`)
+      }
       return nonnegative(resolve_length(length, basis, location), location)
     }
 
-    const preferred = resolve(axis)
+    const value = spec[axis]
+    const mode = axis === 'width' && (value === 'fill' || value === 'fit') ? value : undefined
+    const offer = context.request?.[axis]
+    const preferred = mode === undefined ? resolve(axis)
+      : mode === 'fill' && offer?.kind === 'available' ? nonnegative(offer.value, `${path}.${axis}`) : undefined
     const min = resolve(`min_${axis}`) ?? 0
     const max = resolve(`max_${axis}`) ?? Infinity
     if (min > max) {
       throw new RangeError(`${path}: min_${axis} exceeds max_${axis}`)
     }
-    return Object.freeze({ preferred, min, max })
+    return Object.freeze({ preferred, ...(mode === undefined ? {} : { mode }), min, max })
   }
 
   const { aspect } = spec
@@ -158,4 +168,4 @@ export {
   natural, available, exact, make_request, deflate_request,
   resolve_sizing, prepare_request, finish_size, shape_size,
 }
-export type { Axis, AxisRequest, LayoutRequest, SizeSpec, AxisSizing, Sizing }
+export type { Axis, AxisRequest, LayoutRequest, SizeMode, SizeSpec, AxisSizing, Sizing }

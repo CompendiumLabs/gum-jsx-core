@@ -32,7 +32,7 @@ class Overlay extends Element<OverlayProps> {
       const fragment = query.child(element, request, size, index + 1)
       const font_size = resolve_font_size(element.props.font_size, query.style.font_size)
       const align = resolve_alignment(element.props.anchor ?? 'start')
-      if (align.x === 'stretch' || align.y === 'stretch') throw new TypeError('An anchor selects a point')
+      if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
       // Anchor locates the child's own reference point, just as in Group.
       const x = resolve_length(element.props.x ?? 0, { font_size, fraction: size.width }, 'x')
       const y = resolve_length(element.props.y ?? 0, { font_size, fraction: size.height }, 'y')
@@ -70,7 +70,7 @@ class Rotate extends Element<RotateProps> {
     return transformed_layout(props, query, size => {
       const angle = finite(props.angle ?? 0, 'angle') * Math.PI / 180
       const origin = resolve_alignment(props.origin ?? 'center')
-      if (origin.x === 'stretch' || origin.y === 'stretch') throw new TypeError('Rotation origin selects a point')
+      if (typeof origin.x !== 'number' || typeof origin.y !== 'number') throw new TypeError('Rotation origin selects a point')
       const x = size.width * origin.x, y = size.height * origin.y
       const cos = Math.cos(angle), sin = Math.sin(angle)
       return [cos, sin, -sin, cos, x - cos * x + sin * y, y - sin * x - cos * y]

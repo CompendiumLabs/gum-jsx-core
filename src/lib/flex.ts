@@ -2,7 +2,7 @@ import { finite, nonnegative } from './checks'
 import type { Length } from '../engine/units'
 
 // These source properties are interpreted by the immediate stack parent.
-type FlexSpec = Readonly<{ basis?: Length; grow?: number; shrink?: number }>
+type FlexSpec = Readonly<{ basis?: Length | 'auto'; grow?: number; shrink?: number }>
 type FlexItem = Readonly<{
   basis: number
   min: number

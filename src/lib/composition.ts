@@ -5,15 +5,17 @@ import {
   make_size, make_point, make_rect, make_insets, deflate_size, inflate_size, bounds_overflow, read_point,
 } from '../engine/geometry'
 import type { Insets, Size } from '../engine/geometry'
-import { available, exact, make_request, deflate_request, finish_size } from '../engine/layout'
-import type { LayoutRequest, Sizing } from '../engine/layout'
+import { available, exact, make_request, deflate_request, finish_size, resolve_sizing } from '../engine/layout'
+import type { AxisRequest, AxisSizing, LayoutRequest, Sizing } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
+import { resolve_font_size } from '../engine/units'
 import type { ReferenceBox } from '../engine/units'
 
-type AlignmentValue = number | 'start' | 'center' | 'end' | 'stretch'
+type AlignmentValue = number | 'start' | 'center' | 'end' | 'stretch' | 'fill'
 type Alignment = AlignmentValue | Readonly<{ x?: AlignmentValue; y?: AlignmentValue }>
   | readonly [x: AlignmentValue, y: AlignmentValue]
-type ResolvedAlignment = Readonly<{ x: number | 'stretch'; y: number | 'stretch' }>
+type ResolvedAlignmentValue = number | 'stretch' | 'fill'
+type ResolvedAlignment = Readonly<{ x: ResolvedAlignmentValue; y: ResolvedAlignmentValue }>
 type FitMode = 'contain' | 'cover' | 'scale_down'
 
 // Alignment values are dimensionless: 0/start, 0.5/center, and 1/end.
@@ -24,8 +26,8 @@ function resolve_alignment(align: Alignment = 'start', path = 'alignment'): Reso
   if (tuple && (axes.x === undefined || axes.y === undefined)) {
     throw new TypeError(`${path} needs two alignment values`)
   }
-  function resolve(value: AlignmentValue = 'start'): number | 'stretch' {
-    if (value === 'stretch') return value
+  function resolve(value: AlignmentValue = 'start'): ResolvedAlignmentValue {
+    if (value === 'stretch' || value === 'fill') return value
     const fraction = typeof value === 'number' ? value
       : { start: 0, center: 0.5, end: 1 }[value]
     finite(fraction, path)
@@ -38,9 +40,25 @@ function resolve_alignment(align: Alignment = 'start', path = 'alignment'): Reso
 // Oversized content can align outside the frame; keep the resulting negative offset.
 function align_offset(size: Size, child: Size, align: ResolvedAlignment) {
   return make_point(
-    (size.width - child.width) * (align.x === 'stretch' ? 0 : align.x),
-    (size.height - child.height) * (align.y === 'stretch' ? 0 : align.y),
+    (size.width - child.width) * (typeof align.x === 'number' ? align.x : 0),
+    (size.height - child.height) * (typeof align.y === 'number' ? align.y : 0),
   )
+}
+
+// Fill chooses an allocation only for automatic sizes, within the child's
+// limits. Stretch deliberately overrides both explicit sizes and limits.
+function fills_axis(align: ResolvedAlignmentValue, sizing: AxisSizing): boolean {
+  return align === 'stretch' || align === 'fill'
+    && sizing.mode !== 'fit' && (sizing.preferred === undefined || sizing.mode === 'fill')
+}
+
+function aligned_request(offer: AxisRequest, size: number | undefined,
+  align: ResolvedAlignmentValue, sizing?: AxisSizing): AxisRequest {
+  if (size !== undefined) {
+    if (align === 'stretch') return exact(size)
+    if (sizing && fills_axis(align, sizing)) return exact(Math.max(sizing.min, Math.min(sizing.max, size)))
+  }
+  return offer.kind === 'exact' ? available(offer.value) : offer
 }
 
 // Exact allocations and equal min/max limits establish axes independently of a
@@ -57,7 +75,7 @@ function definite_reference(request: LayoutRequest, sizing: Sizing): ReferenceBo
 
 // One-child layout is deflate → query → inflate → align. The child's natural
 // answer sets hugging axes, while definite axes provide percentage references.
-// Stretch sends exact requests only on axes established before measurement.
+// Fill/stretch send allocations only on axes established before measurement.
 // No second query or element reconstruction is needed for ordinary alignment.
 function layout_content(
   child: Element | undefined, query: LayoutQuery, insets: Insets = make_insets(),
@@ -74,11 +92,15 @@ function layout_content(
       height: Math.max(0, fixed.height - insets.top - insets.bottom),
     }),
   })
+  let sizing: Sizing | undefined
+  if (child && (align.x === 'fill' || align.y === 'fill')) {
+    const path = `${query.path}/${child.type.name}[0]`
+    const font_size = resolve_font_size(child.props.font_size, query.style.font_size, `${path}.font_size`)
+    sizing = resolve_sizing(child.props, { font_size, reference, path })
+  }
   const request = make_request({
-    width: align.x === 'stretch' && reference.width !== undefined ? exact(reference.width)
-      : inner.width.kind === 'exact' ? available(inner.width.value) : inner.width,
-    height: align.y === 'stretch' && reference.height !== undefined ? exact(reference.height)
-      : inner.height.kind === 'exact' ? available(inner.height.value) : inner.height,
+    width: aligned_request(inner.width, reference.width, align.x, sizing?.width),
+    height: aligned_request(inner.height, reference.height, align.y, sizing?.height),
   })
   const fragment = child ? query.child(child, request, reference) : undefined
   const measured = fragment?.size ?? make_size()
@@ -107,5 +129,5 @@ function fit_scale(source: Size, target: ReferenceBox, mode: FitMode): number {
   return finite(mode === 'scale_down' ? Math.min(1, scale) : scale, 'fit scale')
 }
 
-export { resolve_alignment, align_offset, definite_reference, layout_content, fit_scale }
+export { resolve_alignment, align_offset, fills_axis, aligned_request, definite_reference, layout_content, fit_scale }
 export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode }

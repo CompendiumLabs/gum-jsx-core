@@ -33,7 +33,7 @@ function graph_children(elements: readonly Element[], query: LayoutQuery, size: 
     const path = `${query.path}/${element.type.name}[${index}]`
     const font = resolve_font_size(element.props.font_size, query.style.font_size, `${path}.font_size`)
     const align = resolve_alignment(anchor, `${path}.anchor`)
-    if (align.x === 'stretch' || align.y === 'stretch') throw new TypeError('An anchor selects a point')
+    if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
     const left = x === undefined ? 0 : coordinate_length(x, 'x', size, font, coordinates, `${path}.x`)
     const top = y === undefined ? 0 : coordinate_length(y, 'y', size, font, coordinates, `${path}.y`)
     return place_fragment(fragment,

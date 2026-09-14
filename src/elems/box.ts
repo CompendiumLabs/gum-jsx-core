@@ -104,7 +104,7 @@ class Fit extends Element<FitProps> {
   static layout(props: FitProps, query: LayoutQuery) {
     const { mode = 'contain', align = 'center', clip = false } = props
     const alignment = resolve_alignment(align)
-    if (alignment.x === 'stretch' || alignment.y === 'stretch') {
+    if (typeof alignment.x !== 'number' || typeof alignment.y !== 'number') {
       throw new TypeError('Fit uses uniform scaling; choose start, center, or end alignment')
     }
     const child = content_child(props.children)

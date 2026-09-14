@@ -97,6 +97,14 @@ horizontal insets use reference width; height and vertical insets use reference
 height. The reference is the parent's established content box before flex slots
 are allocated. Deflating an offer does not change that reference.
 
+Width additionally accepts `"fill"` and `"fit"`. Fill occupies an available width,
+clamped to own limits, and falls back to ordinary measurement without an offer.
+Fit uses ordinary measurement and opts out of a parent's fill alignment; text
+still wraps at its available width. These values are width policies, not lengths.
+`resolve_sizing` accepts an optional `request` in its context to resolve fill from
+the actual parent offer. The layout pass supplies it automatically. Resolving fill
+once keeps an own maximum from turning natural measurement into a full-width request.
+
 Resolve `font_size` first using `resolve_font_size(value, inherited)`. Both its
 relative forms refer to the inherited size. Subsequent em lengths and line height
 use the resolved local font size. Defaults live in [defaults.ts](./src/engine/defaults.ts):
@@ -391,7 +399,7 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
 | `radius` | Rounded outer corners; scalar, `{x,y}`, or `[x,y]`, default zero. Clamped to the box. |
-| `align` | `"start"`, `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}` or `[x,y]`. Default start on both axes. |
+| `align` | `"start"`, `"center"`, `"end"`, `"fill"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}` or `[x,y]`. Default start on both axes. |
 | `clip` | Clip the child inside the border, including the padding area; default false. |
 
 Background and border are local decoration. Ordinary `fill`, `stroke`, and font
@@ -417,6 +425,30 @@ Alignment positions the child's allocated box. Numeric alignment is dimensionles
 exact child request on axes established before measurement; other axes still
 hug. Center/end alignment may give oversized children negative offsets. Baselines
 move with the child. Clipping changes visible ink and retains overflow.
+
+Fill uses the established content area but allocates only automatically sized
+children, respecting explicit dimensions, `width="fit"`, and min/max limits.
+Remaining space stays at the end of a fill-aligned axis. Hard stretch continues
+to override child dimensions and limits.
+
+For document layouts, `TextBox` and `TextFrame` default to `width="fill"` and
+`align={{ x: "fill" }}`; `TextCol` defaults to `width="fill"` and `align="fill"`.
+Their existing padding, border, and gap defaults remain. Heights are content-sized,
+and flexible row children still require explicit flex weights.
+
+```jsx
+<Svg width={px(400)}>
+  <TextBox padding={em(1)}>
+    <TextCol gap={0}>
+      <HStack><Text>Left</Text><Spacer /><Text>Right</Text></HStack>
+      <Frame><Text>Content</Text></Frame>
+    </TextCol>
+  </TextBox>
+</Svg>
+```
+
+Use `width="fit"` for compact document components. `Box`, `Frame`, `HStack`, and
+`VStack` retain their ordinary sizing defaults.
 
 Use nested Boxes for spacing outside a decorated frame:
 
@@ -451,7 +483,7 @@ Fit occupies finite offered axes; unoffered axes follow the scaled child. It
 establishes its chosen target axes as references, then queries the child naturally.
 `contain` fits within the target, `cover` fills it with possible overflow, and
 `scale_down` contains without enlarging. Alignment defaults to center and accepts
-the same positions as Box, excluding stretch. `clip` defaults to false; enable it
+the same positions as Box, excluding fill and stretch. `clip` defaults to false; enable it
 for cropped cover fitting. Fit scales the child's allocated rectangle, including
 any nested padding, glyphs, strokes, and guides; it does not fit ink extents. Text
 keeps its natural line breaks instead of reflowing to the target width. Zero source axes
@@ -500,7 +532,7 @@ needs one query per element, including Svg:
 |---|---|
 | `width`, `height`, `min_width`, etc. | Shared sizing for the stack's full allocation. |
 | `gap` | Length between adjacent children, default zero. No leading or trailing gap. |
-| `align` | Cross-axis `"start"` (default), `"center"`, `"end"`, `"stretch"`, or a number from 0 to 1. HStack also accepts `"baseline"`. |
+| `align` | Cross-axis `"start"` (default), `"center"`, `"end"`, `"fill"`, `"stretch"`, or a number from 0 to 1. HStack also accepts `"baseline"`. |
 | `justify` | Main-axis `"start"` (default), `"center"`, `"end"`, a number from 0 to 1, `"space_between"`, `"space_around"`, or `"space_evenly"`. |
 
 Flex and `align_self` properties belong to the **direct child** of a stack. Put
@@ -509,7 +541,7 @@ pass through wrappers.
 
 | Child prop | Meaning |
 |---|---|
-| `basis` | Starting main-axis length. Otherwise use the child's preferred width/height, otherwise its measured natural size. |
+| `basis` | Starting main-axis length, or `"auto"` to use the explicit dimension/content basis. Omitted follows the rules below. |
 | `grow` | Nonnegative weight for surplus space, default **0**. |
 | `shrink` | Nonnegative shortage weight, default **0**; multiplied by the original basis. |
 | `align_self` | Override the parent's cross-axis `align` for this child. Same values; omitted or `undefined` uses the stack's `align`. |
@@ -533,13 +565,27 @@ keep their clamped bases. If maxima prevent filling the frame, `justify` places 
 unused space. If minima or zero shrink weights prevent fitting, overflow remains
 explicit; the stack does not clip. Wrap it in a Box with `clip` when needed.
 
-`basis={0} grow={1}` gives an item an equal share of remaining space alongside
-other such items. `grow={1}` alone adds equal surplus to potentially unequal
-natural bases. `width={0.5}` instead means half the stack's **full established
+An explicit length basis wins. Otherwise the child's explicit main-axis dimension
+supplies its basis. If still unsized, positive `grow` starts from zero under an
+available or exact main-axis request; natural requests and omitted/zero growth
+retain measured bases. An own maximum can supply an available budget, while a
+minimum alone retains natural bases before adding surplus.
+
+`basis="auto"` skips the zero fallback and uses an explicit main-axis dimension
+or measured content. A row child's `width="fit"` also preserves a measured basis;
+`width="fill"` supplies no fixed basis. Grow still enlarges the final allocation,
+and an explicit length basis overrides fit. An explicit `basis={0}` stays zero
+even without a budget, where content can overflow a zero allocation.
+
+`grow={1}` gives an unsized item an equal share of remaining space alongside
+other such items, subject to limits. `basis="auto" grow={1}` adds equal surplus
+to potentially unequal natural bases. See the runnable
+[growth bases example](../gum-next-docs/topics/code/stack_basis.jsx).
+`width={0.5}` instead means half the stack's **full established
 width**, before subtracting gaps. Two half-width children plus a gap overflow
 unless shrinking is enabled. A fraction used as `basis` follows the same rule.
 
-Basis, preferred sizes, and limits resolve using the child's local font size;
+Length bases, preferred sizes, and limits resolve using the child's local font size;
 the gap uses the stack's font size. A fractional gap uses the stack's established
 main-axis length. Those references stay fixed across every probe and allocation.
 For example, `HStack width={1}` under a fixed-width Svg establishes that width.
@@ -559,8 +605,10 @@ before allocating vertical space; a row allocates widths and reflows text before
 selecting the shared height. Stretch may override a child's preferred cross size
 and cross limits, following the exact-request contract. The selected cross size
 is never fed back into percentage references. These are bounded measurement
-phases, with no aspect-fitting search or font scaling. Only stretching children
-are remeasured at the selected cross size. A stretching column keeps its selected
+phases, with no aspect-fitting search or font scaling. Fill follows the same
+phases but preserves explicit cross dimensions and `width="fit"`, and clamps
+automatic allocations to child limits. Only participating fill/stretch children
+are remeasured at their selected cross size. A stretching column keeps its selected
 width if a non-stretching child later grows wider during height allocation;
 that excess is overflow, not another width-selection/reflow cycle.
 
@@ -641,7 +689,7 @@ its painted ink. `anchor="center"` subtracts half the child's width and height;
 at the position. Tuple entries can mix fractions and keywords, for example
 `anchor={['end', 0.5]}`. Per-axis Box/Fit/Anchor alignment and Rotate origins also
 accept tuples. Stack alignment stays a single-axis value.
-There is no stretch anchor; width and height control sizing.
+Anchors accept neither fill nor stretch; width and height control sizing.
 
 Position metadata belongs to the direct child. Put it on the Box or VStack when
 that container is what Group should place. Nested Groups create local canvas

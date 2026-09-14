@@ -26,7 +26,7 @@ export {
   resolve_sizing, prepare_request, finish_size, shape_size,
 } from './engine/layout'
 export type {
-  AxisRequest, LayoutRequest, SizeSpec, AxisSizing, Sizing,
+  AxisRequest, LayoutRequest, SizeMode, SizeSpec, AxisSizing, Sizing,
 } from './engine/layout'
 export { union_rects, intersect_rects, make_transform, transform_rect } from './engine/geometry'
 export { make_fragment, place_fragment, content_bounds, transform_guides } from './engine/fragment'

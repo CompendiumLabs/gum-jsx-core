@@ -127,7 +127,7 @@ class LayoutPass {
       active.add(key)
       try {
         const basis = { font_size: style.font_size, reference, path }
-        const sizing = resolve_sizing(element.props, basis)
+        const sizing = resolve_sizing(element.props, { ...basis, request })
         const prepared = prepare_request(request, sizing)
         const query: LayoutQuery = Object.freeze({
           request: prepared, sizing, style, reference, path, coordinates,
