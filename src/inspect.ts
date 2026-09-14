@@ -18,10 +18,11 @@ function inspect_fragment(fragment: Fragment): string {
     const ink = node.ink === null ? 'none'
       : `${node.ink.x},${node.ink.y},${node.ink.width},${node.ink.height}`
     const guides = Object.entries(node.guides).map(([key, value]) => ` ${key}=${value}`).join('')
+    const math = node.math ? ` math=${JSON.stringify(node.math)}` : ''
     const content = node.content
     const box = content ? ` content=${content.x},${content.y},${content.width},${content.height}` : ''
     lines.push(`${'  '.repeat(depth)}${name} ${width}×${height} ${location}${matrix}`
-      + ` ink=${ink}${overflow_text(node.overflow)}${guides}${box}${node.clip ? ' clipped' : ''}`)
+      + ` ink=${ink}${overflow_text(node.overflow)}${guides}${math}${box}${node.clip ? ' clipped' : ''}`)
     for (const child of node.children) {
       const transform = child.transform ? ` matrix(${child.transform.join(',')})` : ''
       visit(child.fragment, depth + 1, child.offset, transform)

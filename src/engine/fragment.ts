@@ -1,13 +1,15 @@
 import { finite } from '../lib/checks'
 import { drawing_ink, copy_drawing } from './drawing'
 import type { Drawing } from './drawing'
+import { copy_math_metrics } from './math'
+import type { MathMetrics } from './math'
 import {
   make_size, make_point, make_rect, make_clip, make_insets, make_transform, read_point,
   union_rects, intersect_rects, transform_rect, bounds_overflow,
 } from './geometry'
 import type { Clip, Insets, Point, PointValue, Rect, Size, Transform } from './geometry'
 
-// Named guides are vertical positions, including text baselines and a future math axis.
+// Named guides are vertical positions, including text baselines and the math axis.
 type Guides = Readonly<Partial<Record<string, number>>>
 const OWNED = Symbol('next.fragment')
 
@@ -17,6 +19,7 @@ interface Fragment<Draw = Drawing> {
   readonly label?: string
   readonly size: Size
   readonly guides: Guides
+  readonly math?: MathMetrics
   readonly ink: Rect | null
   readonly overflow: Insets
   readonly draw: readonly Draw[]
@@ -37,6 +40,7 @@ type FragmentSpec = Readonly<{
   name?: string
   label?: string
   guides?: Guides
+  math?: MathMetrics
   ink?: Rect | null
   overflow?: Insets
   draw?: readonly Drawing[]
@@ -106,6 +110,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
     ...(spec.name === undefined ? {} : { name: spec.name }),
     ...(spec.label === undefined ? {} : { label: spec.label }),
     size, guides: Object.freeze(guides),
+    ...(spec.math === undefined ? {} : { math: copy_math_metrics(spec.math) }),
     ink: clip === undefined ? ink : intersect_rects(ink, clip),
     overflow: bounds_overflow(size, bounds),
     draw: Object.freeze(draw), children: Object.freeze(children),

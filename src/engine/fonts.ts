@@ -17,6 +17,7 @@ type GlyphShape = Readonly<{
 type MeasuredFont = Readonly<{
   ascent: number
   descent: number
+  has_glyphs: (text: string) => boolean
   shape: (text: string) => GlyphShape
 }>
 interface FontProvider {
@@ -26,6 +27,28 @@ type FontOptions = Readonly<{ weight?: number; style?: FontStyle }>
 type FontData = ArrayBuffer | Uint8Array
 type Face = {
   family: string; weight: number; style: FontStyle; url?: URL; font?: Font
+  pending?: Promise<void>
+}
+
+class FontNotLoadedError extends Error {
+  constructor(readonly family: string) {
+    super(`Load ${family} with fonts.load() before layout`)
+    this.name = 'FontNotLoadedError'
+  }
+}
+
+class MissingGlyphError extends Error {
+  constructor(readonly family: string, readonly code_point: number) {
+    const code = code_point.toString(16).toUpperCase().padStart(4, '0')
+    super(`${family} has no glyph for U+${code}`)
+    this.name = 'MissingGlyphError'
+  }
+}
+
+function font_options(family: string, { weight = 400, style = 'normal' }: FontOptions) {
+  if (!family || !Number.isFinite(weight) || weight < 1 || weight > 1000
+    || !['normal', 'italic'].includes(style)) throw new TypeError('Invalid font registration')
+  return { family, weight, style }
 }
 
 // Access local files only on demand. Importing core performs no host I/O and
@@ -79,13 +102,13 @@ function measure_font(font: Font, family: string, oblique: boolean): MeasuredFon
   const cache = new Map<string, GlyphShape>()
   const ascent = nonnegative(font.ascent / font.unitsPerEm, 'font ascent')
   const descent = nonnegative(-font.descent / font.unitsPerEm, 'font descent')
-  return Object.freeze({ ascent, descent, shape(text: string): GlyphShape {
+  const has_glyphs = (text: string) => [...text].every(char => font.hasGlyphForCodePoint(char.codePointAt(0)!))
+  return Object.freeze({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
     const cached = cache.get(text)
     if (cached) return cached
     for (const char of text) {
       if (!font.hasGlyphForCodePoint(char.codePointAt(0)!)) {
-        const code = char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')
-        throw new Error(`${family} has no glyph for U+${code}`)
+        throw new MissingGlyphError(family, char.codePointAt(0)!)
       }
     }
 
@@ -135,12 +158,23 @@ class Fonts implements FontProvider {
 
   // Registration copies/parses bytes now. Notify a reused pass of this new version.
   register(family: string, data: FontData, options: FontOptions = {}): void {
-    const { weight = 400, style = 'normal' } = options
-    if (!family || !Number.isFinite(weight) || weight < 1 || weight > 1000
-      || !['normal', 'italic'].includes(style)) throw new TypeError('Invalid font registration')
-    const face = { family, weight, style, font: parse_font(data) }
+    const face = { ...font_options(family, options), font: parse_font(data) }
+    this.#register(face)
+  }
+
+  // Register asset metadata without I/O. Identical registration preserves loaded
+  // bytes and in-flight requests; replacement invalidates measured faces.
+  register_url(family: string, url: URL, options: FontOptions = {}): void {
+    const face = { ...font_options(family, options), url: new URL(url.href) }
+    const old = this.#faces.find(item => item.family === family
+      && item.weight === face.weight && item.style === face.style)
+    if (old?.url?.href === face.url.href) return
+    this.#register(face)
+  }
+
+  #register(face: Face): void {
     this.#faces = this.#faces.filter(item =>
-      item.family !== family || item.weight !== weight || item.style !== style)
+      item.family !== face.family || item.weight !== face.weight || item.style !== face.style)
     this.#faces.push(face)
     this.#measured.clear()
     this.#version++
@@ -150,11 +184,17 @@ class Fonts implements FontProvider {
   async load(family?: string): Promise<void> {
     await Promise.all(this.#faces.filter(face => !family || face.family === family).map(async face => {
       if (face.font || !face.url) return
-      const fs = face.url.protocol === 'file:' ? local_fs() : undefined
-      if (fs) { face.font = parse_font(fs.readFileSync(face.url)); return; }
-      const response = await fetch(face.url)
-      if (!response.ok) throw new Error(`Unable to load font: ${face.url} (${response.status})`)
-      face.font = parse_font(await response.arrayBuffer())
+      if (!face.pending) {
+        const url = face.url
+        face.pending = (async () => {
+          const fs = url.protocol === 'file:' ? local_fs() : undefined
+          if (fs) { face.font = parse_font(fs.readFileSync(url)); return; }
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`Unable to load font: ${url} (${response.status})`)
+          face.font = parse_font(await response.arrayBuffer())
+        })().finally(() => { face.pending = undefined })
+      }
+      await face.pending
     }))
   }
 
@@ -172,7 +212,7 @@ class Fonts implements FontProvider {
 
     if (!face.font) {
       const fs = face.url?.protocol === 'file:' ? local_fs() : undefined
-      if (!fs || !face.url) throw new Error(`Load ${family} with fonts.load() before layout`)
+      if (!fs || !face.url) throw new FontNotLoadedError(family)
       face.font = parse_font(fs.readFileSync(face.url))
     }
     const measured = measure_font(face.font, family, oblique)
@@ -181,5 +221,5 @@ class Fonts implements FontProvider {
   }
 }
 
-export { Fonts }
+export { Fonts, FontNotLoadedError, MissingGlyphError }
 export type { GlyphShape, MeasuredFont, FontProvider, FontOptions, FontData }

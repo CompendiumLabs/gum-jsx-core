@@ -11,9 +11,12 @@ import { UnresolvedLengthError } from './units'
 import type { ReferenceBox } from './units'
 import { copy_coordinates } from './coordinates'
 import type { Coordinates } from './coordinates'
+import { copy_math_context } from './math'
+import type { MathContext } from './math'
 
 type LayoutContext = Readonly<{
   style?: Style; reference?: ReferenceBox; path?: string; coordinates?: Coordinates | null
+  math?: MathContext | null
 }>
 type Resource = Readonly<{ value: unknown; version: string | number }>
 type LayoutQuery = Readonly<{
@@ -23,9 +26,10 @@ type LayoutQuery = Readonly<{
   reference: ReferenceBox
   path: string
   coordinates?: Coordinates
+  math?: MathContext
   child: (
     element: Element, request: LayoutRequest, reference?: ReferenceBox, index?: number,
-    context?: Pick<LayoutContext, 'coordinates' | 'style'>,
+    context?: Pick<LayoutContext, 'coordinates' | 'style' | 'math'>,
   ) => Fragment
   resource: <T>(name: string) => T
   prepare: <T>(name: string, compute: () => T) => T
@@ -44,9 +48,9 @@ function copy_reference(reference: ReferenceBox = {}): ReferenceBox {
 // Cache exactly the inputs visible to geometry. Diagnostic paths are not geometry.
 function query_key(
   request: LayoutRequest, style: Style, reference: ReferenceBox, epoch: number,
-  coordinates?: Coordinates,
+  coordinates?: Coordinates, math?: MathContext,
 ): string {
-  return JSON.stringify([request, style, reference.width, reference.height, epoch, coordinates])
+  return JSON.stringify([request, style, reference.width, reference.height, epoch, coordinates, math])
 }
 
 class LayoutError extends Error {
@@ -111,7 +115,8 @@ class LayoutPass {
       const reference = copy_reference(context.reference)
       const style = resolve_style(element.props, context.style, path)
       const coordinates = context.coordinates ? copy_coordinates(context.coordinates) : undefined
-      const key = query_key(request, style, reference, this.#epoch, coordinates)
+      const math = context.math ? copy_math_context(context.math) : undefined
+      const key = query_key(request, style, reference, this.#epoch, coordinates, math)
       const cache = this.#cache.get(element) ?? new Map<string, Fragment>()
       this.#cache.set(element, cache)
       const cached = cache.get(key)
@@ -130,9 +135,9 @@ class LayoutPass {
         const sizing = resolve_sizing(element.props, { ...basis, request })
         const prepared = prepare_request(request, sizing)
         const query: LayoutQuery = Object.freeze({
-          request: prepared, sizing, style, reference, path, coordinates,
+          request: prepared, sizing, style, reference, path, coordinates, math,
           child: (child, offer, basis = {}, index = 0, context = {}) => this.layout(child, offer, {
-            style, coordinates, ...context, reference: basis, path: `${path}/${child.type.name}[${index}]`,
+            style, coordinates, math, ...context, reference: basis, path: `${path}/${child.type.name}[${index}]`,
           }),
           resource: <T>(name: string) => this.resource<T>(name),
           // Prepared content depends on source, style, and resources, never offers
@@ -140,7 +145,7 @@ class LayoutPass {
           prepare: <T>(name: string, compute: () => T): T => {
             const cache = this.#prepared.get(element) ?? new Map<string, unknown>()
             this.#prepared.set(element, cache)
-            const key = JSON.stringify([name, style, this.#epoch])
+            const key = JSON.stringify([name, style, this.#epoch, math])
             if (!cache.has(key)) cache.set(key, compute())
             return cache.get(key) as T
           },
