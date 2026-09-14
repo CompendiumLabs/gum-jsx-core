@@ -5,17 +5,18 @@ import { draw_rect } from '../engine/drawing'
 import { make_fragment } from '../engine/fragment'
 import { make_point, make_rect } from '../engine/geometry'
 import { mark_context, mark_bounds } from './marks'
+import { resolve_rect_radius } from './shapes'
+import type { RectRadius } from './shapes'
 import type { MarkProps } from './marks'
 import type { LayoutQuery } from '../engine/pass'
 import { resolve_paint, resolve_style } from '../engine/style'
 import type { StyleSpec } from '../engine/style'
-import type { Length } from '../engine/units'
 
 type PerBar<T> = T | readonly T[] | ((value: number, index: number) => T)
 type BarsProps = MarkProps & Readonly<{
   values?: readonly number[]; positions?: readonly number[]
   bases?: PerBar<number>; bar_width?: PerBar<number>
-  direction?: 'vertical' | 'horizontal'; radius?: Length
+  direction?: 'vertical' | 'horizontal'; radius?: RectRadius
   styles?: readonly StyleSpec[] | ((value: number, index: number) => StyleSpec)
 }>
 type BarProps = Omit<BarsProps, 'values' | 'positions' | 'bases' | 'bar_width' | 'styles'> & Readonly<{
@@ -23,7 +24,7 @@ type BarProps = Omit<BarsProps, 'values' | 'positions' | 'bases' | 'bar_width' |
 }>
 type BarDatum = Readonly<{ value: number; position: number; base: number; width: number; style: StyleSpec }>
 type BarsData = MarkProps & Readonly<{
-  bars: readonly BarDatum[]; direction?: 'vertical' | 'horizontal'; radius?: Length
+  bars: readonly BarDatum[]; direction?: 'vertical' | 'horizontal'; radius?: RectRadius
 }>
 
 function bars_data({ values = [], positions, bases = 0, bar_width = 0.8, styles, ...props }: BarsProps): BarsData {
@@ -55,13 +56,13 @@ function bar_corners(bar: BarDatum, direction = 'vertical') {
 }
 
 function bars_layout(props: BarsData, query: LayoutQuery) {
-  const { size, point, length } = mark_context(props, query)
-  const radius = length(props.radius ?? 0)
+  const { size, point } = mark_context(props, query)
+  const radius = resolve_rect_radius(props.radius ?? 0, size, query)
   const draw = props.bars.map(bar => {
     const [a, b] = bar_corners(bar, props.direction).map(point)
     const rect = make_rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y))
     const paint = resolve_paint(resolve_style(bar.style, query.style), size, query.path)
-    return draw_rect(rect, paint, make_point(radius, radius))
+    return draw_rect(rect, paint, radius)
   })
   return make_fragment({ size, draw })
 }

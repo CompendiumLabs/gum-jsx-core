@@ -8,7 +8,10 @@ type PointValue<T = number> = Readonly<{ x: T; y: T }> | readonly [x: T, y: T]
 type Point = Readonly<{ x: number; y: number }>
 type Size = Readonly<{ width: number; height: number }>
 type Rect = Readonly<Point & Size>
-type Clip = Readonly<Rect & { radius?: Point }>
+type CornerRadii<T = Point> = Readonly<Record<'tl' | 'tr' | 'br' | 'bl', T>>
+type RectRadii = Point | CornerRadii
+type RectRadiiValue = PointValue | CornerRadii<PointValue>
+type Clip = Readonly<Rect & { radius?: RectRadii }>
 type Transform = readonly [number, number, number, number, number, number]
 type Insets = Readonly<{
   left: number
@@ -73,14 +76,30 @@ function add_insets(a: Insets, b: Insets): Insets {
   })
 }
 
+function map_corners<T, U>(corners: CornerRadii<T>, map: (value: T) => U): CornerRadii<U> {
+  return Object.freeze({ tl: map(corners.tl), tr: map(corners.tr), br: map(corners.br), bl: map(corners.bl) })
+}
+
+// Preserve the compact pair representation for existing uniform rectangles.
+function map_radii(radius: RectRadiiValue, map: (value: PointValue) => Point): RectRadii {
+  return radius !== null && typeof radius === 'object' && 'tl' in radius
+    ? map_corners(radius, map) : map(radius)
+}
+
+// Each radius is capped at half its axis, keeping adjacent corners disjoint.
+function clamp_radii(radius: RectRadiiValue, size: Size): RectRadii {
+  return map_radii(radius, value => {
+    const pair = read_point(value, 'radius')
+    return make_point(Math.min(nonnegative(pair.x, 'radius.x'), size.width / 2),
+      Math.min(nonnegative(pair.y, 'radius.y'), size.height / 2))
+  })
+}
+
 // Clips retain optional rounded corners; rectangular callers need no extra data.
-function make_clip(rect: Rect, radius?: PointValue): Clip {
+function make_clip(rect: Rect, radius?: RectRadiiValue): Clip {
   const bounds = make_rect(rect.x, rect.y, rect.width, rect.height)
   if (radius === undefined) return bounds
-  const pair = read_point(radius, 'radius')
-  const x = Math.min(nonnegative(pair.x, 'radius.x'), rect.width / 2)
-  const y = Math.min(nonnegative(pair.y, 'radius.y'), rect.height / 2)
-  return Object.freeze({ ...bounds, radius: make_point(x, y) })
+  return Object.freeze({ ...bounds, radius: clamp_radii(radius, bounds) })
 }
 
 // Share shorthand expansion between layout lengths and numeric data padding.
@@ -206,7 +225,8 @@ function transform_rect(rect: Rect | null, offset: PointValue, transform?: Trans
 
 export {
   read_point, make_size, make_point, make_rect, make_clip, make_insets, add_insets, read_insets, resolve_insets,
+  map_radii, clamp_radii,
   deflate_size, inflate_size, bounds_overflow,
   union_rects, intersect_rects, make_transform, transform_rect,
 }
-export type { Point, PointValue, Size, Rect, Clip, Transform, Insets, InsetSpec }
+export type { Point, PointValue, Size, Rect, CornerRadii, RectRadii, RectRadiiValue, Clip, Transform, Insets, InsetSpec }

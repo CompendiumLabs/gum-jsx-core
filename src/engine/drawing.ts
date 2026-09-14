@@ -1,6 +1,6 @@
 import { finite, nonnegative } from '../lib/checks'
-import { make_point, make_rect, read_point } from './geometry'
-import type { Point, PointValue, Rect as PixelRect } from './geometry'
+import { make_point, make_rect, read_point, clamp_radii } from './geometry'
+import type { Point, PointValue, RectRadii, RectRadiiValue, Rect as PixelRect } from './geometry'
 import { copy_path, path_bounds } from './path'
 import type { PathCommand } from './path'
 import type { LineCap, LineJoin } from './style'
@@ -15,7 +15,7 @@ type Paint = Readonly<{
   stroke_dasharray?: readonly number[]
   opacity?: number
 }>
-type RectDraw = Readonly<{ kind: 'rect'; rect: PixelRect; radius?: Point } & Paint>
+type RectDraw = Readonly<{ kind: 'rect'; rect: PixelRect; radius?: RectRadii } & Paint>
 type EllipseDraw = Readonly<{ kind: 'ellipse'; center: Point; radius: Point } & Paint>
 type PathDraw = Readonly<{
   kind: 'path'; commands: readonly PathCommand[]; bounds: PixelRect | null
@@ -46,13 +46,11 @@ function copy_paint(paint: Paint): Paint {
 }
 
 // Drawing commands contain final geometry and paint; the renderer only serializes.
-function draw_rect(rect: PixelRect, paint: Paint, radius: PointValue = make_point()): RectDraw {
+function draw_rect(rect: PixelRect, paint: Paint, radius: RectRadiiValue = make_point()): RectDraw {
   const { x, y, width, height } = rect
-  const pair = read_point(radius, 'radius')
-  const rx = Math.min(nonnegative(pair.x, 'radius.x'), width / 2)
-  const ry = Math.min(nonnegative(pair.y, 'radius.y'), height / 2)
+  const bounds = make_rect(x, y, width, height)
   return Object.freeze({
-    kind: 'rect', rect: make_rect(x, y, width, height), radius: make_point(rx, ry),
+    kind: 'rect', rect: bounds, radius: clamp_radii(radius, bounds),
     ...copy_paint(paint),
   })
 }

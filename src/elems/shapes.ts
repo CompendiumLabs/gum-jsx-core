@@ -5,7 +5,7 @@ import { Element, define_component, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment } from '../engine/fragment'
 import { make_size, make_point, make_rect, read_point } from '../engine/geometry'
-import type { PointValue, Size } from '../engine/geometry'
+import type { PointValue, Size, RectRadii } from '../engine/geometry'
 import { shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { map_path } from '../engine/path'
@@ -17,7 +17,9 @@ import type { Length } from '../engine/units'
 type Position = Readonly<{ x: Length; y: Length }>
 type PositionValue = PointValue<Length>
 type Radius = Length | PositionValue
-type RectProps = ElementProps & Readonly<{ radius?: Radius }>
+type RadiusSides = Readonly<Partial<Record<'t' | 'b' | 'l' | 'r' | 'tl' | 'tr' | 'bl' | 'br', Radius>>>
+type RectRadius = Radius | RadiusSides
+type RectProps = ElementProps & Readonly<{ radius?: RectRadius }>
 type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>
 type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>
 type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue }>
@@ -50,22 +52,45 @@ function is_position(value: Radius): value is PositionValue {
 }
 
 // A scalar radius stays circular; a pair resolves against the corresponding axes.
-function resolve_radius(radius: Radius, size: Size, query: LayoutQuery) {
+function resolve_radius(radius: Radius, size: Size, query: LayoutQuery, path = 'radius') {
   if (is_position(radius)) {
-    const point = resolve_position(radius, size, query, 'radius')
-    nonnegative(point.x, 'radius.x'); nonnegative(point.y, 'radius.y')
+    const point = resolve_position(radius, size, query, path)
+    nonnegative(point.x, `${path}.x`); nonnegative(point.y, `${path}.y`)
     return point
   }
   const basis = { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }
-  const value = nonnegative(resolve_length(radius, basis, `${query.path}.radius`), 'radius')
+  const value = nonnegative(resolve_length(radius, basis, `${query.path}.${path}`), path)
   return make_point(value, value)
+}
+
+// Explicit corners win over sides; top/bottom win where side defaults overlap.
+function resolve_rect_radius(radius: RectRadius, size: Size, query: LayoutQuery): RectRadii {
+  if (radius !== null && typeof radius === 'object' && !Array.isArray(radius)
+    && !('unit' in radius) && !('x' in radius) && !('y' in radius)) {
+    const sides = radius as RadiusSides
+    for (const key of Object.keys(sides)) {
+      if (!['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br'].includes(key)) {
+        throw new TypeError(`${query.path}.radius: unknown side or corner ${key}`)
+      }
+    }
+    const resolved = Object.fromEntries(Object.entries(sides).filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, resolve_radius(value!, size, query, `radius.${key}`)]))
+    const zero = make_point()
+    return Object.freeze({
+      tl: resolved.tl ?? resolved.t ?? resolved.l ?? zero,
+      tr: resolved.tr ?? resolved.t ?? resolved.r ?? zero,
+      br: resolved.br ?? resolved.b ?? resolved.r ?? zero,
+      bl: resolved.bl ?? resolved.b ?? resolved.l ?? zero,
+    })
+  }
+  return resolve_radius(radius as Radius, size, query)
 }
 
 // Rect and RoundedRect share geometry; the latter supplies a convenient default.
 function rect_layout(props: RectProps, query: LayoutQuery, radius: Radius = 0) {
   const { size, paint } = shape_context(props, query)
   const rect = make_rect(0, 0, size.width, size.height)
-  const corners = resolve_radius(props.radius ?? radius, size, query)
+  const corners = resolve_rect_radius(props.radius ?? radius, size, query)
   return make_fragment({ size, draw: [draw_rect(rect, paint, corners)] })
 }
 
@@ -85,7 +110,7 @@ class Square extends Element<RectProps> {
     const { size, paint } = shape_context(props, query, 1)
     const side = Math.min(size.width, size.height)
     const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side)
-    const radius = resolve_radius(props.radius ?? 0, make_size(side, side), query)
+    const radius = resolve_rect_radius(props.radius ?? 0, make_size(side, side), query)
     return make_fragment({ size, draw: [draw_rect(rect, paint, radius)] })
   }
 }
@@ -164,7 +189,8 @@ const Triangle = define_component<PolygonProps>('Triangle', props => new Polygon
   points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props,
 }))
 
-export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path, resolve_radius, is_position,
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
+  resolve_radius, resolve_rect_radius, is_position,
   UnitLine, HLine, VLine, Dot, Triangle }
-export type { Position, PositionValue, Radius, RectProps, CircleProps, EllipseProps,
+export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps }

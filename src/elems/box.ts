@@ -9,13 +9,13 @@ import { make_fragment, place_fragment, transform_guides } from '../engine/fragm
 import type { Fragment } from '../engine/fragment'
 import {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets,
-  resolve_insets, deflate_size,
+  resolve_insets, deflate_size, map_radii, read_point,
 } from '../engine/geometry'
-import type { Point, Size, InsetSpec } from '../engine/geometry'
+import type { RectRadii, Size, InsetSpec } from '../engine/geometry'
 import { make_request, finish_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_radius } from './shapes'
-import type { Radius } from './shapes'
+import { resolve_rect_radius } from './shapes'
+import type { RectRadius } from './shapes'
 import { px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
@@ -24,7 +24,7 @@ type BoxProps = ElementProps & Readonly<{
   border_width?: Length
   border_color?: string
   background?: string
-  radius?: Radius
+  radius?: RectRadius
   align?: Alignment
   clip?: boolean
 }>
@@ -37,7 +37,7 @@ type FitProps = ElementProps & Readonly<{
 // Clip a twice-wide stroke to the frame: exactly one border width remains
 // inside, even when corners are rounded or the border fills the entire box.
 // The clipped-away half is drawing construction, not layout overflow.
-function frame_border(size: Size, width: number, color: string, radius: Point, opacity = 1): Fragment {
+function frame_border(size: Size, width: number, color: string, radius: RectRadii, opacity = 1): Fragment {
   const rect = make_rect(0, 0, size.width, size.height)
   const draw = draw_rect(rect, { fill: 'none', stroke: color, stroke_width: 2 * width, opacity }, radius)
   return make_fragment({ name: 'Border', size, draw: [draw], ink: opacity ? rect : null,
@@ -67,7 +67,7 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
   const layout = layout_content(child, query, add_insets(padding, border), props.align)
   const { size, content, guides, overflow, placement } = layout
   const rect = make_rect(0, 0, size.width, size.height)
-  const radius = resolve_radius(props.radius ?? 0, size, query)
+  const radius = resolve_rect_radius(props.radius ?? 0, size, query)
   const corners = make_clip(rect, radius).radius!
   const draw = background === 'none' ? [] : [draw_rect(rect,
     { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity }, corners)]
@@ -78,8 +78,10 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
   if (props.clip && placement) {
     const inner = deflate_size(size, border)
     const area = make_rect(border_width, border_width, inner.width, inner.height)
-    const radius = make_point(Math.max(0, corners.x - border_width),
-      Math.max(0, corners.y - border_width))
+    const radius = map_radii(corners, value => {
+      const { x, y } = read_point(value)
+      return make_point(Math.max(0, x - border_width), Math.max(0, y - border_width))
+    })
     const clipped = make_fragment({ name: 'Clip', size, children,
       clip: make_clip(area, radius) })
     children.splice(0, 1, place_fragment(clipped))

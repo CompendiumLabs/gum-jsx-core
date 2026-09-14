@@ -20,7 +20,8 @@ export {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
   deflate_size, inflate_size, bounds_overflow,
 } from './engine/geometry'
-export type { Point, PointValue, Size, Rect as PixelRect, Clip as ClipShape, Insets, InsetSpec } from './engine/geometry'
+export type { Point, PointValue, Size, Rect as PixelRect, CornerRadii, RectRadii, RectRadiiValue,
+  Clip as ClipShape, Insets, InsetSpec } from './engine/geometry'
 export {
   natural, available, exact, make_request, deflate_request,
   resolve_sizing, prepare_request, finish_size, shape_size,
@@ -49,7 +50,7 @@ export { Svg } from './elems/svg'
 export type { SvgProps } from './elems/svg'
 export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
 export { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
-export type { Position, PositionValue, Radius, RectProps, CircleProps, EllipseProps,
+export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps } from './elems/shapes'
 export { Text, Span } from './elems/text'
 export type { TextProps, TextOptions, SpanProps } from './elems/text'

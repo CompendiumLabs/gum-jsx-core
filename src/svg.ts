@@ -1,6 +1,6 @@
 import type { Drawing } from './engine/drawing'
 import type { Fragment } from './engine/fragment'
-import type { Rect } from './engine/geometry'
+import type { Point, Rect, RectRadii } from './engine/geometry'
 import { path_data } from './engine/path'
 
 type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string }>
@@ -18,6 +18,26 @@ function rect_attributes(rect: Rect): string {
   return `x="${x}" y="${y}" width="${width}" height="${height}"`
 }
 
+// SVG rects have one radius pair; separate corners need an outline of exact arcs.
+// Use the same outline for decoration and clipping so their edges coincide.
+function render_rect(rect: Rect, radius?: RectRadii, paint = ''): string {
+  if (!radius || 'x' in radius || rect.width === 0 || rect.height === 0) {
+    const rounded = radius && 'x' in radius ? ` rx="${radius.x}" ry="${radius.y}"` : ''
+    return `<rect ${rect_attributes(rect)}${rounded}${paint ? ` ${paint}` : ''}/>`
+  }
+  const { x, y, width, height } = rect, right = x + width, bottom = y + height
+  // A zero radius on either axis makes that corner square, as on SVG rects.
+  const square = (r: Point) => r.x === 0 || r.y === 0 ? { x: 0, y: 0 } : r
+  const tl = square(radius.tl), tr = square(radius.tr), br = square(radius.br), bl = square(radius.bl)
+  const arc = (r: Point, x: number, y: number) => r.x && r.y
+    ? `A${r.x} ${r.y} 0 0 1 ${x} ${y}` : `L${x} ${y}`
+  const d = `M${x + tl.x} ${y}L${right - tr.x} ${y}`
+    + arc(tr, right, y + tr.y) + `L${right} ${bottom - br.y}`
+    + arc(br, right - br.x, bottom) + `L${x + bl.x} ${bottom}`
+    + arc(bl, x, bottom - bl.y) + `L${x} ${y + tl.y}` + arc(tl, x + tl.x, y) + 'Z'
+  return `<path d="${d}"${paint ? ` ${paint}` : ''}/>`
+}
+
 // Each drawing kind has an explicit vocabulary, with no arbitrary attribute injection.
 function render_drawing(draw: Drawing): string {
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
@@ -28,11 +48,7 @@ function render_drawing(draw: Drawing): string {
     + (draw.stroke_dasharray?.some(value => value > 0) ? ` stroke-dasharray="${draw.stroke_dasharray.join(' ')}"` : '')
     + (draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : '')
   switch (draw.kind) {
-    case 'rect': {
-      const { radius } = draw
-      const rounded = radius ? ` rx="${radius.x}" ry="${radius.y}"` : ''
-      return `<rect ${rect_attributes(draw.rect)}${rounded} ${paint}/>`
-    }
+    case 'rect': return render_rect(draw.rect, draw.radius, paint)
     case 'ellipse': {
       const { center, radius } = draw
       return `<ellipse cx="${center.x}" cy="${center.y}" rx="${radius.x}" ry="${radius.y}" ${paint}/>`
@@ -59,9 +75,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       if (!id) {
         id = `${id_prefix}-clip-${clips.size}`
         clips.set(node, id)
-        const { radius } = node.clip
-        const corners = radius ? ` rx="${radius.x}" ry="${radius.y}"` : ''
-        const rect = `<rect ${rect_attributes(node.clip)}${corners}/>`
+        const rect = render_rect(node.clip, node.clip.radius)
         definitions.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">${rect}</clipPath>`)
       }
       clip = ` clip-path="url(#${id})"`

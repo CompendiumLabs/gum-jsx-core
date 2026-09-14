@@ -398,7 +398,7 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
-| `radius` | Rounded outer corners; scalar, `{x,y}`, or `[x,y]`, default zero. Clamped to the box. |
+| `radius` | Rounded outer corners; scalar, `{x,y}` / `[x,y]` pair, or side/corner object, default zero. Clamped to the box. |
 | `align` | `"start"`, `"center"`, `"end"`, `"fill"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}` or `[x,y]`. Default start on both axes. |
 | `clip` | Clip the child inside the border, including the padding area; default false. |
 
@@ -406,6 +406,17 @@ Background and border are local decoration. Ordinary `fill`, `stroke`, and font
 props still inherit to children. `Frame` is Box with a default 1px border.
 The border paints above the child, wholly inside the frame, even when thicker
 than half the box. Its drawing construction introduces no extra ink overflow.
+
+Radius objects use `t`, `b`, `l`, `r`, `tl`, `tr`, `bl`, and `br` (bottom-right).
+For example, `radius={{ t: px(8) }}` rounds only the top corners;
+`radius={{ t: [px(12), px(6)], tr: 0 }}` leaves only the top-left corner rounded.
+Entries accept the same scalar lengths and elliptical pairs as uniform radii.
+Unspecified corners are square. Explicit corners override sides, and `t`/`b`
+override `l`/`r` at shared corners, independently of object order. Each axis is
+capped at half its dimension. Backgrounds, borders, and inner clips share the
+same corners. Rect, RoundedRect, Square, and bars accept these forms too.
+On bars, sides name screen edges; fractions retain the mark allocation as their
+reference, with pairs using its width and height independently.
 
 Box resolves em padding and border against its own font size, before querying
 the child. Fractional padding uses the corresponding parent content axis.
@@ -843,7 +854,7 @@ ordinary shape sizing policy.
 
 | Element | Geometry props and defaults |
 |---|---|
-| `Rect` | `radius` defaults to zero; a scalar uses the shorter side, `{x,y}` resolves per axis. |
+| `Rect` | `radius` defaults to zero; a scalar uses the shorter side, `{x,y}` / `[x,y]` resolves per axis, and a side/corner object selects corners as on Box. |
 | `Square` | Same props as Rect; centered square geometry with side equal to the shorter allocation axis. |
 | `RoundedRect` | Same props, with a default radius of 0.125 of the shorter side. Radii clamp to half the corresponding dimension. |
 | `Circle` | `center: {x: 0.5, y: 0.5}`, scalar `radius: 0.5` of the shorter side. |
