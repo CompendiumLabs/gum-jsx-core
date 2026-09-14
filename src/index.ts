@@ -82,7 +82,7 @@ export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, Segments
   ArcProps, FillProps, ArrowProps, ArrowHeadProps, RayProps, PointSize, PointsProps } from './elems/marks'
 export { spline_path, rounded_path, arc_path, spline1d, spline2d } from './lib/curves'
 export { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
-export type { PerBar, BarProps, BarsProps } from './elems/bars'
+export type { PerBar, BarStyle, BarProps, BarsProps } from './elems/bars'
 export { HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
 export type { Tick, TickSpec, AxisProps, LabelProps, MeshProps, Mesh2DProps } from './elems/axis'

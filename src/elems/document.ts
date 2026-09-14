@@ -137,17 +137,20 @@ class Bullets extends Element<StackProps, BulletsProps> {
 // Slides are ordinary fixed canvases with a measured title and flexible content
 // region. Text uses pixels/em; resizing never silently magnifies the type scale.
 class Slide extends Element<SlideData, SlideProps> {
-  static defaults: Partial<SlideData> = { font_size: px(20), aspect: 16 / 9 }
+  static defaults: Partial<SlideData> = { aspect: 16 / 9 }
   static data_bounds() {
     return null
   }
   static normalize(input: SlideProps): SlideData {
     const { title, title_style, gap = em(0.8), children, ...props } = scope_props(input, ['title'])
+    const content = text_children(children)
     return { ...props,
-      body: new VStack({ gap, align: 'stretch', children: [
+      body: new VStack({ gap, align: 'fill', children: [
         title === undefined ? null : text_element(title, { font_size: em(1.6), font_weight: 700, ...title_style }),
-        new Box({ grow: 1, shrink: 1, basis: px(0), align: 'stretch', children:
-          new TextCol({ children }) }),
+        // A single layout receives the body allocation directly. An extra column
+        // would probe its natural height, losing the budget for nested flex items.
+        new Box({ grow: 1, shrink: 1, basis: px(0), align: 'fill', children:
+          content.length === 1 ? content[0] : new TextCol({ children: content }) }),
       ] }),
     }
   }

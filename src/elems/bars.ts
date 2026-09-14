@@ -13,16 +13,17 @@ import { resolve_paint, resolve_style } from '../engine/style'
 import type { StyleSpec } from '../engine/style'
 
 type PerBar<T> = T | readonly T[] | ((value: number, index: number) => T)
+type BarStyle = StyleSpec & Readonly<{ radius?: RectRadius }>
 type BarsProps = MarkProps & Readonly<{
   values?: readonly number[]; positions?: readonly number[]
   bases?: PerBar<number>; bar_width?: PerBar<number>
   direction?: 'vertical' | 'horizontal'; radius?: RectRadius
-  styles?: readonly StyleSpec[] | ((value: number, index: number) => StyleSpec)
+  styles?: readonly BarStyle[] | ((value: number, index: number) => BarStyle)
 }>
 type BarProps = Omit<BarsProps, 'values' | 'positions' | 'bases' | 'bar_width' | 'styles'> & Readonly<{
   value?: number; position?: number; base?: number; bar_width?: number
 }>
-type BarDatum = Readonly<{ value: number; position: number; base: number; width: number; style: StyleSpec }>
+type BarDatum = Readonly<{ value: number; position: number; base: number; width: number; style: BarStyle }>
 type BarsData = MarkProps & Readonly<{
   bars: readonly BarDatum[]; direction?: 'vertical' | 'horizontal'; radius?: RectRadius
 }>
@@ -57,11 +58,15 @@ function bar_corners(bar: BarDatum, direction = 'vertical') {
 
 function bars_layout(props: BarsData, query: LayoutQuery) {
   const { size, point } = mark_context(props, query)
-  const radius = resolve_rect_radius(props.radius ?? 0, size, query)
+  const shared_radius = resolve_rect_radius(props.radius ?? 0, size, query)
   const draw = props.bars.map(bar => {
     const [a, b] = bar_corners(bar, props.direction).map(point)
     const rect = make_rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y))
-    const paint = resolve_paint(resolve_style(bar.style, query.style), size, query.path)
+    const style = resolve_style(bar.style, query.style)
+    const paint = resolve_paint(style, size, query.path)
+    // Radius is geometry, so it must be consumed separately from inherited paint.
+    const radius = bar.style.radius === undefined ? shared_radius
+      : resolve_rect_radius(bar.style.radius, size, { ...query, style })
     return draw_rect(rect, paint, radius)
   })
   return make_fragment({ size, draw })
@@ -101,4 +106,4 @@ class HBar extends Bar {
 }
 
 export { Bar, VBar, HBar, Bars, VBars, HBars }
-export type { PerBar, BarProps, BarsProps }
+export type { PerBar, BarStyle, BarProps, BarsProps }

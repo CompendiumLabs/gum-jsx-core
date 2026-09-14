@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Box, Frame, Rect, RoundedRect, Square, Bars, VBars, HBars, Bar, VBar, HBar, Graph,
+  Box, Frame, Rect, RoundedRect, Square, Bars, VBars, HBars, Bar, VBar, HBar, Graph, BarPlot,
   LayoutPass, px, em, make_request, exact, make_rect, make_clip, make_fragment,
   draw_rect, render_svg, evaluate,
 } from '../src/index'
@@ -125,6 +125,60 @@ const tests: Record<string, () => void> = {
     }
     const source = evaluate('<Svg width={px(200)} height={px(100)}><BarPlot values={[1, 2]} radius={{t: px(4)}} /></Svg>')
     assert.match(render_svg(pass.layout(source)), /A4 4 0 0 1/)
+  },
+
+  'value-dependent bar styles round the exposed ends and preserve callback indices on resize'() {
+    for (const direction of ['vertical', 'horizontal'] as const) {
+      const calls: [number, number][] = []
+      const source = new BarPlot({ values: [1, NaN, -2], direction,
+        styles: (value, index) => {
+          calls.push([value, index])
+          const side = direction === 'vertical' ? value > 0 ? 't' : 'b' : value > 0 ? 'r' : 'l'
+          return { fill: value > 0 ? 'blue' : 'red', radius: { [side]: px(4 + index) } }
+        },
+      })
+      const before = JSON.stringify(source), layout = new LayoutPass()
+      assert.deepEqual(calls, [[1, 0], [-2, 2]])
+      for (const width of [400, 600]) {
+        const root = layout.layout(source, make_request({ width: exact(width), height: exact(300) }))
+        const collect = (node: Fragment): RectDraw[] => node.name === 'Bars'
+          ? [...node.draw] as RectDraw[] : node.children.flatMap(child => collect(child.fragment))
+        const [positive, negative] = collect(root), small = { x: 4, y: 4 }, large = { x: 6, y: 6 }
+        assert.deepEqual(positive.radius, corners(direction === 'vertical' ? { tl: small, tr: small } : { tr: small, br: small }))
+        assert.deepEqual(negative.radius, corners(direction === 'vertical' ? { bl: large, br: large } : { tl: large, bl: large }))
+        assert.equal(positive.fill, 'blue'); assert.equal(negative.fill, 'red')
+        assert.match(render_svg(root), /A4 4 0 0 1/)
+        assert.match(render_svg(root), /A6 6 0 0 1/)
+      }
+      assert.deepEqual(calls, [[1, 0], [-2, 2]])
+      assert.equal(JSON.stringify(source), before)
+    }
+  },
+
+  'per-bar radius overrides preserve shared defaults, explicit zero, and source snapshots'() {
+    const custom = { t: px(6) }
+    const styles = [{ radius: custom }, { radius: 0 }, { fill: 'red' }, { radius: undefined }]
+    const bars = new Bars({ values: [1, 2, 3, 4], radius: px(8), styles })
+    custom.t = px(30)
+    const root = pass.layout(new Graph({ children: bars }), make_request({ width: exact(600), height: exact(300) }))
+    const draw = root.children[0].fragment.draw as readonly RectDraw[]
+    assert.deepEqual(draw.map(item => item.radius), [
+      corners({ tl: { x: 6, y: 6 }, tr: { x: 6, y: 6 } }), zero, { x: 8, y: 8 }, { x: 8, y: 8 },
+    ])
+    assert.equal(draw[2].fill, 'red')
+  },
+
+  'per-bar radii resolve layout units and clamp to each bar rectangle'() {
+    const bars = new Bars({ values: [1, 1, 1], positions: [0, 1, 2],
+      styles: [{ radius: em(0.5), font_size: px(20) }, { radius: [0.05, 0.1] }, { radius: px(1000) }],
+    })
+    const fragment = pass.layout(new Graph({ xlim: [-1, 3], ylim: [0, 2], children: bars }), fixed).children[0].fragment
+    const draw = fragment.draw as readonly RectDraw[]
+    assert.deepEqual(draw[0].radius, { x: 10, y: 10 })
+    assert.deepEqual(draw[1].radius, { x: 10, y: 10 })
+    assert.deepEqual(draw[2].radius, { x: draw[2].rect.width / 2, y: draw[2].rect.height / 2 })
+    const invalid = new Bars({ values: [1], styles: () => ({ radius: { t: px(-1) } }) })
+    assert.throws(() => pass.layout(new Graph({ children: invalid }), fixed), /radius.*nonnegative/)
   },
 
   'invalid corner lengths, unknown keys, and malformed pairs fail clearly'() {
