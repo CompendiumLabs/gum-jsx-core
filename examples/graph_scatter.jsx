@@ -1,5 +1,5 @@
 // Directed limits reverse x while annotations and custom markers remain upright.
-const samples = [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 6, y: 3 }, { x: 8, y: 7 }];
+const samples = [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 6, y: 3 }, { x: 8, y: 7 }]
 return <Svg width={px(540)} height={px(330)}>
   <Box padding={px(28)} background="white">
     <Graph xlim={[10, 0]} ylim={[0, 8]}>
@@ -11,4 +11,4 @@ return <Svg width={px(540)} height={px(330)}>
       <HAxis lim={[10, 0]} /><VAxis lim={[0, 8]} />
     </Graph>
   </Box>
-</Svg>;
+</Svg>

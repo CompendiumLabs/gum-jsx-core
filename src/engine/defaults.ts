@@ -12,6 +12,6 @@ const DEFAULTS = Object.freeze({
   stroke_miterlimit: 4,
   fill: 'none',
   stroke: 'black',
-});
+})
 
-export { DEFAULTS };
+export { DEFAULTS }

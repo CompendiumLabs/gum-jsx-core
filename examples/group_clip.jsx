@@ -4,7 +4,7 @@ const artwork = [
   <Rect fill={lightgray} stroke={none} />,
   <Rect x={px(-14)} y={0.28} width={px(76)} height={px(44)} fill={blue} stroke={none} />,
   <Circle x={0.88} y={0.5} anchor="center" width={px(88)} fill={red} stroke={none} />,
-];
+]
 
 return <Svg color={slate}>
   <Box padding={px(24)} background={white}>
@@ -17,4 +17,4 @@ return <Svg color={slate}>
       </VStack>)}
     </HStack>
   </Box>
-</Svg>;
+</Svg>

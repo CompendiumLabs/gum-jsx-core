@@ -7,4 +7,4 @@ return <Svg width={px(600)} height={px(480)}>
     <SymLine f={t => polar(t, 1.25)} tlim={[0, tau]}
       stroke="#e8793c" stroke_width={px(2.5)} />
   </Plot>
-</Svg>;
+</Svg>

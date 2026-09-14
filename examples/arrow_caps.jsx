@@ -1,5 +1,5 @@
 // Thick shafts stay behind arrow tips for every cap style and route shape.
-const caps = ['butt', 'round', 'square'];
+const caps = ['butt', 'round', 'square']
 const CapColumn = ({ cap }) => <VStack gap={px(12)}>
   <Text width={px(224)} text-align="center" font-family={mono}>{cap}</Text>
   <Group width={px(224)} height={px(140)}>
@@ -12,7 +12,7 @@ const CapColumn = ({ cap }) => <VStack gap={px(12)}>
       stroke={slate} stroke-width={px(8)} stroke-linecap={cap}
       head-size={px(28)} head-width={0.8} head-style={{fill: green}} />
   </Group>
-</VStack>;
+</VStack>
 return <Svg width={px(760)}>
   <Box padding={px(24)} background={white} color={slate}>
     <VStack gap={px(20)} align="stretch">
@@ -39,4 +39,4 @@ return <Svg width={px(760)}>
       </HStack>
     </VStack>
   </Box>
-</Svg>;
+</Svg>

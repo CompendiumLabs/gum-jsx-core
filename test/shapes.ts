@@ -1,21 +1,21 @@
-import assert from 'node:assert/strict';
+import assert from 'node:assert/strict'
 import {
   LayoutPass, Svg, Box, Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
   px, em, make_request, available, exact, move_to, line_to, quad_to, curve_to, close_path, render_svg,
-} from '../src/index';
+} from '../src/index'
 
 const tests: Record<string, () => void> = {
   'aspectless shapes fill available space from Svg, including through Box insets'() {
-    const pass = new LayoutPass();
+    const pass = new LayoutPass()
     for (const Shape of [Rect, RoundedRect, Ellipse, Line, Polyline, Polygon, Path]) {
-      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }));
-      const shape = root.children[0].fragment;
-      assert.deepEqual(shape.size, { width: 200, height: 100 });
+      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }))
+      const shape = root.children[0].fragment
+      assert.deepEqual(shape.size, { width: 200, height: 100 })
       if (shape.draw[0]?.kind === 'rect') {
-        assert.deepEqual(shape.draw[0].rect, { x: 0, y: 0, width: 200, height: 100 });
+        assert.deepEqual(shape.draw[0].rect, { x: 0, y: 0, width: 200, height: 100 })
       } else if (shape.draw[0]?.kind === 'ellipse') {
-        assert.deepEqual(shape.draw[0].center, { x: 100, y: 50 });
-        assert.deepEqual(shape.draw[0].radius, { x: 100, y: 50 });
+        assert.deepEqual(shape.draw[0].center, { x: 100, y: 50 })
+        assert.deepEqual(shape.draw[0].radius, { x: 100, y: 50 })
       }
     }
 
@@ -23,140 +23,140 @@ const tests: Record<string, () => void> = {
     const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Box({
       padding: px(10), border_width: px(2),
       children: new Box({ padding: px(4), children: new Rect({ stroke_width: px(3) }) }),
-    }) }));
-    const box = root.children[0].fragment, wrapper = box.children[0];
-    const shape = wrapper.fragment.children[0];
-    assert.deepEqual(box.size, root.size);
-    assert.deepEqual(box.content, { x: 12, y: 12, width: 176, height: 76 });
-    assert.deepEqual(wrapper.offset, { x: 12, y: 12 });
-    assert.deepEqual(shape.offset, { x: 4, y: 4 });
-    assert.deepEqual(shape.fragment.size, { width: 168, height: 68 });
-    assert.equal(shape.fragment.draw[0].stroke_width, 3);
+    }) }))
+    const box = root.children[0].fragment, wrapper = box.children[0]
+    const shape = wrapper.fragment.children[0]
+    assert.deepEqual(box.size, root.size)
+    assert.deepEqual(box.content, { x: 12, y: 12, width: 176, height: 76 })
+    assert.deepEqual(wrapper.offset, { x: 12, y: 12 })
+    assert.deepEqual(shape.offset, { x: 4, y: 4 })
+    assert.deepEqual(shape.fragment.size, { width: 168, height: 68 })
+    assert.equal(shape.fragment.draw[0].stroke_width, 3)
   },
 
   'aspectless axes size independently under natural, preferred, and constrained requests'() {
-    const pass = new LayoutPass();
-    const offer = make_request({ width: available(200), height: available(100) });
+    const pass = new LayoutPass()
+    const offer = make_request({ width: available(200), height: available(100) })
     for (const Shape of [Rect, Ellipse]) {
       assert.deepEqual(pass.layout(new Shape({ width: px(60) }), offer).size,
-        { width: 60, height: 100 });
+        { width: 60, height: 100 })
       assert.deepEqual(pass.layout(new Shape({ height: px(30) }), offer).size,
-        { width: 200, height: 30 });
-      assert.deepEqual(pass.layout(new Shape({ width: px(60) })).size, { width: 60, height: 16 });
-      assert.deepEqual(pass.layout(new Shape({ height: px(30) })).size, { width: 16, height: 30 });
-      const limited = new Shape({ min_width: px(240), max_height: px(80) });
-      assert.deepEqual(pass.layout(limited, offer).size, { width: 240, height: 80 });
+        { width: 200, height: 30 })
+      assert.deepEqual(pass.layout(new Shape({ width: px(60) })).size, { width: 60, height: 16 })
+      assert.deepEqual(pass.layout(new Shape({ height: px(30) })).size, { width: 16, height: 30 })
+      const limited = new Shape({ min_width: px(240), max_height: px(80) })
+      assert.deepEqual(pass.layout(limited, offer).size, { width: 240, height: 80 })
       assert.deepEqual(pass.layout(limited, make_request({ width: exact(50), height: exact(30) })).size,
-        { width: 50, height: 30 });
-      const zero = pass.layout(new Shape(), make_request({ width: available(0), height: available(100) }));
-      assert.deepEqual(zero.size, { width: 0, height: 100 });
-      assert.equal(zero.ink, null);
+        { width: 50, height: 30 })
+      const zero = pass.layout(new Shape(), make_request({ width: available(0), height: available(100) }))
+      assert.deepEqual(zero.size, { width: 0, height: 100 })
+      assert.equal(zero.ink, null)
       assert.deepEqual(pass.layout(new Svg({ width: px(200), children: new Shape() })).size,
-        { width: 200, height: 16 });
+        { width: 200, height: 16 })
       assert.deepEqual(pass.layout(new Svg({ height: px(100), children: new Shape() })).size,
-        { width: 16, height: 100 });
+        { width: 16, height: 100 })
     }
   },
 
   'intrinsic and explicit shape aspects remain preferred under available offers'() {
-    const pass = new LayoutPass();
+    const pass = new LayoutPass()
     for (const Shape of [Square, Circle]) {
-      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }));
-      assert.deepEqual(root.children[0].fragment.size, { width: 100, height: 100 });
+      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }))
+      assert.deepEqual(root.children[0].fragment.size, { width: 100, height: 100 })
       assert.deepEqual(pass.layout(new Svg({ children: new Shape({ width: px(64) }) })).size,
-        { width: 64, height: 64 });
+        { width: 64, height: 64 })
     }
     for (const Shape of [Rect, Ellipse]) {
-      const shape = new Shape({ aspect: 2 });
-      const root = pass.layout(new Svg({ width: px(200), height: px(80), children: shape }));
-      assert.deepEqual(root.children[0].fragment.size, { width: 160, height: 80 });
+      const shape = new Shape({ aspect: 2 })
+      const root = pass.layout(new Svg({ width: px(200), height: px(80), children: shape }))
+      assert.deepEqual(root.children[0].fragment.size, { width: 160, height: 80 })
       assert.deepEqual(pass.layout(shape, make_request({ width: exact(200), height: exact(80) })).size,
-        { width: 200, height: 80 });
+        { width: 200, height: 80 })
     }
   },
 
   'all primitives have finite natural geometry and explicit empty or degenerate ink'() {
-    const pass = new LayoutPass();
+    const pass = new LayoutPass()
     for (const Shape of [Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path]) {
-      const normal = pass.layout(new Shape());
-      assert.deepEqual(normal.size, { width: 16, height: 16 });
-      const zero = pass.layout(new Shape(), make_request({ width: exact(0), height: exact(0) }));
-      assert.deepEqual(zero.size, { width: 0, height: 0 });
-      assert.doesNotMatch(render_svg(zero), /NaN|Infinity/);
-      assert.equal(zero.ink, null);
+      const normal = pass.layout(new Shape())
+      assert.deepEqual(normal.size, { width: 16, height: 16 })
+      const zero = pass.layout(new Shape(), make_request({ width: exact(0), height: exact(0) }))
+      assert.deepEqual(zero.size, { width: 0, height: 0 })
+      assert.doesNotMatch(render_svg(zero), /NaN|Infinity/)
+      assert.equal(zero.ink, null)
     }
-    assert.equal(pass.layout(new Path({ commands: [move_to(0, 0)] })).ink, null);
+    assert.equal(pass.layout(new Path({ commands: [move_to(0, 0)] })).ink, null)
     const dot = pass.layout(new Line({ from: { x: 0.5, y: 0.5 }, to: { x: 0.5, y: 0.5 },
-      stroke_linecap: 'round', stroke_width: px(4) }));
-    assert.deepEqual(dot.ink, { x: 6, y: 6, width: 4, height: 4 });
+      stroke_linecap: 'round', stroke_width: px(4) }))
+    assert.deepEqual(dot.ink, { x: 6, y: 6, width: 4, height: 4 })
   },
 
   'circle and ellipse radii use their declared scalar or axis references'() {
-    const pass = new LayoutPass();
-    const request = make_request({ width: exact(100), height: exact(40) });
-    const circle = pass.layout(new Circle({ stroke: 'none', fill: 'red' }), request).draw[0];
-    const ellipse = pass.layout(new Ellipse(), request).draw[0];
-    assert.ok(circle.kind === 'ellipse' && ellipse.kind === 'ellipse');
-    assert.deepEqual(circle.center, { x: 50, y: 20 });
-    assert.deepEqual(circle.radius, { x: 20, y: 20 });
-    assert.deepEqual(ellipse.radius, { x: 50, y: 20 });
+    const pass = new LayoutPass()
+    const request = make_request({ width: exact(100), height: exact(40) })
+    const circle = pass.layout(new Circle({ stroke: 'none', fill: 'red' }), request).draw[0]
+    const ellipse = pass.layout(new Ellipse(), request).draw[0]
+    assert.ok(circle.kind === 'ellipse' && ellipse.kind === 'ellipse')
+    assert.deepEqual(circle.center, { x: 50, y: 20 })
+    assert.deepEqual(circle.radius, { x: 20, y: 20 })
+    assert.deepEqual(ellipse.radius, { x: 50, y: 20 })
     const mixed = pass.layout(new Ellipse({ font_size: px(10), center: { x: px(12), y: em(2) },
-      radius: { x: 0.25, y: em(1) } }), request).draw[0];
-    assert.ok(mixed.kind === 'ellipse');
-    assert.deepEqual(mixed.center, { x: 12, y: 20 });
-    assert.deepEqual(mixed.radius, { x: 25, y: 10 });
-    const round = pass.layout(new RoundedRect({ radius: px(50) }), request).draw[0];
-    assert.ok(round.kind === 'rect');
-    assert.deepEqual(round.radius, { x: 50, y: 20 });
-    assert.throws(() => pass.layout(new Circle({ radius: px(-1) })), /radius/);
+      radius: { x: 0.25, y: em(1) } }), request).draw[0]
+    assert.ok(mixed.kind === 'ellipse')
+    assert.deepEqual(mixed.center, { x: 12, y: 20 })
+    assert.deepEqual(mixed.radius, { x: 25, y: 10 })
+    const round = pass.layout(new RoundedRect({ radius: px(50) }), request).draw[0]
+    assert.ok(round.kind === 'rect')
+    assert.deepEqual(round.radius, { x: 50, y: 20 })
+    assert.throws(() => pass.layout(new Circle({ radius: px(-1) })), /radius/)
   },
 
   'resizing changes geometry while explicit pixel strokes remain fixed'() {
-    const pass = new LayoutPass();
-    const shape = new Line({ from: { x: px(2), y: em(1) }, to: { x: 1, y: 0.5 }, stroke_width: px(3) });
-    const small = pass.layout(shape, make_request({ width: exact(40), height: exact(20) }));
-    const large = pass.layout(shape, make_request({ width: exact(80), height: exact(40) }));
-    assert.equal(small.draw[0].stroke_width, 3); assert.equal(large.draw[0].stroke_width, 3);
-    assert.ok(large.draw[0].kind === 'path');
-    assert.deepEqual(large.draw[0].commands, [{ kind: 'M', x: 2, y: 16 }, { kind: 'L', x: 80, y: 20 }]);
+    const pass = new LayoutPass()
+    const shape = new Line({ from: { x: px(2), y: em(1) }, to: { x: 1, y: 0.5 }, stroke_width: px(3) })
+    const small = pass.layout(shape, make_request({ width: exact(40), height: exact(20) }))
+    const large = pass.layout(shape, make_request({ width: exact(80), height: exact(40) }))
+    assert.equal(small.draw[0].stroke_width, 3); assert.equal(large.draw[0].stroke_width, 3)
+    assert.ok(large.draw[0].kind === 'path')
+    assert.deepEqual(large.draw[0].commands, [{ kind: 'M', x: 2, y: 16 }, { kind: 'L', x: 80, y: 20 }])
     const fraction = pass.layout(new Circle({ stroke_width: 0.1 }),
-      make_request({ width: exact(80), height: exact(40) }));
-    assert.equal(fraction.draw[0].stroke_width, 4);
+      make_request({ width: exact(80), height: exact(40) }))
+    assert.equal(fraction.draw[0].stroke_width, 4)
   },
 
   'paths resolve every control point, own source data, and bound curves conservatively'() {
-    const pass = new LayoutPass();
+    const pass = new LayoutPass()
     const commands = [move_to(0, 0.5), quad_to(px(5), em(-1), 0.5, 0.5),
-      curve_to(0.5, 1, 1, 1, 1, 0.5), line_to(0, 0.5), close_path()];
-    const element = new Path({ commands, fill: '#234', stroke_linejoin: 'round' });
-    commands.length = 0;
-    const fragment = pass.layout(element, make_request({ width: exact(100), height: exact(50) }));
-    const draw = fragment.draw[0];
-    assert.ok(draw.kind === 'path');
-    assert.deepEqual(draw.commands[1], { kind: 'Q', x1: 5, y1: -16, x: 50, y: 25 });
-    assert.deepEqual(draw.commands[2], { kind: 'C', x1: 50, y1: 50, x2: 100, y2: 50, x: 100, y: 25 });
-    assert.deepEqual(draw.bounds, { x: 0, y: -16, width: 100, height: 66 });
-    assert.deepEqual(fragment.ink, { x: -0.5, y: -16.5, width: 101, height: 67 });
-    assert.ok(Object.isFrozen(draw.commands[1]));
-    assert.match(render_svg(fragment), /Q5 -16 50 25C50 50 100 50 100 25/);
-    assert.throws(() => pass.layout(new Path({ commands: [line_to(1, 1)] })), /begin with move_to/);
+      curve_to(0.5, 1, 1, 1, 1, 0.5), line_to(0, 0.5), close_path()]
+    const element = new Path({ commands, fill: '#234', stroke_linejoin: 'round' })
+    commands.length = 0
+    const fragment = pass.layout(element, make_request({ width: exact(100), height: exact(50) }))
+    const draw = fragment.draw[0]
+    assert.ok(draw.kind === 'path')
+    assert.deepEqual(draw.commands[1], { kind: 'Q', x1: 5, y1: -16, x: 50, y: 25 })
+    assert.deepEqual(draw.commands[2], { kind: 'C', x1: 50, y1: 50, x2: 100, y2: 50, x: 100, y: 25 })
+    assert.deepEqual(draw.bounds, { x: 0, y: -16, width: 100, height: 66 })
+    assert.deepEqual(fragment.ink, { x: -0.5, y: -16.5, width: 101, height: 67 })
+    assert.ok(Object.isFrozen(draw.commands[1]))
+    assert.match(render_svg(fragment), /Q5 -16 50 25C50 50 100 50 100 25/)
+    assert.throws(() => pass.layout(new Path({ commands: [line_to(1, 1)] })), /begin with move_to/)
   },
 
   'polygons close their path and acute miter joins remain within reported ink'() {
-    const pass = new LayoutPass();
-    const points = [{ x: 0, y: 1 }, { x: 0.5, y: 0 }, { x: 1, y: 1 }];
-    const line = pass.layout(new Polyline({ points }));
-    const polygon = pass.layout(new Polygon({ points, stroke_width: px(4), stroke_miterlimit: 8 }));
-    assert.ok(line.draw[0].kind === 'path' && polygon.draw[0].kind === 'path');
-    assert.equal(line.draw[0].commands.length, 3);
-    assert.deepEqual(polygon.draw[0].commands.at(-1), { kind: 'Z' });
-    assert.deepEqual(polygon.ink, { x: -16, y: -16, width: 48, height: 48 });
-    assert.match(render_svg(polygon), /stroke-miterlimit="8"/);
+    const pass = new LayoutPass()
+    const points = [{ x: 0, y: 1 }, { x: 0.5, y: 0 }, { x: 1, y: 1 }]
+    const line = pass.layout(new Polyline({ points }))
+    const polygon = pass.layout(new Polygon({ points, stroke_width: px(4), stroke_miterlimit: 8 }))
+    assert.ok(line.draw[0].kind === 'path' && polygon.draw[0].kind === 'path')
+    assert.equal(line.draw[0].commands.length, 3)
+    assert.deepEqual(polygon.draw[0].commands.at(-1), { kind: 'Z' })
+    assert.deepEqual(polygon.ink, { x: -16, y: -16, width: 48, height: 48 })
+    assert.match(render_svg(polygon), /stroke-miterlimit="8"/)
   },
-};
+}
 
 for (const [name, test] of Object.entries(tests)) {
-  test();
-  console.log(`ok - ${name}`);
+  test()
+  console.log(`ok - ${name}`)
 }
-console.log(`${Object.keys(tests).length} shape checks passed.`);
+console.log(`${Object.keys(tests).length} shape checks passed.`)

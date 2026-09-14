@@ -74,16 +74,16 @@ objects. Negative lengths are valid for coordinates. Sizing and inset operations
 require nonnegative resolved values.
 
 ```ts
-import { em, px, resolve_length, measure_length } from 'gum-next-core';
+import { em, px, resolve_length, measure_length } from 'gum-next-core'
 
-const basis = { font_size: 16, fraction: 200 };
-resolve_length(0.5, basis);       // 100 pixels
-resolve_length(em(2), basis);     // 32 pixels
-resolve_length(px(10));          // 10 pixels
+const basis = { font_size: 16, fraction: 200 }
+resolve_length(0.5, basis)       // 100 pixels
+resolve_length(em(2), basis)     // 32 pixels
+resolve_length(px(10))          // 10 pixels
 
-measure_length(0.5);             // { value: 0.5, unit: 'fraction' }
-resolve_length(0.5, { fraction: 0 }); // 0 pixels: a known zero reference
-resolve_length(0);               // 0 pixels: no reference needed
+measure_length(0.5)             // { value: 0.5, unit: 'fraction' }
+resolve_length(0.5, { fraction: 0 }) // 0 pixels: a known zero reference
+resolve_length(0)               // 0 pixels: no reference needed
 ```
 
 `measure_length` preserves an unresolved dependency for an intrinsic query.
@@ -128,16 +128,16 @@ and nonnegative; zero is an exact value, not an absent dimension.
 ```ts
 import {
   available, make_request, resolve_sizing, prepare_request, finish_size, make_size,
-} from 'gum-next-core';
+} from 'gum-next-core'
 
-const context = { reference: { width: 640 }, path: 'root/child' };
-const sizing = resolve_sizing({ width: 0.5 }, context);
-const request = make_request({ width: available(400) });
-const prepared = prepare_request(request, sizing); // width: exact(320)
+const context = { reference: { width: 640 }, path: 'root/child' }
+const sizing = resolve_sizing({ width: 0.5 }, context)
+const request = make_request({ width: available(400) })
+const prepared = prepare_request(request, sizing) // width: exact(320)
 
 // A real element would measure its content using `prepared` here.
-const content = make_size(300, 20);
-const size = finish_size(content, prepared, sizing); // 320×20
+const content = make_size(300, 20)
+const size = finish_size(content, prepared, sizing) // 320×20
 ```
 
 Use the same resolved sizing for preparation and completion. Preparation and
@@ -267,16 +267,16 @@ The same source can answer different allocations without being rebuilt:
 
 ```ts
 import { Rect, Svg, px, em, LayoutPass, make_request, exact, render_svg }
-  from 'gum-next-core';
+  from 'gum-next-core'
 
-const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) });
-const scene = new Svg({ width: px(160), height: px(80), children: tile });
-const pass = new LayoutPass();
-const first = pass.layout(scene); // child: 80×32, 2px stroke
+const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) })
+const scene = new Svg({ width: px(160), height: px(80), children: tile })
+const pass = new LayoutPass()
+const first = pass.layout(scene) // child: 80×32, 2px stroke
 const second = pass.layout(scene, make_request({
   width: exact(320), height: exact(120),
-}));                            // child: 160×32, 2px stroke
-const svg = render_svg(second);
+}))                            // child: 160×32, 2px stroke
+const svg = render_svg(second)
 ```
 
 Constructors snapshot and deeply freeze source records and arrays, preserving
@@ -295,9 +295,9 @@ just their defaults:
 class SmallRect extends Rect {
   static defaults: Partial<RectProps> = {
     width: px(32), height: px(16), fill: 'tomato',
-  };
+  }
 }
-const tile = new SmallRect({ width: px(48) });
+const tile = new SmallRect({ width: px(48) })
 ```
 
 Defaults merge across the class hierarchy and are snapshotted on first use.
@@ -747,14 +747,14 @@ implementation. Browser asset packaging is deferred; no installed/system font is
 required by the resulting SVG.
 
 ```ts
-import { Fonts, LayoutPass } from 'gum-next-core';
+import { Fonts, LayoutPass } from 'gum-next-core'
 
-const fonts = new Fonts();
-fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' });
-const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } });
+const fonts = new Fonts()
+fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' })
+const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
 
 // After later registrations, explicitly invalidate any reused pass:
-pass.set_resource('fonts', fonts, fonts.version);
+pass.set_resource('fonts', fonts, fonts.version)
 ```
 
 The replaceable `FontProvider.resolve(family, weight, style)` returns ascent,

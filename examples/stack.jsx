@@ -5,7 +5,7 @@ function Entry({ label, text, color }) {
     <Text width={px(76)} font_size={px(14)} font_weight={bold} color={color}>{label}</Text>
     <Text grow={1} shrink={1} line_height={em(1.4)}>{text}</Text>
     <Square width={px(40)} fill={color} stroke={none} />
-  </HStack>;
+  </HStack>
 }
 
 return <Svg width={px(620)} font_size={px(18)} color={slate}>

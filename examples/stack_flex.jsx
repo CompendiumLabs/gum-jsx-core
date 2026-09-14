@@ -3,7 +3,7 @@
 function Bar({ label, color, ...props }) {
   return <Box height={px(40)} align="center" background={color} radius={px(5)} {...props}>
     <Text color={white} font_size={px(14)} font_weight={bold}>{label}</Text>
-  </Box>;
+  </Box>
 }
 
 return <Svg width={px(560)} color={slate}>

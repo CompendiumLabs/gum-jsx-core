@@ -10,4 +10,4 @@ return <Svg width={px(960)} height={px(540)}>
       </Plot>
     </TextFigure>
   </Slide>
-</Svg>;
+</Svg>

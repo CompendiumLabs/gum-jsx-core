@@ -3,10 +3,10 @@ const waves = [
   { label: 'sin(x)', fy: sin, color: blue },
   { label: 'cos(x)', fy: cos, color: red },
   { label: 'exp(-x/4) sin(x)', fy: x => exp(-x / 4) * sin(x), color: green },
-];
-const xs = linspace(0, tau, 16, false);
-const ys = xs.map(sin);
-const labels = ['0', 'pi/2', 'pi', '3pi/2', '2pi'];
+]
+const xs = linspace(0, tau, 16, false)
+const ys = xs.map(sin)
+const labels = ['0', 'pi/2', 'pi', '3pi/2', '2pi']
 return <Svg width={px(720)}>
   <Box padding={px(24)} background={lightgray} color={slate}>
     <VStack gap={px(16)} align="stretch">
@@ -24,4 +24,4 @@ return <Svg width={px(720)}>
       </Text>
     </VStack>
   </Box>
-</Svg>;
+</Svg>

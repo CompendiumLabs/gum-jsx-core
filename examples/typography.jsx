@@ -1,24 +1,24 @@
 // Inspect line boxes and baseline guides using plain drawing/placement records.
 class Specimen extends Element {
   static layout(props, query) {
-    const size = finish_size(make_size(680, 560), query.request, query.sizing);
-    const children = [], draw = [];
-    let y = 20;
+    const size = finish_size(make_size(680, 560), query.request, query.sizing)
+    const children = [], draw = []
+    let y = 20
     element_children(props.children).forEach((element, index) => {
-      const fragment = query.child(element, make_request({ width: exact(632) }), size, index);
-      children.push(place_fragment(fragment, make_point(24, y)));
+      const fragment = query.child(element, make_request({ width: exact(632) }), size, index)
+      children.push(place_fragment(fragment, make_point(24, y)))
       if (index > 0 && index % 2 === 0) {
         draw.push(draw_rect(make_rect(24, y, 632, fragment.size.height),
-          { fill: lightgray, stroke: none, stroke_width: 0 }));
+          { fill: lightgray, stroke: none, stroke_width: 0 }))
         for (const line of fragment.children) {
-          const baseline = y + line.offset.y + line.fragment.guides.baseline;
+          const baseline = y + line.offset.y + line.fragment.guides.baseline
           draw.push(draw_rect(make_rect(24, baseline, 632, 0.5),
-            { fill: blue, stroke: none, stroke_width: 0 }));
+            { fill: blue, stroke: none, stroke_width: 0 }))
         }
       }
-      y += fragment.size.height + (index % 2 === 0 ? 24 : 8);
-    });
-    return make_fragment({ size, draw, children });
+      y += fragment.size.height + (index % 2 === 0 ? 24 : 8)
+    })
+    return make_fragment({ size, draw, children })
   }
 }
 
@@ -45,4 +45,4 @@ return <Svg width={px(680)} height={px(560)} color={slate}>
     <Text font_size={px(13)} color={slate}>Center-aligned lines in an exact allocation</Text>
     <Text font_size={px(20)} text_align="center">{'A centered first line\nwith a shorter second'}</Text>
   </Specimen>
-</Svg>;
+</Svg>
