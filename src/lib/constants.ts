@@ -1,6 +1,7 @@
 // Public values shared by direct imports and evaluated JSX.
 const sans = 'IBM Plex Sans'
 const mono = 'IBM Plex Mono'
+const italic = 'italic'
 const light = 300
 const regular = 400
 const bold = 700
@@ -27,7 +28,7 @@ const r2d = 180 / Math.PI
 const d2r = Math.PI / 180
 
 export {
-  sans, mono, light, regular, bold,
+  sans, mono, italic, light, regular, bold,
   none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
   e, pi, tau, phi, r2d, d2r,
 }

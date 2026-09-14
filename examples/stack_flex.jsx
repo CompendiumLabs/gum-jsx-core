@@ -7,7 +7,7 @@ function Bar({ label, color, ...props }) {
 }
 
 return <Svg width={px(560)} color={slate}>
-  <Box width={1} padding={px(20)} background={white}>
+  <Box width={1} padding={px(20)}>
     <VStack width={1} gap={px(18)}>
       <Text font_size={px(24)} font_weight={bold}>Where the space goes</Text>
       <VStack width={1} gap={px(6)}>

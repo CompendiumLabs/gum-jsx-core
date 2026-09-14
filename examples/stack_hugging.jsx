@@ -1,7 +1,7 @@
 // All parent dimensions come from content: two naturally packed stacks inside a Box.
 <Svg font_size={px(16)} color={slate}>
   <Box padding={em(1)} border_width={px(2)} border_color={blue}
-    background={white} radius={px(12)}>
+    radius={px(12)}>
     <VStack gap={em(0.75)}>
       <HStack gap={em(0.75)} align="center">
         <Circle height={em(2)} fill={blue} stroke={none} />

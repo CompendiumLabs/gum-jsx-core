@@ -1,7 +1,7 @@
 // Rows align their children's first baselines; children without guides use their
 // bottom edge. The last row instead stretches every allocation to the text height.
 <Svg width={px(540)} font_size={px(16)} color={slate}>
-  <Box width={1} padding={px(20)} background={white}>
+  <Box width={1} padding={px(20)}>
     <VStack width={1} gap={px(22)}>
       <VStack width={1} gap={px(8)}>
         <Text font_size={px(13)} color={slate}>BASELINES / independent font sizes</Text>

@@ -10,7 +10,7 @@ function Entry({ label, text, color }) {
 
 return <Svg width={px(620)} font_size={px(18)} color={slate}>
   <Box width={1} padding={px(20)} border_width={px(2)} border_color={blue}
-    background={white} radius={px(14)}>
+    radius={px(14)}>
     <VStack width={1} gap={px(20)}>
       <VStack width={1} gap={px(6)}>
         <Text font_size={px(28)} font_weight={bold}>Room to stack</Text>

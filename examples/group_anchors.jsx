@@ -1,7 +1,7 @@
 // Each nested Group has its own local 0–1 reference rectangle. The same position
 // meets a different point of the Box: its top-left, center, or bottom-right.
 <Svg width={px(600)} color={slate}>
-  <Box width={1} padding={px(16)} background={white}>
+  <Box width={1} padding={px(16)}>
     <VStack width={1} gap={px(14)}>
       <Text font_size={px(24)} font_weight={bold}>Choose the point that meets the position</Text>
       <Group aspect={3}>

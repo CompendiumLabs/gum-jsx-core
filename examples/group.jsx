@@ -2,7 +2,7 @@
 // region use fractions; node diameters, fonts, and strokes keep their pixel sizes.
 // Try --width 400 to reflow the same drawing at a smaller canvas size.
 <Svg width={px(640)} color={slate}>
-  <Box width={1} padding={px(16)} background={white}>
+  <Box width={1} padding={px(16)}>
     <VStack width={1} gap={px(14)}>
       <Text font_size={px(24)} font_weight={bold}>A place for everything</Text>
       <Group aspect={2}>

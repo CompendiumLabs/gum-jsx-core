@@ -13,7 +13,7 @@ return <Svg width={px(720)}>
       <Text font-size={px(28)} font-weight={bold}>Math, directly in JSX</Text>
       <Plot height={px(320)} xlim={[0, tau]} ylim={[-1.3, 1.3]}
         xlabel="x (radians)" xticks={zip(range(5).map(i => i * pi / 2), labels)}
-        legend={waves.map(({ label, color }) => ({ label, color }))} background={white}>
+        legend={waves.map(({ label, color }) => ({ label, color }))}>
         {waves.map(({ fy, color }) => <SymLine fy={fy} xlim={[0, tau]}
           stroke={color} stroke-width={px(2.5)} />)}
         <Points points={zip(xs, ys)}

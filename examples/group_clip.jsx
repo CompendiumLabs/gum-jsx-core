@@ -7,7 +7,7 @@ const artwork = [
 ]
 
 return <Svg color={slate}>
-  <Box padding={px(24)} background={white}>
+  <Box padding={px(24)}>
     <HStack gap={px(36)}>
       {[false, true].map(clip => <VStack gap={px(10)}>
         <Text font_size={px(14)} font_weight={bold}>clip = {String(clip)}</Text>
