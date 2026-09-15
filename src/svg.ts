@@ -57,6 +57,16 @@ function render_drawing(draw: Drawing): string {
   }
 }
 
+// Keep diagnostic strokes legible through fitting, including zero-sized allocations.
+function render_debug_box(rect: Rect, kind: 'allocated' | 'content'): string {
+  const paint = `data-gum-debug-box="${kind}" stroke="${kind === 'allocated' ? '#e11d48' : '#2563eb'}"`
+    + ' vector-effect="non-scaling-stroke"' + (kind === 'content' ? ' stroke-dasharray="4 3"' : '')
+  if (rect.width === 0 || rect.height === 0) {
+    return `<path d="M${rect.x} ${rect.y}l${rect.width} ${rect.height}" ${paint} stroke-linecap="round"/>`
+  }
+  return render_rect(rect, undefined, paint)
+}
+
 // Render an immutable result, allocating definition IDs only within this document.
 function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   const { width, height } = fragment.size
@@ -66,9 +76,15 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   }
   const definitions: string[] = []
   const clips = new Map<Fragment, string>()
+  const debug: string[] = []
 
   // Shared fragments reuse their local clip definition across placements.
-  function render_fragment(node: Fragment): string {
+  function render_fragment(node: Fragment, transform = ''): string {
+    if (node.debug) {
+      const boxes = render_debug_box({ x: 0, y: 0, ...node.size }, 'allocated')
+        + (node.content ? render_debug_box(node.content, 'content') : '')
+      debug.push(transform ? `<g transform="${transform}">${boxes}</g>` : boxes)
+    }
     let clip = ''
     if (node.clip) {
       let id = clips.get(node)
@@ -88,8 +104,9 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       if (child.transform?.some((value, index) => value !== IDENTITY[index])) {
         transforms.push(`matrix(${child.transform.join(' ')})`)
       }
-      const body = render_fragment(child.fragment)
-      return transforms.length ? `<g transform="${transforms.join(' ')}">${body}</g>` : body
+      const placement_transform = transforms.join(' ')
+      const body = render_fragment(child.fragment, [transform, placement_transform].filter(Boolean).join(' '))
+      return placement_transform ? `<g transform="${placement_transform}">${body}</g>` : body
     })
 
     // Layout hierarchy needs no matching SVG group unless it carries semantics.
@@ -106,7 +123,10 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   if (background !== undefined) {
     parts.push(`<rect width="${width}" height="${height}" fill="${escape_xml(background)}"/>`)
   }
-  return [...parts, body, '</svg>'].join('')
+  // Diagnostics sit above all paint and outside content clips; the viewport still clips.
+  const overlay = debug.length ? '<g data-gum-debug="" fill="none" stroke-width="1"'
+    + ` pointer-events="none" aria-hidden="true">${debug.join('')}</g>` : ''
+  return [...parts, body, overlay, '</svg>'].join('')
 }
 
 export { render_svg }

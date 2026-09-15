@@ -17,6 +17,8 @@ const OWNED = Symbol('next.fragment')
 interface Fragment<Draw = Drawing> {
   readonly name?: string
   readonly label?: string
+  // Rendering diagnostics do not contribute to drawings, ink, or overflow.
+  readonly debug?: boolean
   readonly size: Size
   readonly guides: Guides
   readonly math?: MathMetrics
@@ -39,6 +41,7 @@ type FragmentSpec = Readonly<{
   size: Size
   name?: string
   label?: string
+  debug?: boolean
   guides?: Guides
   math?: MathMetrics
   ink?: Rect | null
@@ -109,6 +112,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
   const fragment: Fragment = {
     ...(spec.name === undefined ? {} : { name: spec.name }),
     ...(spec.label === undefined ? {} : { label: spec.label }),
+    ...(spec.debug === true ? { debug: true } : {}),
     size, guides: Object.freeze(guides),
     ...(spec.math === undefined ? {} : { math: copy_math_metrics(spec.math) }),
     ink: clip === undefined ? ink : intersect_rects(ink, clip),

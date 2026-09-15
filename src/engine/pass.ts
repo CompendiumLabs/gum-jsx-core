@@ -157,7 +157,8 @@ class LayoutPass {
         if (size.width !== result.size.width || size.height !== result.size.height) {
           throw new Error('Element returned a size outside its sizing policy; use finish_size')
         }
-        const fragment = make_fragment({ ...result, name: element.type.name })
+        const fragment = make_fragment({ ...result, name: element.type.name,
+          debug: element.props.debug ?? result.debug })
         cache.set(key, fragment)
         return fragment
       } finally {

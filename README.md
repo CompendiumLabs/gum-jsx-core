@@ -345,6 +345,13 @@ The direct stack parent interprets a child's `basis`, `grow`, `shrink`, and
 Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
 do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
+Set `debug` on an element to outline its allocated box in solid red and its
+content box, when provided, in dashed blue. The flag applies only to that element;
+children can opt in separately. SVG output draws the boxes above the artwork,
+following placement transforms and bypassing content clips within the viewport.
+These diagnostics do not change layout, ink, or overflow and also appear in PNG
+and terminal output. See [Debugging layout](../gum-next-docs/topics/text/Rendering.md#debugging-layout).
+
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
 size policy; an incorrect exact size is an error. Fixed content can draw its natural

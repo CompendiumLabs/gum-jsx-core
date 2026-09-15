@@ -10,6 +10,8 @@ import type { DataBounds } from './coordinates'
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
 type ElementProps = SizeSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
   children?: Child
+  // Outline this element's allocated and content boxes without inheriting to children.
+  debug?: boolean
   // Only the immediate stack parent interprets this placement override.
   align_self?: StackAlign
 }>
