@@ -41,7 +41,7 @@ type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; nam
 
 // Evaluation constructs descriptions only. Component functions can return other elements.
 function evaluate(code: string, options: EvaluateOptions = {}): Element {
-  const { scope = {}, name = 'gum-next.jsx', seed } = options
+  const { scope = {}, name = 'gum.jsx', seed } = options
   const rng = new RNG(seed)
   const bindings = {
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
