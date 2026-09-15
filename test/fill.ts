@@ -192,7 +192,10 @@ const tests: Record<string, () => void> = {
     const text = new LayoutPass().layout(inline).children[0].fragment
     assert.equal(text.label, 'Before bold after')
     assert.throws(() => evaluate('<TextBox><Box /><Box /></TextBox>'), /one content element/)
-    assert.throws(() => evaluate('<TextBox>Text<Box /></TextBox>'), /element child/)
+    const mixed = evaluate('<TextBox>Text<Box width={px(12)} height={px(8)} /></TextBox>')
+    const paragraph = new LayoutPass().layout(mixed).children[0].fragment
+    assert.equal(paragraph.name, 'Text')
+    assert.ok(paragraph.children[0].fragment.children.some(child => child.fragment.name === 'Box'))
   },
 
   'fill is sizing alignment, not a point or main-axis packing value'() {

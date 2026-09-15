@@ -56,7 +56,11 @@ function transformed_layout(props: ElementProps & { resize?: boolean }, query: L
   const size = finish_size(resize ? make_size(bounds.width, bounds.height) : fragment.size,
     query.request, query.sizing)
   const offset = resize ? make_point(-bounds.x, -bounds.y) : make_point()
-  return make_fragment({ size, children: [place_fragment(fragment, offset, transform)] })
+  // A horizontal guide remains representable through translation, scaling,
+  // or a half turn. A tilted/vertical baseline has no single y coordinate.
+  const guides = Math.abs(transform[1]) < 1e-12
+    ? transform_guides(fragment.guides, offset.y + transform[5], transform[3]) : {}
+  return make_fragment({ size, guides, children: [place_fragment(fragment, offset, transform)] })
 }
 
 class TransformBox extends Element<TransformBoxProps> {

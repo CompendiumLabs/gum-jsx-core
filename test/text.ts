@@ -76,7 +76,8 @@ const tests: Record<string, () => void> = {
     assert.equal(lines(narrow), 1)
     assert.ok(narrow.overflow.right > 50)
     assert.equal(narrow.children[0].fragment.draw.length, 2)
-    assert.throws(() => pass.layout(new Text({ children: new Rect() })), /strings, numbers, or Spans/)
+    const inline = pass.layout(new Text({ children: new Rect({ width: px(20), height: px(12) }) }))
+    assert.equal(inline.children[0].fragment.children[0].fragment.name, 'Rect')
   },
 
   'font inheritance precedes measurement and mixed sizes share their true baseline'() {

@@ -731,11 +731,14 @@ the optional common-height figure policy remain later work.
 ```
 
 `Text` accepts strings, numbers, nested arrays, conditional children, and inline
-`Span` elements. Use string expression children to preserve exact whitespace. Spans inherit
+`Span` elements, formulas, and other elements. Use string expression children to preserve exact whitespace. Spans inherit
 font family, weight, style, size, line height, and `color`; they introduce no boxes
-or word breaks. A standalone `Span` can also be measured as text. Other graphics
-belong beside Text through composition. Inline spans have style props, not sizing
-or independent layout props.
+or word breaks. A standalone `Span` can also be measured as text. Inline elements
+are indivisible, align by baseline (or their bottom edge), and enlarge the line
+using their logical height and depth. Give figures concrete dimensions; an
+oversized item overflows rather than shrinking. Inline spans have style props,
+not sizing or independent layout props. Mixed prose and elements also work in
+text boxes, bullet items, captions, and titles.
 
 Text defaults to IBM Plex Sans, weight 400, 16px, 1.2em line height, and black.
 `color` paints glyphs; `fill`/`stroke` paint shapes. Relative font sizes refer to the

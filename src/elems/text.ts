@@ -6,8 +6,10 @@ import { Element } from '../engine/element'
 import type { Child, ElementProps } from '../engine/element'
 import type { FontProvider, GlyphShape, MeasuredFont } from '../engine/fonts'
 import { make_fragment, place_fragment } from '../engine/fragment'
+import type { Fragment } from '../engine/fragment'
 import { make_point, make_size, transform_rect } from '../engine/geometry'
-import { finish_size } from '../engine/layout'
+import { finish_size, make_request } from '../engine/layout'
+import { definite_reference } from '../lib/composition'
 import type { LayoutQuery } from '../engine/pass'
 import { transform_path } from '../engine/path'
 import { resolve_style } from '../engine/style'
@@ -24,23 +26,26 @@ type TextProps = ElementProps & Readonly<{
 // Options for generated labels/captions; the owning component supplies content.
 type TextOptions = Omit<TextProps, 'text' | 'children'>
 type SpanProps = StyleSpec & Readonly<{ children?: Child }>
-type Run = { text: string; style: Style }
+type Run = { text: string; style: Style; element?: Element; index?: number }
 type Metrics = Readonly<{ font: MeasuredFont; above: number; below: number }>
-type Part = Readonly<{ shape: GlyphShape; style: Style; x: number }>
-type Token = Readonly<{
-  parts: readonly Part[]; width: number; gap: number; hard: boolean
+type GlyphPart = Readonly<{ shape: GlyphShape; style: Style; width: number }>
+type SourcePart = GlyphPart | Readonly<{ element: Element; style: Style; index: number }>
+type Part = (GlyphPart | Readonly<{ fragment: Fragment; baseline: number }>) & Readonly<{ x: number }>
+type Token<Content = SourcePart> = Readonly<{
+  parts: readonly Content[]; gap: number; hard: boolean
   above: number; below: number
 }>
 type PreparedText = Readonly<{
-  text: string; tokens: readonly Token[]; above: number; below: number
+  runs: readonly Run[]; tokens: readonly Token[]; above: number; below: number
 }>
+type MeasuredText = Readonly<{ text: string; tokens: readonly (Token<Part> & { width: number })[]; above: number; below: number }>
 type Line = { parts: Part[]; width: number; above: number; below: number }
 
 // Merge equivalent adjacent styles so a redundant Span does not disrupt kerning.
 function append_run(runs: Run[], text: string, style: Style): void {
   if (!text) return
   const last = runs.at(-1)
-  if (last && (last.style === style || JSON.stringify(last.style) === JSON.stringify(style))) {
+  if (last && !last.element && (last.style === style || JSON.stringify(last.style) === JSON.stringify(style))) {
     last.text += text
   } else runs.push({ text, style })
 }
@@ -55,7 +60,11 @@ function collect_runs(child: Child, style: Style, path: string, runs: Run[]): vo
   } else if (child instanceof Span) {
     const nested = `${path}/Span`
     collect_runs(child.props.children, resolve_style(child.props, style, nested), nested, runs)
-  } else throw new TypeError(`${path}: Text content must be strings, numbers, or Spans`)
+  } else if (child instanceof Element) {
+    // Unicode's object replacement character participates in line breaking but
+    // is never shaped. Punctuation and nonbreaking spaces keep their semantics.
+    runs.push({ text: '\ufffc', style, element: child, index: runs.length })
+  } else throw new TypeError(`${path}: Expected text or an inline element`)
 }
 
 // Normalize across span boundaries. Normal mode collapses horizontal whitespace
@@ -65,7 +74,14 @@ function normalize_runs(runs: Run[], pre: boolean, tab_size: number): Run[] {
   const result: Run[] = []
   let column = 0, skip_lf = false
   let pending: Style | undefined
-  for (const { text, style } of runs) {
+  for (const run of runs) {
+    const { text, style } = run
+    if (run.element) {
+      if (pending) { append_run(result, ' ', pending); column++; pending = undefined }
+      result.push(run)
+      column++; skip_lf = false
+      continue
+    }
     for (let char of text) {
       if (char === '\n' && skip_lf) { skip_lf = false; continue; }
       skip_lf = char === '\r'
@@ -111,7 +127,7 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
   collect_runs(props.text ?? props.children, query.style, query.path, raw)
   const runs = normalize_runs(raw, whitespace === 'pre', tab_size)
   const text = runs.map(run => run.text).join('')
-  if (!text) return { text, tokens: [], above: 0, below: 0 }
+  if (!text) return { runs, tokens: [], above: 0, below: 0 }
   const fonts = query.resource<FontProvider>('fonts')
   const metrics = new Map<Style, Metrics>()
   const get_metrics = (style: Style) => {
@@ -136,8 +152,8 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
     const content = text.slice(start, limit)
     const core = whitespace === 'normal' ? content.replace(/ +$/, '') : content
     const boundary = start + core.length
-    const parts: Part[] = []
-    let width = 0, gap = 0, above = strut.above, below = strut.below
+    const parts: SourcePart[] = []
+    let gap = 0, above = strut.above, below = strut.below
 
     // Preserve an inline run's own font metrics, even for whitespace or a newline.
     while (run_index < spans.length && spans[run_index].end <= start) run_index++
@@ -145,27 +161,56 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
       const run = spans[index]
       const metrics = get_metrics(run.style)
       above = Math.max(above, metrics.above); below = Math.max(below, metrics.below)
+      if (run.element) {
+        parts.push({ element: run.element, style: run.style, index: run.index! })
+        continue
+      }
       const from = Math.max(start, run.start)
       const to = Math.min(boundary, run.end)
       const value = text.slice(from, Math.max(from, to)).replace(/\u200b/g, '')
       if (value) {
         const shape = metrics.font.shape(value)
-        parts.push({ shape, style: run.style, x: width })
-        width += shape.advance * run.style.font_size
+        parts.push({ shape, style: run.style, width: shape.advance * run.style.font_size })
       }
       const space = text.slice(Math.max(from, boundary), Math.min(limit, run.end))
       if (space) gap += metrics.font.shape(space).advance * run.style.font_size
     }
-    tokens.push({ parts, width, gap, hard, above, below })
+    tokens.push({ parts, gap, hard, above, below })
     start = end
   }
-  return { text, tokens, above: strut.above, below: strut.below }
+  return { runs, tokens, above: strut.above, below: strut.below }
+}
+
+// Element sizes may depend on an established reference, so they belong to
+// layout, outside offer-independent preparation. The pass still shares their
+// source and shaped content across widths and repeated occurrences.
+function measure_text(prepared: PreparedText, query: LayoutQuery): MeasuredText {
+  const reference = definite_reference(query.request, query.sizing)
+  const labels = new Map<number, string>()
+  const tokens = prepared.tokens.map(token => {
+    let width = 0, above = token.above, below = token.below
+    const parts = token.parts.map((part): Part => {
+      const x = width
+      if ('shape' in part) { width += part.width; return { ...part, x } }
+      const fragment = query.child(part.element, make_request(), reference, part.index,
+        { style: part.style, coordinates: null })
+      const baseline = fragment.guides.baseline ?? fragment.size.height
+      width += fragment.math ? fragment.math.advance + fragment.math.italic : fragment.size.width
+      above = Math.max(above, baseline)
+      below = Math.max(below, fragment.size.height - baseline)
+      labels.set(part.index, fragment.label ?? '\ufffc')
+      return { fragment, baseline, x }
+    })
+    return { ...token, parts, width, above, below }
+  })
+  const text = prepared.runs.map(run => run.element ? labels.get(run.index!) : run.text).join('')
+  return { text, tokens, above: prepared.above, below: prepared.below }
 }
 
 // Greedy word wrapping accepts an oversized first word, reporting overflow.
 // Track the last content edge separately from pending space to avoid cancellation
 // at exact break widths. A final explicit newline contributes a final blank line.
-function flow_lines(prepared: PreparedText, budget: number): Line[] {
+function flow_lines(prepared: MeasuredText, budget: number): Line[] {
   const { tokens, above, below } = prepared
   if (!tokens.length) return []
   const lines: Line[] = []
@@ -195,7 +240,7 @@ function flow_lines(prepared: PreparedText, budget: number): Line[] {
 function text_layout(props: TextProps, query: LayoutQuery) {
   const { text_align = 'left', wrap = true } = props
   if (!['left', 'center', 'right'].includes(text_align)) throw new TypeError('Unknown text_align')
-  const prepared = query.prepare('text', () => prepare_text(props, query))
+  const prepared = measure_text(query.prepare('text', () => prepare_text(props, query)), query)
   const offer = query.request.width
   const budget = wrap && offer.kind !== 'natural' ? offer.value : Infinity
   const lines = flow_lines(prepared, budget)
@@ -204,16 +249,24 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   const size = finish_size(make_size(width, height), query.request, query.sizing)
   let y = 0
   const children = lines.map(line => {
-    const draw = line.parts.map(({ shape, style, x }) => {
+    const glyph = ({ shape, style }: GlyphPart, x: number) => {
       const scale = style.font_size
       const matrix = [scale, 0, 0, scale, x, line.above] as const
       const commands = transform_path(shape.commands, matrix)
       const ink = transform_rect(shape.ink, make_point(), matrix)
       return draw_path(commands, { fill: style.color, stroke: 'none', stroke_width: 0, opacity: style.opacity }, ink)
-    })
+    }
     const height = line.above + line.below
+    const inline = line.parts.some(part => 'fragment' in part)
+    const draw = inline ? [] : line.parts.map(part => glyph(part as GlyphPart, part.x))
+    // Keep source painting order when glyphs and elements overlap. Pure prose
+    // retains its compact line drawing, with no additional run fragments.
+    const content = inline ? line.parts.map(part => 'fragment' in part
+      ? place_fragment(part.fragment, make_point(part.x, line.above - part.baseline))
+      : place_fragment(make_fragment({ name: 'Run', size: make_size(part.width, height),
+          guides: { baseline: line.above }, draw: [glyph(part, 0)] }), make_point(part.x, 0))) : []
     const fragment = make_fragment({
-      name: 'Line', size: make_size(line.width, height), guides: { baseline: line.above }, draw,
+      name: 'Line', size: make_size(Math.max(0, line.width), height), guides: { baseline: line.above }, draw, children: content,
     })
     const x = (size.width - line.width) * (text_align === 'left' ? 0 : text_align === 'center' ? 0.5 : 1)
     const placement = place_fragment(fragment, make_point(x, y))

@@ -21,12 +21,12 @@ import { draw_rect } from '../engine/drawing'
 type TextStackProps = StackProps & Readonly<{ direction?: 'horizontal' | 'vertical' }>
 type TextBoxProps = BoxProps & Readonly<{ text?: string }>
 type TextFigureProps = BoxProps & Prefixed<'caption', TextOptions> & Readonly<{
-  caption?: string | Element; caption_style?: TextOptions; gap?: Length
+  caption?: Child; caption_style?: TextOptions; gap?: Length
 }>
 type TitleBoxProps = BoxProps & Prefixed<'title', TextOptions>
-  & Readonly<{ title?: string | Element; title_style?: TextOptions; gap?: Length }>
+  & Readonly<{ title?: Child; title_style?: TextOptions; gap?: Length }>
 type SlideProps = ElementProps & Prefixed<'title', TextOptions> & Readonly<{
-  title?: string | Element; title_style?: TextOptions; padding?: InsetSpec
+  title?: Child; title_style?: TextOptions; padding?: InsetSpec
   gap?: Length; background?: string; clip?: boolean
 }>
 type SlideData = SlideProps & Readonly<{ body: Element }>
@@ -36,14 +36,17 @@ type BulletsProps = ElementProps & Readonly<{
 
 // Text composition converts text at construction, so reflow always sees the same
 // source elements. Existing figures and their parent-owned flex metadata survive.
-function has_content_element(value: Child): boolean {
-  return Array.isArray(value) ? value.some(has_content_element)
-    : value instanceof Element && !(value instanceof Span)
+function content_items(value: Child): Child[] {
+  return Array.isArray(value) ? value.flatMap(content_items)
+    : value == null || typeof value === 'boolean' ? [] : [value]
 }
 
 function text_element(value: Child, style: TextOptions = {}): Element {
-  return has_content_element(value) ? content_child(value)!
-    : new Text({ ...style, children: value })
+  const items = content_items(value).filter(item => typeof item !== 'string' || !/^[ \t\r\n]*$/.test(item))
+  // Preserve a sole block element (and its flex metadata). Mixed content is a
+  // paragraph, even when one or more of its inline children happen to be math.
+  return items.length && items.every(item => item instanceof Element && !(item instanceof Span))
+    ? content_child(items)! : new Text({ ...style, children: value })
 }
 
 function text_children(value: Child = []): readonly Element[] {
