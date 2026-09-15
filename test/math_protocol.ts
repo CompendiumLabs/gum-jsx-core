@@ -28,6 +28,11 @@ assert.equal(preparations, 2)
 pass.set_resource('revision', {}, 2)
 assert.notEqual(pass.layout(source, make_request(), { math: input }), a)
 assert.equal(preparations, 3)
+const sized = pass.layout(source, make_request(), { math: { ...input, size_index: 11 } })
+assert.notEqual(sized, pass.layout(source, make_request(), { math: input }))
+assert.equal(copy_math_context({ ...input, size_index: 11 }).size_index, 11)
+assert.throws(() => copy_math_context({ ...input, size_index: 12 }), /size index/)
+assert.throws(() => copy_math_context({ ...input, size_index: 1.5 }), /size index/)
 
 class Parent extends Element {
   static layout(_props: {}, query: LayoutQuery) {

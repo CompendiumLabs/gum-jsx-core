@@ -5,7 +5,7 @@ import { finite, nonnegative } from '../lib/checks'
 type MathSizeStyle = 'display' | 'text' | 'script' | 'scriptscript'
 type MathStyle = MathSizeStyle | `${MathSizeStyle}-cramped`
 type MathClass = 'mord' | 'mop' | 'mbin' | 'mrel' | 'mopen' | 'mclose' | 'mpunct' | 'minner' | 'none'
-type MathContext = Readonly<{ style: MathStyle; size: number }>
+type MathContext = Readonly<{ style: MathStyle; size: number; size_index?: number }>
 type MathMetrics = Readonly<{
   advance: number
   left: MathClass
@@ -24,7 +24,11 @@ function copy_math_context(context: MathContext): MathContext {
   }
   const size = finite(context.size, 'math size')
   if (size <= 0) throw new RangeError('Math size multiplier must be positive')
-  return Object.freeze({ style: context.style, size })
+  const index = context.size_index
+  if (index !== undefined && (!Number.isInteger(index) || index < 1 || index > 11)) {
+    throw new RangeError('Math font size index must be an integer from 1 to 11')
+  }
+  return Object.freeze({ style: context.style, size, ...(index === undefined ? {} : { size_index: index }) })
 }
 
 function copy_math_metrics(metrics: MathMetrics): MathMetrics {
