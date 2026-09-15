@@ -26,21 +26,21 @@ development dependencies. Runtime code lives in `src/`, with `src/index.ts` as
 the package entry point. The JSX parser and its source-error helpers live in
 `src/lib/`, declarations in `src/types/`, and the six bundled IBM Plex faces in
 `src/fonts/` with their OFL license. Tests and tools live in `test/` and `scripts/`;
-runnable examples live in [gum-next-docs](../gum-next-docs/README.md).
+runnable examples live in [gum-jsx-docs](../gum-jsx-docs/README.md).
 No files or packages from the old core checkout are needed.
 
-The rendering command now lives in [gum-next-cli](../gum-next-cli/README.md).
+The rendering command now lives in [gum-jsx-cli](../gum-jsx-cli/README.md).
 From the workspace root, render an example with:
 
 ```sh
-bun run gum gum-next-docs/elements/code/Frame.jsx -f tree --stats
-bun run gum gum-next-docs/elements/code/Box.jsx --width 220 -o /tmp/card.png
+bun run gum gum-jsx-docs/elements/code/Frame.jsx -f tree --stats
+bun run gum gum-jsx-docs/elements/code/Box.jsx --width 220 -o /tmp/card.png
 ```
 
 The CLI accepts a JSX file or stdin and defaults to kitty graphics on stdout.
 Use `--format` or an output filename to select SVG, PNG, tree, or JSON output.
-PNG uses [gum-next-png](../gum-next-png/README.md). See the CLI README for options and
-viewport behavior. The [docs collections](../gum-next-docs/README.md) contain
+PNG uses [gum-jsx-png](../gum-jsx-png/README.md). See the CLI README for options and
+viewport behavior. The [docs collections](../gum-jsx-docs/README.md) contain
 runnable sources and explanations; use the CLI for SVG, PNG, or numerical trees.
 
 Core development tools remain available from this directory:
@@ -73,7 +73,7 @@ objects. Negative lengths are valid for coordinates. Sizing and inset operations
 require nonnegative resolved values.
 
 ```ts
-import { em, px, resolve_length, measure_length } from 'gum-next-core'
+import { em, px, resolve_length, measure_length } from 'gum-jsx-core'
 
 const basis = { font_size: 16, fraction: 200 }
 resolve_length(0.5, basis)       // 100 pixels
@@ -135,7 +135,7 @@ and nonnegative; zero is an exact value, not an absent dimension.
 ```ts
 import {
   available, make_request, resolve_sizing, prepare_request, finish_size, make_size,
-} from 'gum-next-core'
+} from 'gum-jsx-core'
 
 const context = { reference: { width: 640 }, path: 'root/child' }
 const sizing = resolve_sizing({ width: 0.5 }, context)
@@ -237,12 +237,12 @@ JSX creates descriptions without doing layout:
 ```
 
 Named constants are available both in evaluated JSX and as imports from
-`gum-next-core`: `sans`, `mono`, `light` (300), `regular` (400), `bold` (700),
+`gum-jsx-core`: `sans`, `mono`, `light` (300), `regular` (400), `bold` (700),
 `none`, `white`, `black`, `blue`, `red`, `green`, `yellow`, `purple`, `gray`,
 `lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
 For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
-[style reference](../gum-next-docs/topics/text/Style.md) for their exact values.
+[style reference](../gum-jsx-docs/topics/text/Style.md) for their exact values.
 
 JSX attribute names also accept dashes: `font-size` becomes `font_size`, and
 `stroke-dasharray` becomes `stroke_dasharray`. This applies to built-in elements
@@ -274,7 +274,7 @@ The same source can answer different allocations without being rebuilt:
 
 ```ts
 import { Rect, Svg, px, em, LayoutPass, make_request, exact, render_svg }
-  from 'gum-next-core'
+  from 'gum-jsx-core'
 
 const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) })
 const scene = new Svg({ width: px(160), height: px(80), children: tile })
@@ -318,7 +318,7 @@ source data belongs in props, with no ordinary instance field initializers.
 `Element` is available inside JSX as well as through imports. `define_element(name,
 layout, defaults?, options?)` remains a convenience using the same machinery; its
 defaults are captured at the factory call. Both forms support normalization and
-data bounds; see [Custom elements](../gum-next-docs/topics/text/CustomElements.md).
+data bounds; see [Custom elements](../gum-jsx-docs/topics/text/CustomElements.md).
 The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
@@ -350,14 +350,14 @@ content box, when provided, in dashed blue. The flag applies only to that elemen
 children can opt in separately. SVG output draws the boxes above the artwork,
 following placement transforms and bypassing content clips within the viewport.
 These diagnostics do not change layout, ink, or overflow and also appear in PNG
-and terminal output. See [Debugging layout](../gum-next-docs/topics/text/Rendering.md#debugging-layout).
+and terminal output. See [Debugging layout](../gum-jsx-docs/topics/text/Rendering.md#debugging-layout).
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
 size policy; an incorrect exact size is an error. Fixed content can draw its natural
 geometry inside a smaller allocated frame and record overflow. See the synthetic
 [fixed, expanding, and wrapping leaves](./test/fixtures/leaves.ts) and the custom parent
-in [repeated.jsx](../gum-next-docs/topics/code/repeated.jsx). These fixtures exercise custom layout
+in [repeated.jsx](../gum-jsx-docs/topics/code/repeated.jsx). These fixtures exercise custom layout
 policies independently of Text and the standard containers.
 
 Natural queries and constrained queries use this same method. Cache entries are
@@ -388,8 +388,8 @@ This is a complete 100×100 document, with no manual placement or root dimension
 
 Square reports 64×64. Box adds 16px padding and a 2px border on each side; Svg
 adopts its 100×100 result. Each element receives one layout query. See the
-[Box](../gum-next-docs/elements/text/Box.md) and
-[Frame](../gum-next-docs/elements/text/Frame.md) examples for related composition.
+[Box](../gum-jsx-docs/elements/text/Box.md) and
+[Frame](../gum-jsx-docs/elements/text/Frame.md) examples for related composition.
 
 Box has at most one content element; put text in an ordinary `Text` child. It
 hugs measured content unless its own sizing or an exact request fixes an axis.
@@ -528,7 +528,7 @@ unless their own sizing or an exact request requires more space.
 
 The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
 12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
-and Svg hugs the row's height. See [HStack](../gum-next-docs/elements/text/HStack.md)
+and Svg hugs the row's height. See [HStack](../gum-jsx-docs/elements/text/HStack.md)
 for a runnable mixed row; try different viewport widths. For plain JSX text,
 outer blank lines and common indentation are removed automatically. Internal
 text newlines still become line breaks; keep each paragraph on one content line
@@ -598,7 +598,7 @@ even without a budget, where content can overflow a zero allocation.
 `grow={1}` gives an unsized item an equal share of remaining space alongside
 other such items, subject to limits. `basis="auto" grow={1}` adds equal surplus
 to potentially unequal natural bases. See the runnable
-[growth bases example](../gum-next-docs/topics/code/stack_basis.jsx).
+[growth bases example](../gum-jsx-docs/topics/code/stack_basis.jsx).
 `width={0.5}` instead means half the stack's **full established
 width**, before subtracting gaps. Two half-width children plus a gap overflow
 unless shrinking is enabled. A fraction used as `basis` follows the same rule.
@@ -721,9 +721,9 @@ its region. Use a positioned `Fit` when the intent is to scale a completed drawi
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
 See the [Group implementation](./src/elems/group.ts) and the
-[canvas](../gum-next-docs/elements/text/Group.md),
-[anchors](../gum-next-docs/topics/text/group_anchors.md), and
-[clipping](../gum-next-docs/topics/text/group_clip.md) examples. Stage 6(a) covers
+[canvas](../gum-jsx-docs/elements/text/Group.md),
+[anchors](../gum-jsx-docs/topics/text/group_anchors.md), and
+[clipping](../gum-jsx-docs/topics/text/group_clip.md) examples. Stage 6(a) covers
 this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
 the optional common-height figure policy remain later work.
 
@@ -781,7 +781,7 @@ For exact spaces or blank lines, use an explicit string with `whitespace="pre"`,
 such as `<Text whitespace="pre">{'  Revenue  \n'}</Text>`. The whitespace prop
 controls layout after parsing; it does not disable source normalization. Element
 containers and text stacks ignore blank strings between children. See the
-[JSX reference](../gum-next-docs/topics/text/JSX.md#jsx-whitespace) for more examples.
+[JSX reference](../gum-jsx-docs/topics/text/JSX.md#jsx-whitespace) for more examples.
 
 Automatic hyphenation, emergency word splitting, full paragraph
 bidi, fallback font chains, and color emoji are outside this stage's coverage.
@@ -820,7 +820,7 @@ implementation. Browser asset packaging is deferred; no installed/system font is
 required by the resulting SVG.
 
 ```ts
-import { Fonts, LayoutPass } from 'gum-next-core'
+import { Fonts, LayoutPass } from 'gum-jsx-core'
 
 const fonts = new Fonts()
 fonts.register('My Font', font_bytes, { weight: 400, style: 'normal' })
@@ -880,7 +880,7 @@ allowed: `<Line from={[px(12), 0.5]} to={[1, 0.5]} />`. `zip(xs, ys)` can be pas
 directly as `points`. Callbacks and generated geometry retain named `{x,y}` records.
 TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengths;
 `Point` and `Position` remain record types. See the
-[point values reference](../gum-next-docs/topics/text/PointValues.md) and its runnable example.
+[point values reference](../gum-jsx-docs/topics/text/PointValues.md) and its runnable example.
 
 ```jsx
 <Path width={px(120)} height={px(60)} stroke_width={px(2)}
@@ -915,11 +915,11 @@ original public utility set is available alongside additional Math aliases,
 
 | Group | Reference and examples |
 |---|---|
-| Scalars, reductions, interpolation | [Math helpers](../gum-next-docs/topics/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
-| Sequences and arrays | [Arrays](../gum-next-docs/topics/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
-| Vector and complex arithmetic | [Vectors](../gum-next-docs/topics/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
-| Color interpolation | [Colors](../gum-next-docs/topics/text/Colors.md): interp, palette |
-| Reproducible samples | [Random](../gum-next-docs/topics/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
+| Scalars, reductions, interpolation | [Math helpers](../gum-jsx-docs/topics/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
+| Sequences and arrays | [Arrays](../gum-jsx-docs/topics/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
+| Vector and complex arithmetic | [Vectors](../gum-jsx-docs/topics/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
+| Color interpolation | [Colors](../gum-jsx-docs/topics/text/Colors.md): interp, palette |
+| Reproducible samples | [Random](../gum-jsx-docs/topics/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
 
 `range` excludes its stop; `linspace` includes its endpoint by default and keeps
 the existing 101-sample default. Pass false as its fourth argument for periodic
@@ -935,7 +935,7 @@ Each `evaluate` call owns a fresh random stream, defaulting to seed 42; pass
 share a separate host stream; `new RNG(seed)` creates an independent one.
 `integer` excludes its upper bound. Layout and rendering never consume random
 samples, so resizing preserves the data. See the
-[migration notes](../gum-next-docs/topics/text/Migration.md#numeric-helpers) for
+[migration notes](../gum-jsx-docs/topics/text/Migration.md#numeric-helpers) for
 differences from the original helpers.
 
 ## Graphs and plotting
@@ -966,10 +966,10 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Capability | Elements / reference |
 |---|---|
 | Curves, points, fills, arrows | CoordLine, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
-| Plot composition | [Plot](../gum-next-docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
+| Plot composition | [Plot](../gum-jsx-docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
-| Sampling | [Sampling](../gum-next-docs/topics/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
+| Sampling | [Sampling](../gum-jsx-docs/topics/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
@@ -983,7 +983,7 @@ Clearance uses the resolved shaft stroke, cap style, and head width after data
 mapping. Original head tips, unheaded endpoints, and inferred limits stay fixed.
 Short terminal segments are consumed without reversing the shaft; if the whole
 route is consumed, only the heads remain. Field arrows share the same rule.
-See the [cap comparison](../gum-next-docs/topics/code/arrow_caps.jsx) for thick straight, curved, and
+See the [cap comparison](../gum-jsx-docs/topics/code/arrow_caps.jsx) for thick straight, curved, and
 rounded arrows.
 
 Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
@@ -1001,7 +1001,7 @@ defaults to 101. SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
-and [coordinate helpers](../gum-next-docs/topics/text/Coordinates.md) can also be
+and [coordinate helpers](../gum-jsx-docs/topics/text/Coordinates.md) can also be
 used directly. `static normalize(input)` consumes raw input once before source
 defaults are merged; `Element<SourceProps, InputProps>` types the two separately.
 The same hook is available through define_element's fourth options argument.
@@ -1012,7 +1012,7 @@ This is a basic linear plotting API. Log/date scales, label collision avoidance,
 adaptive sampling, grouped/stacked bar automation, and advanced arrowheads
 remain deferred. Splines can overshoot samples; a
 sampler cannot identify discontinuities between two finite samples. See the
-[overview](../docs/PLOTTING.md) and [docs](../gum-next-docs/README.md) for decisions,
+[overview](../docs/PLOTTING.md) and [docs](../gum-jsx-docs/README.md) for decisions,
 examples, and current limits.
 
 ## Networks
@@ -1054,9 +1054,9 @@ straight routes via `curve={false}`, rounded routes via `radius`, and optional
 `gap` clearance. Equal endpoint IDs produce a self loop. Duplicate or missing IDs
 fail during layout. Node placement and obstacle avoidance remain explicit.
 
-See [Network](../gum-next-docs/elements/text/Network.md),
-[Edge](../gum-next-docs/elements/text/Edge.md), and the
-[transformed connection example](../gum-next-docs/topics/code/network_connections.jsx).
+See [Network](../gum-jsx-docs/elements/text/Network.md),
+[Edge](../gum-jsx-docs/elements/text/Edge.md), and the
+[transformed connection example](../gum-jsx-docs/topics/code/network_connections.jsx).
 
 ## Scoped component props
 
@@ -1101,7 +1101,7 @@ prefix, followed by the remaining props, without mutating the input. The longest
 matching prefix wins; optional exact `keep` keys stay in the remaining props.
 Joining adds a prefix to each key. Values remain unmodified, including units and
 callbacks. `Prefixed<'label', TextOptions>` derives the corresponding TypeScript
-prop names and value types. See [Custom elements](../gum-next-docs/topics/text/CustomElements.md).
+prop names and value types. See [Custom elements](../gum-jsx-docs/topics/text/CustomElements.md).
 
 Scopes are constructor-input syntax. `static defaults` still contains canonical
 source props and merges after normalization; for example Arrow defaults use
@@ -1135,7 +1135,7 @@ commit when asked. Keep this implementation isolated until a separate migration
 decision. The legacy Env, math/plotting elements, and add-on packages continue
 to use the old core.
 
-The workspace's `gum-next-cli` targets this implementation. A globally installed
+The workspace's `gum-jsx-cli` targets this implementation. A globally installed
 legacy `gum` and the legacy documentation or authoring skills still target the
 old API. Run `bun install` at the workspace root to link the packages. No build
 is needed to run TypeScript sources. JSX examples are read as source by
@@ -1147,7 +1147,7 @@ for math, sampling, layout composition, props, and JSX parsing. `src/engine/`
 contains the shared Element and layout contracts, layout pass, geometry, units,
 styles, drawing data, and font adapter. The source root contains only the public
 API (`index.ts`), JSX evaluation (`eval.ts`), SVG rendering (`svg.ts`), and fragment
-inspection (`inspect.ts`). Package consumers should import from `gum-next-core`.
+inspection (`inspect.ts`). Package consumers should import from `gum-jsx-core`.
 
 | Responsibility | Start here |
 |---|---|
@@ -1162,8 +1162,8 @@ inspection (`inspect.ts`). Package consumers should import from `gum-next-core`.
 | Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/elems/shapes.ts), [path.ts](./src/engine/path.ts), [drawing.ts](./src/engine/drawing.ts), [fragment.ts](./src/engine/fragment.ts) |
 | Public API and JSX names | [index.ts](./src/index.ts), [eval.ts](./src/eval.ts) |
 | Rendering and debugging | [svg.ts](./src/svg.ts), [inspect.ts](./src/inspect.ts) |
-| Command-line I/O | [gum-next-cli](../gum-next-cli/README.md) |
-| PNG conversion | [gum-next-png](../gum-next-png/README.md) |
+| Command-line I/O | [gum-jsx-cli](../gum-jsx-cli/README.md) |
+| PNG conversion | [gum-jsx-png](../gum-jsx-png/README.md) |
 
 “Keep the layout pass ice cold.” Add container behavior to the container or a pure
 helper. Shared ElementProps includes flex and position metadata for typing; their
@@ -1183,7 +1183,7 @@ props on two newly constructed elements do not give them a shared cache entry.
 
 When adding a public element, export it and its types in `src/index.ts`, add its JSX
 binding in `src/eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
-paired Markdown/JSX examples to `gum-next-docs` and run its content check;
+paired Markdown/JSX examples to `gum-jsx-docs` and run its content check;
 inspect CLI-generated images and numerical trees. The custom placement examples
 are intentional protocol examples, while new composition examples should use the
 standard elements. Update this README, the docs README, and roadmap status.
@@ -1196,10 +1196,10 @@ For public type changes, also verify
 declaration emission into a scratch directory:
 
 ```sh
-bun tsc --noEmit false --declaration --emitDeclarationOnly --outDir /tmp/gum-next-types
+bun tsc --noEmit false --declaration --emitDeclarationOnly --outDir /tmp/gum-jsx-types
 ```
 
-The docs examples render through the workspace CLI and gum-next-edit's docs view.
+The docs examples render through the workspace CLI and gum-jsx-edit's docs view.
 Use `pass.stats` and counting font providers for
 measurement-cost regressions. Natural hugging and Group examples generally query
 each child once; flex/reflow/stretch may require additional queries. Counted layouts,
