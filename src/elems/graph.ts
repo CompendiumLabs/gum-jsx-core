@@ -26,19 +26,23 @@ function graph_size(query: LayoutQuery, aspect = 1.5): Size {
 // metadata locates annotations in data space; omitted positions stay at the origin.
 function graph_children(elements: readonly Element[], query: LayoutQuery, size: Size,
   coordinates: Coordinates) {
+  return elements.map((element, index) => graph_child(element, query, size, coordinates, index))
+}
+
+// Network shares placement with Graph while choosing its own measurement order.
+function graph_child(element: Element, query: LayoutQuery, size: Size,
+  coordinates: Coordinates, index: number) {
   const request = make_request({ width: available(size.width), height: available(size.height) })
-  return elements.map((element, index) => {
-    const fragment = query.child(element, request, size, index, { coordinates })
-    const { x, y, anchor = 'start' } = element.props
-    const path = `${query.path}/${element.type.name}[${index}]`
-    const font = resolve_font_size(element.props.font_size, query.style.font_size, `${path}.font_size`)
-    const align = resolve_alignment(anchor, `${path}.anchor`)
-    if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
-    const left = x === undefined ? 0 : coordinate_length(x, 'x', size, font, coordinates, `${path}.x`)
-    const top = y === undefined ? 0 : coordinate_length(y, 'y', size, font, coordinates, `${path}.y`)
-    return place_fragment(fragment,
-      make_point(left - align.x * fragment.size.width, top - align.y * fragment.size.height))
-  })
+  const fragment = query.child(element, request, size, index, { coordinates })
+  const { x, y, anchor = 'start' } = element.props
+  const path = `${query.path}/${element.type.name}[${index}]`
+  const font = resolve_font_size(element.props.font_size, query.style.font_size, `${path}.font_size`)
+  const align = resolve_alignment(anchor, `${path}.anchor`)
+  if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
+  const left = x === undefined ? 0 : coordinate_length(x, 'x', size, font, coordinates, `${path}.x`)
+  const top = y === undefined ? 0 : coordinate_length(y, 'y', size, font, coordinates, `${path}.y`)
+  return place_fragment(fragment,
+    make_point(left - align.x * fragment.size.width, top - align.y * fragment.size.height))
 }
 
 class Graph extends Element<GraphProps> {
@@ -54,5 +58,5 @@ class Graph extends Element<GraphProps> {
   }
 }
 
-export { Graph, graph_size, graph_children }
+export { Graph, graph_size, graph_children, graph_child }
 export type { GraphProps }

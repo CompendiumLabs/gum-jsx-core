@@ -1015,6 +1015,49 @@ sampler cannot identify discontinuities between two finite samples. See the
 [overview](../docs/PLOTTING.md) and [docs](../gum-next-docs/README.md) for decisions,
 examples, and current limits.
 
+## Networks
+
+```jsx
+<Svg width={px(480)} height={px(200)}>
+  <Network>
+    <Edge start="input" end="output" stroke={blue} />
+    <Node id="input" x={0} y={0}>
+      Input
+    </Node>
+    <Node id="output" x={1} y={0}>
+      Output
+    </Node>
+  </Network>
+</Svg>
+```
+
+Node is a compact TextFrame with `width="fit"`, a centered placement anchor,
+and an optional ID. Network uses Graph sizing and coordinates, inferring limits
+from node centers and edge waypoints with 0.2 default data padding. Explicit node
+widths wrap labels at their ordinary font size. Put edges first to paint them
+behind nodes; source order remains paint order independently of measurement order.
+
+Each named node's fragment exposes `connection: { id, boundary }`, where boundary
+is its outer rounded frame in local pixels. Network lays out ordinary children
+first, then follows their placements to locate these boundaries through Box,
+Fit, Rotate, and other containers. Ports and normals follow the composed transforms,
+including when the visible frame differs from its surrounding allocation.
+Nested networks set `connection_scope` to keep their IDs local. Custom elements
+can supply the same connection metadata without adding any paint.
+
+Edges are direct Network children. `start`/`end` accept IDs or node elements with
+IDs; references do not insert nodes into the diagram. Automatic sides face the
+other node or adjacent waypoint. `start_side`/`end_side` and `start_loc`/`end_loc`
+override the ports in each node's local frame. Rounded corners use the actual
+outline. Edges share Arrow's heads and styling, with curved routes by default,
+straight routes via `curve={false}`, rounded routes via `radius`, and optional
+`gap` clearance. Equal endpoint IDs produce a self loop. Duplicate or missing IDs
+fail during layout. Node placement and obstacle avoidance remain explicit.
+
+See [Network](../gum-next-docs/elements/text/Network.md),
+[Edge](../gum-next-docs/elements/text/Edge.md), and the
+[transformed connection example](../gum-next-docs/topics/code/network_connections.jsx).
+
 ## Scoped component props
 
 Compound elements accept prefixed props for their generated parts. JSX accepts

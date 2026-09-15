@@ -11,6 +11,9 @@ import type { Clip, Insets, Point, PointValue, Rect, Size, Transform } from './g
 
 // Named guides are vertical positions, including text baselines and the math axis.
 type Guides = Readonly<Partial<Record<string, number>>>
+// A connection follows the node's frame, independently of allocation and ink.
+// Parents discover these records through placements, including their transforms.
+type Connection = Readonly<{ id: string; boundary: Clip }>
 const OWNED = Symbol('next.fragment')
 
 // All geometry is local to this fragment. A renderer never performs layout.
@@ -28,6 +31,9 @@ interface Fragment<Draw = Drawing> {
   readonly children: readonly Placement<Draw>[]
   readonly content?: Rect
   readonly clip?: Clip
+  readonly connection?: Connection
+  // Nested networks keep their node identifiers local.
+  readonly connection_scope?: boolean
 }
 
 // A parent owns placement; the same child fragment can have many placements.
@@ -50,6 +56,8 @@ type FragmentSpec = Readonly<{
   children?: readonly Placement[]
   content?: Rect
   clip?: Clip
+  connection?: Connection
+  connection_scope?: boolean
 }>
 
 // Placing a result preserves its identity and never asks for another measurement.
@@ -109,6 +117,12 @@ function make_fragment(spec: FragmentSpec): Fragment {
   const clip = spec.clip === undefined ? undefined : make_clip(spec.clip, spec.clip.radius)
   const content = spec.content === undefined ? undefined
     : make_rect(spec.content.x, spec.content.y, spec.content.width, spec.content.height)
+  let connection: Connection | undefined
+  if (spec.connection !== undefined) {
+    const { id, boundary } = spec.connection
+    if (typeof id !== 'string' || !id.length) throw new TypeError('A connection needs a nonempty string id')
+    connection = Object.freeze({ id, boundary: make_clip(boundary, boundary.radius) })
+  }
   const fragment: Fragment = {
     ...(spec.name === undefined ? {} : { name: spec.name }),
     ...(spec.label === undefined ? {} : { label: spec.label }),
@@ -120,6 +134,8 @@ function make_fragment(spec: FragmentSpec): Fragment {
     draw: Object.freeze(draw), children: Object.freeze(children),
     ...(content === undefined ? {} : { content }),
     ...(clip === undefined ? {} : { clip }),
+    ...(connection === undefined ? {} : { connection }),
+    ...(spec.connection_scope === true ? { connection_scope: true } : {}),
   }
   Object.defineProperty(fragment, OWNED, { value: true })
   return Object.freeze(fragment)
@@ -129,4 +145,4 @@ function make_fragment(spec: FragmentSpec): Fragment {
 // painted bounds after clipping; overflow records excess content before clipping.
 // An explicit transform acts in child coordinates, before the placement offset.
 export { make_fragment, place_fragment, content_bounds, transform_guides }
-export type { Transform, Guides, Fragment, Placement, FragmentSpec }
+export type { Transform, Guides, Connection, Fragment, Placement, FragmentSpec }

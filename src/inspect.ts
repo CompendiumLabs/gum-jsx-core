@@ -21,8 +21,9 @@ function inspect_fragment(fragment: Fragment): string {
     const math = node.math ? ` math=${JSON.stringify(node.math)}` : ''
     const content = node.content
     const box = content ? ` content=${content.x},${content.y},${content.width},${content.height}` : ''
+    const connection = node.connection ? ` connection=${JSON.stringify(node.connection)}` : ''
     lines.push(`${'  '.repeat(depth)}${name} ${width}×${height} ${location}${matrix}`
-      + ` ink=${ink}${overflow_text(node.overflow)}${guides}${math}${box}${node.clip ? ' clipped' : ''}`)
+      + ` ink=${ink}${overflow_text(node.overflow)}${guides}${math}${box}${connection}${node.clip ? ' clipped' : ''}`)
     for (const child of node.children) {
       const transform = child.transform ? ` matrix(${child.transform.join(',')})` : ''
       visit(child.fragment, depth + 1, child.offset, transform)

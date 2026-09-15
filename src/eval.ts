@@ -23,6 +23,7 @@ import * as vectors from './lib/vectors'
 import { interp, palette } from './lib/colors'
 import { RNG } from './lib/random'
 import { Graph } from './elems/graph'
+import { Node, Edge, Network } from './elems/network'
 import { Overlay, TransformBox, Rotate, Attach, Anchor } from './elems/placement'
 import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './elems/marks'
 import { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
@@ -49,7 +50,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     Svg, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
-    Graph, Plot, BarPlot, Legend, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor,
+    Graph, Plot, BarPlot, Legend, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
     CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,

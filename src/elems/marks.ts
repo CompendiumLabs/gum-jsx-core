@@ -336,22 +336,42 @@ function inset_route(points: readonly Point[], start: number, end: number): read
 
 function arrow_draw(points: readonly Point[], paint: Paint, head: ReturnType<typeof resolve_arrow_head>,
   props: Pick<ArrowProps, 'start_head' | 'end_head' | 'curve' | 'tension'>,
-  radius = 0) {
+  radius = 0, directions?: Readonly<{ start: Point; end: Point }>) {
   const distinct = points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y)
   const headed = distinct.length > 1 && head.length > 0
   const start = headed && (props.start_head ?? false), end = headed && (props.end_head ?? true)
   // Open or one-sided heads meet the shaft at the tip. A full filled head
   // covers a shortened shaft; a half head cannot cover both sides of its cap.
   const inset = (start || end) && !head.open && head.side === 'both' ? arrow_inset(paint, head) : 0
-  const shaft = start || end ? inset_route(distinct, start ? inset : 0, end ? inset : 0) : points
+  let shaft = start || end ? inset_route(distinct, start ? inset : 0, end ? inset : 0) : points
+  // Network supplies unit tangents in final pixels. Retreat beneath its heads
+  // along those tangents, which need not follow the chord between the nodes.
+  if (directions && props.curve && headed && shaft.length > 1) {
+    const a = distinct[0], b = distinct.at(-1)!
+    const ds = start ? inset : 0, de = end ? inset : 0
+    shaft = [make_point(a.x + directions.start.x * ds, a.y + directions.start.y * ds),
+      ...distinct.slice(1, -1), make_point(b.x - directions.end.x * de, b.y - directions.end.y * de)]
+  }
   const path = props.curve ? spline_path(shaft, props.tension)
     : radius ? rounded_path(shaft, radius) : line_path(shaft)
+  if (directions && props.curve && shaft.length > 1) {
+    const a = shaft[0], b = shaft[1], c = shaft.at(-2)!, d = shaft.at(-1)!
+    const first = path[1], last = path.at(-1)!
+    const scale = (props.tension ?? 1) / 3
+    const ds = Math.hypot(b.x - a.x, b.y - a.y) * scale
+    const de = Math.hypot(d.x - c.x, d.y - c.y) * scale
+    if (first.kind === 'C') path[1] = { ...first,
+      x1: a.x + directions.start.x * ds, y1: a.y + directions.start.y * ds }
+    // Read again: a two-node route has just one cubic with both endpoint handles.
+    if (last.kind === 'C') path[path.length - 1] = { ...path.at(-1)! as typeof last,
+      x2: d.x - directions.end.x * de, y2: d.y - directions.end.y * de }
+  }
   const draw = [draw_path(path, { ...paint, fill: 'none' })]
   if (!headed) return draw
-  const add = (tip: Point, before: Point) => draw.push(
-    head.draw(tip, Math.atan2(tip.y - before.y, tip.x - before.x)))
-  if (start) add(distinct[0], distinct[1])
-  if (end) add(distinct[distinct.length - 1], distinct[distinct.length - 2])
+  const add = (tip: Point, before: Point, direction?: Point) => draw.push(
+    head.draw(tip, Math.atan2(direction?.y ?? tip.y - before.y, direction?.x ?? tip.x - before.x)))
+  if (start) add(distinct[0], distinct[1], directions && make_point(-directions.start.x, -directions.start.y))
+  if (end) add(distinct[distinct.length - 1], distinct[distinct.length - 2], directions?.end)
   return draw
 }
 
