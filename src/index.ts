@@ -83,8 +83,9 @@ export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, A
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points } from './elems/marks'
 export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
-  ArcProps, FillProps, ArrowProps, ArrowHeadProps, RayProps, PointSize, PointsProps } from './elems/marks'
+  ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadProps, RayProps, PointSize, PointsProps } from './elems/marks'
 export { spline_path, rounded_path, arc_path, spline1d, spline2d } from './lib/curves'
+export { arrow_barb } from './lib/arrows'
 export { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 export type { PerBar, BarStyle, BarProps, BarsProps } from './elems/bars'
 export { HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,

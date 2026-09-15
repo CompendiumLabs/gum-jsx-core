@@ -3,7 +3,7 @@ import {
   Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, TitleBox, TitleFrame, TextFigure, Slide, Text, Rect,
   LayoutPass, element_children, prefix_split, prefix_join, evaluate, render_svg, make_request, exact, px, em,
 } from '../src/index'
-import type { Element, ArrowProps, Prefixed, StyleSpec } from '../src/index'
+import type { Element, ArrowProps, ArrowHeadStyle, Prefixed, StyleSpec } from '../src/index'
 
 const fixed = make_request({ width: exact(400), height: exact(240) })
 function svg(element: Element) { return render_svg(new LayoutPass().layout(element, fixed)); }
@@ -30,22 +30,30 @@ const tests: Record<string, () => void> = {
     assert.equal(props.tick_label_color, 'blue')
   },
 
-  'scoped arrow paint preserves geometry and agrees with nested objects and dashed JSX'() {
+  'scoped arrow options preserve geometry and agree with nested objects and dashed JSX'() {
     const base: ArrowProps = { points: [[0.1, 0.9], [0.4, 0.1], [0.9, 0.6]], curve: true,
-      start_head: true, head_size: px(20), head_width: 1, stroke: 'red', stroke_width: px(5) }
-    const style = { fill: 'blue', stroke: 'green', stroke_width: px(2), opacity: 0.5 }
+      start_head: true, head_size: px(20), head_width: 1, head_curve: 0.7, stroke: 'red', stroke_width: px(5) }
+    const style = { fill: 'blue', stroke: 'green', stroke_width: px(2), opacity: 0.5, curve: 0.7 }
     const arrow = new Arrow({ ...base, head_style: { fill: 'red', stroke: 'green' },
       head_fill: 'blue', head_stroke_width: px(2), head_opacity: 0.5 })
     assert.equal(svg(arrow), svg(new Arrow({ ...base, head_style: style })))
     assert.deepEqual(arrow.props.head_style, style)
     assert.deepEqual(arrow.props.head_size, px(20))
     assert.equal(arrow.props.head_width, 1)
+    assert.equal(arrow.props.head_style?.curve, 0.7)
     assert.ok(!Object.hasOwn(arrow.props, 'head_fill'))
     assert.ok(Object.isFrozen(arrow.props.head_style))
-    const dashed = evaluate('<Arrow head-fill="blue" head-stroke-width={px(2)} head-size={px(20)} />')
-    assert.equal(svg(dashed), svg(new Arrow({ head_fill: 'blue', head_stroke_width: px(2), head_size: px(20) })))
+    const dashed = evaluate('<Arrow curve head-curve={0.7} head-fill="blue" head-stroke-width={px(2)} head-size={px(20)} />')
+    assert.equal(svg(dashed), svg(new Arrow({ curve: true, head_curve: 0.7,
+      head_fill: 'blue', head_stroke_width: px(2), head_size: px(20) })))
     assert.equal(svg(new Arrow({ head_style: { fill: 'blue' }, head_fill: undefined })),
       svg(new Arrow({ head_style: { fill: undefined } })))
+    const open = evaluate('<Arrow curve head-open head-curve={0.7} head-barb="left" head-stroke="blue" head-size={px(20)} />')
+    assert.equal(svg(open), svg(new Arrow({ curve: true, head_size: px(20),
+      head_style: { open: true, curve: 0.7, barb: 'left', stroke: 'blue' } })))
+    const overridden = new Arrow({ head_style: { open: true, curve: 1, stroke: 'red' },
+      head_open: false, head_curve: 0, head_stroke: 'blue' })
+    assert.deepEqual(overridden.props.head_style, { open: false, curve: 0, stroke: 'blue' })
   },
 
   'canonical class defaults and explicit undefined keep their construction semantics'() {
@@ -58,6 +66,11 @@ const tests: Record<string, () => void> = {
     assert.equal(cleared.props.head_style, undefined)
     assert.equal(cleared.props.head_size, undefined)
     assert.ok(Object.hasOwn(cleared.props, 'head_size'))
+    class OpenHead extends Arrow {
+      static defaults: Partial<ArrowProps> = { head_open: true, head_curve: 0.7 }
+    }
+    assert.equal(svg(new OpenHead()), svg(new Arrow({ head_open: true, head_curve: 0.7 })))
+    assert.equal(svg(new OpenHead({ head_open: false, head_curve: 0 })), svg(new Arrow()))
   },
 
   'axis scopes keep owner geometry and typography while accepting text options'() {
@@ -178,6 +191,10 @@ const tests: Record<string, () => void> = {
 if (false) {
   const props: Prefixed<'head', StyleSpec> = { head_fill: 'blue', head_stroke_width: px(2) }
   new Arrow(props)
+  const head: Prefixed<'head', ArrowHeadStyle> = { head_open: true, head_curve: 0.7, head_barb: 'left', head_stroke: 'blue' }
+  new Arrow(head)
+  // @ts-expect-error open is a shape option with a boolean value
+  new Arrow({ head_open: 'yes' })
   new Plot({ xaxis_tick_size: px(8), xaxis_label_wrap: false, title_wrap: false })
   const [tick, label, rest] = prefix_split(['tick', 'tick_label'],
     { tick_size: px(8), tick_label_color: 'red' }, ['tick_size'])

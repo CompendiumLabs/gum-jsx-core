@@ -7,7 +7,7 @@ import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point } from '../engine/geometry'
 import { make_request, shape_size } from '../engine/layout'
-import { arrow_draw, line_path } from './marks'
+import { arrow_draw, line_path, resolve_arrow_head } from './marks'
 import { Rotate } from './placement'
 import type { Side } from './placement'
 import { scope_props, merge_scoped } from '../lib/props'
@@ -94,10 +94,11 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
   const tick_size = nonnegative(resolve_length(props.tick_size ?? px(5), basis, 'tick_size'), 'tick_size')
   const gap = nonnegative(resolve_length(props.label_offset ?? px(4), basis, 'label_offset'), 'label_offset')
   const sign = positive ? 1 : -1
-  const paint = resolve_paint(resolve_style(props.line_style, query.style), size, query.path)
+  const line_style = resolve_style(props.line_style, query.style)
+  const paint = resolve_paint(line_style, size, query.path)
   const draw = mode === 'axis' && (props.line ?? true) ? arrow_draw(
     [point(along(lim[0]), cross), point(along(lim[1]), cross)], paint,
-    { ...paint, fill: paint.stroke, stroke: 'none' }, props.arrow ? 7 : 0,
+    resolve_arrow_head({ head_size: px(props.arrow ? 7 : 0) }, size, line_style, query.path, paint),
     { end_head: props.arrow }) : []
   if (mode !== 'labels' && tick_size) {
     const ticks = items.flatMap(item => line_path([

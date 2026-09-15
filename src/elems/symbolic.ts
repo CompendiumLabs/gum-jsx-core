@@ -6,8 +6,9 @@ import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point } from '../engine/geometry'
 import type { Point } from '../engine/geometry'
 import { exact, make_request } from '../engine/layout'
-import { CoordLine, Spline, Points, Fill, mark_context, mark_bounds, arrow_draw } from './marks'
-import type { CoordLineProps, SplineProps, PointsProps, FillProps, MarkProps } from './marks'
+import { CoordLine, Spline, Points, Fill, mark_context, mark_bounds, arrow_draw,
+  head_scope, arrow_head_options, resolve_arrow_head } from './marks'
+import type { CoordLineProps, SplineProps, PointsProps, FillProps, MarkProps, ArrowHeadScope } from './marks'
 import { linspace, sample_points, sample_count, finite_point, scalar_value } from '../lib/sampling'
 import type { PointValue, ScalarFunction, SampleProps } from '../lib/sampling'
 import { px } from '../engine/units'
@@ -23,9 +24,8 @@ type SymFillProps = Omit<FillProps, 'points' | 'boundary'> & Readonly<{
 }>
 type VectorSample = Readonly<{ point: Point; vector: Point }>
 type VectorSampleValue = Readonly<{ point: PointValue; vector: PointValue }>
-type FieldProps = MarkProps & Readonly<{
+type FieldProps = MarkProps & ArrowHeadScope & Readonly<{
   vectors?: readonly VectorSampleValue[]; scale?: number; normalize?: boolean
-  head_size?: Length; head_width?: number
   shape?: Element | ((sample: VectorSample, index: number) => Element); shape_height?: Length
 }>
 type FieldDatum = Readonly<{ from: Point; to: Point; shape?: Element }>
@@ -74,7 +74,7 @@ const SymFill = define_component<SymFillProps>('SymFill', ({ upper = 1, lower = 
 class Field extends Element<FieldData, FieldProps> {
   static normalize({ vectors = [], scale = 1, normalize = false, shape, ...props }: FieldProps): FieldData {
     finite(scale, 'scale')
-    return { ...props, vectors: vectors.flatMap((sample, index) => {
+    return { ...head_scope(props), vectors: vectors.flatMap((sample, index) => {
       const from = finite_point(sample.point), vector = finite_point(sample.vector)
       if (!from || !vector) return []
       const norm = Math.hypot(vector.x, vector.y)
@@ -92,6 +92,7 @@ class Field extends Element<FieldData, FieldProps> {
   static layout(props: FieldData, query: LayoutQuery) {
     const { size, point, paint, length } = mark_context(props, query)
     const draw = [], children = []
+    let head: ReturnType<typeof resolve_arrow_head> | undefined
     for (const [index, vector] of props.vectors.entries()) {
       const a = point(vector.from), b = point(vector.to)
       if (vector.shape) {
@@ -100,8 +101,11 @@ class Field extends Element<FieldData, FieldProps> {
           { width, height }, index, { coordinates: null })
         const angle = Math.atan2(b.y - a.y, b.x - a.x), c = Math.cos(angle), s = Math.sin(angle)
         children.push(place_fragment(fragment, a, [c, s, -s, c, s * height / 2, -c * height / 2]))
-      } else draw.push(...arrow_draw([a, b], paint, { ...paint, fill: paint.stroke, stroke: 'none' },
-        length(props.head_size ?? px(5)), { head_width: props.head_width }))
+      } else {
+        head ??= resolve_arrow_head({ ...arrow_head_options(props), head_size: props.head_size ?? px(5) },
+          size, query.style, query.path, paint)
+        draw.push(...arrow_draw([a, b], paint, head, {}))
+      }
     }
     return make_fragment({ size, draw, children })
   }

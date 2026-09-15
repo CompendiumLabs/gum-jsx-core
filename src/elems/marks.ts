@@ -2,6 +2,7 @@ import { finite, nonnegative } from '../lib/checks'
 import { coordinate_length, point_bounds } from '../engine/coordinates'
 import type { GeometrySpace } from '../engine/coordinates'
 import { arc_path, rounded_path, spline_path } from '../lib/curves'
+import { arrow_barb } from '../lib/arrows'
 import { draw_path } from '../engine/drawing'
 import type { Paint } from '../engine/drawing'
 import { Element, element_children } from '../engine/element'
@@ -12,12 +13,13 @@ import type { Point, Size } from '../engine/geometry'
 import { exact, make_request, shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import type { PathCommand } from '../engine/path'
-import { scope_props } from '../lib/props'
+import { transform_path } from '../engine/path'
+import { prefix_split, scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Circle, is_position } from './shapes'
 import type { Position, PositionValue, Radius } from './shapes'
 import { resolve_paint, resolve_style } from '../engine/style'
-import type { StyleSpec } from '../engine/style'
+import type { Style, StyleSpec } from '../engine/style'
 import { px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
@@ -32,13 +34,19 @@ type FillProps = MarkProps & Readonly<{
   boundary?: readonly (PositionValue | null)[] | number
   direction?: 'vertical' | 'horizontal'
 }>
-type ArrowProps = MarkProps & Prefixed<'head', StyleSpec> & Readonly<{
-  from?: PositionValue; to?: PositionValue; points?: readonly PositionValue[]
-  start_head?: boolean; end_head?: boolean; head_size?: Length; head_width?: number
-  head_style?: StyleSpec; curve?: boolean; tension?: number; radius?: Length
+type ArrowBarbSide = 'both' | 'left' | 'right'
+type ArrowHeadOptions = StyleSpec & Readonly<{
+  head_size?: Length; head_width?: number; open?: boolean; curve?: number; barb?: ArrowBarbSide
 }>
-type ArrowHeadProps = MarkProps & Readonly<{
-  tip?: PositionValue; angle?: number; head_size?: Length; head_width?: number; open?: boolean
+type ArrowHeadStyle = Omit<ArrowHeadOptions, 'head_size' | 'head_width'>
+type ArrowHeadScope = Pick<ArrowHeadOptions, 'head_size' | 'head_width'>
+  & Prefixed<'head', ArrowHeadStyle> & Readonly<{ head_style?: ArrowHeadStyle }>
+type ArrowProps = MarkProps & ArrowHeadScope & Readonly<{
+  from?: PositionValue; to?: PositionValue; points?: readonly PositionValue[]
+  start_head?: boolean; end_head?: boolean; curve?: boolean; tension?: number; radius?: Length
+}>
+type ArrowHeadProps = MarkProps & ArrowHeadOptions & Readonly<{
+  tip?: PositionValue; angle?: number
 }>
 type RayProps = MarkProps & Readonly<{ origin?: PositionValue; angle?: number; length?: Length }>
 type PointSize = Length | PositionValue
@@ -229,27 +237,78 @@ class HFill extends Fill {
   static defaults: Partial<FillProps> = { direction: 'horizontal' }
 }
 
-function arrow_head(tip: Point, angle: number, length: number, width = 0.65, open = false): PathCommand[] {
-  nonnegative(width, 'head_width')
+function arrow_head(tip: Point, angle: number, barb: ReturnType<typeof arrow_barb>, open: boolean,
+  side: ArrowBarbSide): PathCommand[] {
   const c = Math.cos(angle), s = Math.sin(angle)
-  const corner = (side: number) => make_point(tip.x - length * c - side * length * width * s / 2,
-    tip.y - length * s + side * length * width * c / 2)
-  return line_path([corner(-1), tip, corner(1)], !open)
+  const upper = transform_path(barb.commands, [-c, -s, s, -c, tip.x, tip.y])
+  const lower = transform_path(barb.commands, [-c, -s, -s, c, tip.x, tip.y])
+  const path: PathCommand[] = []
+  for (let i = side === 'right' ? 0 : upper.length - 1; i > 0; i--) {
+    const a = upper[i], b = upper[i - 1]
+    if (a.kind === 'Z' || b.kind === 'Z') continue
+    if (!path.length) path.push({ kind: 'M', x: a.x, y: a.y })
+    path.push(a.kind === 'C'
+      ? { kind: 'C', x1: a.x2, y1: a.y2, x2: a.x1, y2: a.y1, x: b.x, y: b.y }
+      : { kind: 'L', x: b.x, y: b.y })
+  }
+  if (!path.length) path.push({ kind: 'M', ...tip })
+  if (side !== 'left') path.push(...lower.slice(1))
+  if (!open) {
+    if (side !== 'both') {
+      const length = barb.at(1).x
+      path.push({ kind: 'L', x: tip.x - length * c, y: tip.y - length * s })
+    }
+    path.push({ kind: 'Z' })
+  }
+  return path
 }
 
 function arrow_points(props: ArrowProps): readonly PositionValue[] {
   return props.points ?? [props.from ?? { x: 0, y: 0 }, props.to ?? { x: 1, y: 1 }]
 }
 
-// A triangular head narrows to zero at the tip. Retreat far enough that the
+// Size and width already carry the head prefix on standalone ArrowHead. Every
+// other shape or style option is scoped automatically, without a geometry list.
+function head_scope<Props extends ArrowHeadScope>(props: Props): Props {
+  return scope_props(props, ['head'], ['head_size', 'head_width'])
+}
+
+function arrow_head_options(props: ArrowHeadScope): ArrowHeadOptions {
+  const [flat] = prefix_split(['head'], props, ['head_size', 'head_width', 'head_style'])
+  // Flat class defaults are applied after construction-time normalization.
+  // Explicit options already in head_style take precedence over those defaults.
+  return { ...flat, ...props.head_style, head_size: props.head_size, head_width: props.head_width }
+}
+
+// Both the element and generated arrowheads use this resolver and drawing path.
+// An attached head inherits its shaft's stroke; an open head always has no fill.
+function resolve_arrow_head(props: ArrowHeadOptions, size: Size, inherited: Style, path: string, shaft?: Paint) {
+  const style = shaft ? resolve_style({ fill: shaft.stroke,
+    stroke: props.open ? shaft.stroke : 'none', ...props }, inherited, path) : inherited
+  const length = nonnegative(resolve_length(props.head_size ?? px(9), {
+    font_size: style.font_size, fraction: Math.min(size.width, size.height),
+  }, `${path}.head_size`), 'head_size')
+  const width = props.head_width ?? (shaft ? 1.3 : 0.65), curve = props.curve ?? 0, open = props.open ?? false
+  const side = props.barb ?? 'both'
+  if (!['both', 'left', 'right'].includes(side)) throw new TypeError('barb must be both, left, or right')
+  const barb = arrow_barb(length, width, curve), paint = resolve_paint(style, size, path)
+  return { length, width, curve, open, barb, side,
+    draw: (tip: Point, angle: number) => draw_path(arrow_head(tip, angle, barb, open, side),
+      open ? { ...paint, fill: 'none' } : paint) }
+}
+
+// A head narrows to zero at the tip. Retreat far enough that the
 // shaft's cap fits between its sides, using the resolved stroke width in pixels.
-function arrow_inset(paint: Paint, length: number, width: number): number {
+function arrow_inset(paint: Paint, head: ReturnType<typeof resolve_arrow_head>): number {
+  const { length, width, curve, barb } = head
   const half = paint.stroke === 'none' ? 0 : paint.stroke_width / 2
   if (!half) return 0
   const corner = 2 * half / width
   const cap = paint.stroke_linecap ?? 'butt'
-  const inset = cap === 'round' ? Math.hypot(half, corner)
-    : corner + (cap === 'square' ? half : 0)
+  // A curved head uses the cap's enclosing rectangle; the straight case keeps
+  // its exact round-cap clearance. Both follow the actual drawn barb geometry.
+  const inset = curve ? barb.reach(half) + (cap === 'butt' ? 0 : half)
+    : cap === 'round' ? Math.hypot(half, corner) : corner + (cap === 'square' ? half : 0)
   // A head narrower than the shaft cannot cover it. Let the cap reach the head's
   // base instead of leaving a gap by retreating farther than the whole head.
   return Math.min(inset, length + (cap === 'butt' ? 0 : half))
@@ -275,21 +334,22 @@ function inset_route(points: readonly Point[], start: number, end: number): read
   return end ? cut(route.toReversed(), end).toReversed() : route
 }
 
-function arrow_draw(points: readonly Point[], paint: Paint, head: Paint, length: number,
-  props: Pick<ArrowProps, 'start_head' | 'end_head' | 'head_width' | 'curve' | 'tension'>,
+function arrow_draw(points: readonly Point[], paint: Paint, head: ReturnType<typeof resolve_arrow_head>,
+  props: Pick<ArrowProps, 'start_head' | 'end_head' | 'curve' | 'tension'>,
   radius = 0) {
   const distinct = points.filter((p, i) => !i || p.x !== points[i - 1].x || p.y !== points[i - 1].y)
-  const headed = distinct.length > 1 && length > 0
+  const headed = distinct.length > 1 && head.length > 0
   const start = headed && (props.start_head ?? false), end = headed && (props.end_head ?? true)
-  const width = start || end ? nonnegative(props.head_width ?? 1.3, 'head_width') : 0
-  const inset = start || end ? arrow_inset(paint, length, width) : 0
+  // Open or one-sided heads meet the shaft at the tip. A full filled head
+  // covers a shortened shaft; a half head cannot cover both sides of its cap.
+  const inset = (start || end) && !head.open && head.side === 'both' ? arrow_inset(paint, head) : 0
   const shaft = start || end ? inset_route(distinct, start ? inset : 0, end ? inset : 0) : points
   const path = props.curve ? spline_path(shaft, props.tension)
     : radius ? rounded_path(shaft, radius) : line_path(shaft)
   const draw = [draw_path(path, { ...paint, fill: 'none' })]
   if (!headed) return draw
-  const add = (tip: Point, before: Point) => draw.push(draw_path(
-    arrow_head(tip, Math.atan2(tip.y - before.y, tip.x - before.x), length, width), head))
+  const add = (tip: Point, before: Point) => draw.push(
+    head.draw(tip, Math.atan2(tip.y - before.y, tip.x - before.x)))
   if (start) add(distinct[0], distinct[1])
   if (end) add(distinct[distinct.length - 1], distinct[distinct.length - 2])
   return draw
@@ -297,17 +357,16 @@ function arrow_draw(points: readonly Point[], paint: Paint, head: Paint, length:
 
 class Arrow extends Element<ArrowProps> {
   static normalize(props: ArrowProps): ArrowProps {
-    return scope_props(props, ['head'], ['head_size', 'head_width'])
+    return head_scope(props)
   }
   static data_bounds(props: ArrowProps) {
     return mark_bounds(props, arrow_points(props))
   }
   static layout(props: ArrowProps, query: LayoutQuery) {
     const { size, point, paint, length } = mark_context(props, query)
-    const head = resolve_paint(resolve_style({ fill: paint.stroke, stroke: 'none', ...props.head_style },
-      query.style), size, query.path)
+    const head = resolve_arrow_head(arrow_head_options(props), size, query.style, query.path, paint)
     return make_fragment({ size, draw: arrow_draw(arrow_points(props).map(point), paint, head,
-      length(props.head_size ?? px(9)), props, length(props.radius ?? 0)) })
+      props, length(props.radius ?? 0)) })
   }
 }
 
@@ -317,11 +376,10 @@ class ArrowHead extends Element<ArrowHeadProps> {
     return mark_bounds(props, [props.tip ?? { x: 1, y: 0.5 }])
   }
   static layout(props: ArrowHeadProps, query: LayoutQuery) {
-    const { size, point, paint, length } = mark_context(props, query)
-    const commands = arrow_head(point(props.tip ?? { x: 1, y: 0.5 }),
-      finite(props.angle ?? 0, 'angle') * Math.PI / 180, length(props.head_size ?? px(9)),
-      props.head_width, props.open)
-    return make_fragment({ size, draw: [draw_path(commands, props.open ? { ...paint, fill: 'none' } : paint)] })
+    const { size, point } = mark_context(props, query)
+    const head = resolve_arrow_head(props, size, query.style, query.path)
+    return make_fragment({ size, draw: [head.draw(point(props.tip ?? { x: 1, y: 0.5 }),
+      finite(props.angle ?? 0, 'angle') * Math.PI / 180)] })
   }
 }
 
@@ -373,6 +431,7 @@ class Points extends Element<PointsData, PointsProps> {
 }
 
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
-  Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, finite_runs, line_path, arrow_draw }
+  Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, finite_runs, line_path, arrow_draw,
+  head_scope, arrow_head_options, resolve_arrow_head }
 export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
-  ArcProps, FillProps, ArrowProps, ArrowHeadProps, RayProps, PointSize, PointsProps }
+  ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }
