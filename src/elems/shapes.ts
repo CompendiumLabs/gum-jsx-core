@@ -183,7 +183,7 @@ const VLine = define_component<LineProps>('VLine', props => new Line({
   from: { x: 0.5, y: 0 }, to: { x: 0.5, y: 1 }, ...props,
 }))
 const Dot = define_component<CircleProps>('Dot', props => new Circle({
-  width: px(6), height: px(6), fill: 'black', stroke: 'none', ...props,
+  width: px(6), height: px(6), fill: 'theme:foreground', stroke: 'none', ...props,
 }))
 const Triangle = define_component<PolygonProps>('Triangle', props => new Polygon({
   points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props,

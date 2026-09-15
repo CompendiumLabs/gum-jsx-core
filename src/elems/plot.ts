@@ -26,6 +26,7 @@ import type { Prefixed } from '../lib/props'
 import { Line, Rect } from './shapes'
 import { HStack, VStack } from './stack'
 import type { StyleSpec } from '../engine/style'
+import { theme_color } from '../engine/theme'
 import type { TextOptions } from './text'
 import { em, px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
@@ -61,7 +62,7 @@ type OuterLabelProps = ElementProps & Readonly<{
 type OuterLabelData = ElementProps & Readonly<{ side?: Side; offset?: Length; label_element: Element }>
 
 class Legend extends Element<BoxProps, LegendProps> {
-  static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: '#cbd5e1', background: 'white', radius: px(4) }
+  static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: 'theme:border', radius: px(4) }
   static data_bounds() {
     return null
   }
@@ -69,7 +70,7 @@ class Legend extends Element<BoxProps, LegendProps> {
     const { entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props } = scope_props(input, ['label'])
     return { ...props,
       children: new VStack({ gap, children: entries.map(entry => {
-        const color = entry.color ?? '#2563eb'
+        const color = entry.color ?? 'theme:accent'
         const badge = entry.badge ?? (entry.kind === 'bar'
           ? new Rect({ width: badge_width, height: em(0.7), fill: color, stroke: 'none' })
           : entry.kind === 'point' ? new Points({ width: badge_width, height: em(0.8), space: 'local',
@@ -155,7 +156,7 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   const add = (fragment: Fragment) => children.push(place_fragment(fragment, offset))
   const plot_rect = make_rect(0, 0, inner.width, inner.height)
   if (props.plot_background) add(make_fragment({ name: 'PlotBackground', size: inner,
-    draw: [draw_rect(plot_rect, { fill: props.plot_background, stroke: 'none', stroke_width: 0,
+    draw: [draw_rect(plot_rect, { fill: theme_color(props.plot_background, query.style.theme), stroke: 'none', stroke_width: 0,
       opacity: query.style.opacity })] }))
   props.meshes.forEach((mesh, i) => add(query.child(mesh, request, inner, 30 + i, context)))
   const data = make_fragment({ name: 'Graph', size: inner,
@@ -166,7 +167,7 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
     { font_size: query.style.font_size, fraction: Math.min(inner.width, inner.height) }, 'border_width')
   if (border < 0) throw new RangeError('border_width must be nonnegative')
   if (border) add(make_fragment({ name: 'PlotBorder', size: inner,
-    draw: [draw_rect(plot_rect, { fill: 'none', stroke: props.border_color ?? '#cbd5e1', stroke_width: border,
+    draw: [draw_rect(plot_rect, { fill: 'none', stroke: theme_color(props.border_color ?? 'theme:border', query.style.theme), stroke_width: border,
       opacity: query.style.opacity })] }))
   props.axes.forEach((axis, i) => add(query.child(axis, request, inner, i, context)))
   // Outer text stays upright; only the completed y title is rotated.
@@ -183,12 +184,12 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
       make_point(area.x + inner.width - legend.size.width - gap, area.y + gap)))
   }
   const draw = props.background ? [draw_rect(make_rect(0, 0, size.width, size.height),
-    { fill: props.background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity })] : []
+    { fill: theme_color(props.background, query.style.theme), stroke: 'none', stroke_width: 0, opacity: query.style.opacity })] : []
   return make_fragment({ size, content: area, draw, children })
 }
 
 class Plot extends Element<PlotData, PlotProps> {
-  static defaults: Partial<PlotData> = { font_size: px(12), color: '#334155', stroke: '#64748b' }
+  static defaults: Partial<PlotData> = { font_size: px(12), color: 'theme:text', stroke: 'theme:muted' }
   static normalize = plot_data
   static data_bounds() {
     return null
@@ -197,14 +198,14 @@ class Plot extends Element<PlotData, PlotProps> {
 }
 
 class BarPlot extends Element<PlotData, BarPlotProps> {
-  static defaults: Partial<PlotData> = { font_size: px(12), color: '#334155', stroke: '#64748b' }
+  static defaults: Partial<PlotData> = { font_size: px(12), color: 'theme:text', stroke: 'theme:muted' }
   static data_bounds() {
     return null
   }
   static normalize({ values, positions, bases, bar_width, styles, direction, radius, children, ...props }: BarPlotProps): PlotData {
     return plot_data({
       ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, radius,
-        fill: props.fill ?? '#2563eb' }),
+        fill: props.fill ?? 'theme:accent' }),
         ...element_children(children)],
     })
   }

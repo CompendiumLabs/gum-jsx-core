@@ -109,7 +109,9 @@ const tests: Record<string, () => void> = {
     assert.ok(visible.overflow.right > 0 && visible.overflow.bottom > 0)
     assert.equal(visible.clip, undefined)
     assert.deepEqual(clipped.overflow, visible.overflow)
-    assert.deepEqual(clipped.ink, { x: 0, y: 0, width: 640, height: 360 })
+    assert.deepEqual(clipped.ink, { x: 24, y: 24, width: 616, height: 336 })
+    const painted = pass.layout(new Slide({ children, clip: true, background: 'white' }), request)
+    assert.deepEqual(painted.ink, { x: 0, y: 0, width: 640, height: 360 })
     const tiny = pass.layout(new Slide({ title: 'Title', children: new Graph() }),
       make_request({ width: exact(0), height: exact(0) }))
     assert.doesNotMatch(render_svg(tiny), /NaN|Infinity/)

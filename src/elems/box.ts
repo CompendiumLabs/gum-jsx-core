@@ -2,6 +2,7 @@ import { nonnegative } from '../lib/checks'
 import { layout_content, resolve_alignment, align_offset, fit_scale, definite_reference } from '../lib/composition'
 import type { Alignment, FitMode } from '../lib/composition'
 import { DEFAULTS } from '../engine/defaults'
+import { theme_color } from '../engine/theme'
 import { draw_rect } from '../engine/drawing'
 import { Element, content_child } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -57,8 +58,8 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
     { font_size, fraction }, `${query.path}.border_width`), 'border_width')
   const border = make_insets({ left: border_width, top: border_width,
     right: border_width, bottom: border_width })
-  const background = props.background ?? 'none'
-  const border_color = props.border_color ?? query.style.color
+  const background = theme_color(props.background ?? 'none', query.style.theme)
+  const border_color = theme_color(props.border_color ?? query.style.color, query.style.theme)
   if (typeof background !== 'string' || typeof border_color !== 'string') {
     throw new TypeError('Box background and border_color must be paint strings')
   }

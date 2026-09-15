@@ -73,7 +73,7 @@ function bars_layout(props: BarsData, query: LayoutQuery) {
 }
 
 class Bars extends Element<BarsData, BarsProps> {
-  static defaults: Partial<BarsData> = { fill: '#2563eb', stroke: 'none' }
+  static defaults: Partial<BarsData> = { fill: 'theme:accent', stroke: 'none' }
   static normalize = bars_data
   static data_bounds(props: BarsData) {
     return mark_bounds(props, props.bars.flatMap(bar => bar_corners(bar, props.direction)))

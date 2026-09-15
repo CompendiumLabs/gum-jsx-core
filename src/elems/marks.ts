@@ -213,7 +213,7 @@ function fill_layout(props: FillProps, query: LayoutQuery) {
 }
 
 class Fill extends Element<FillProps> {
-  static defaults: Partial<FillProps> = { fill: '#dbeafe', stroke: 'none' }
+  static defaults: Partial<FillProps> = { fill: 'theme:area', stroke: 'none' }
   static data_bounds(props: FillProps) {
     return mark_bounds(props,
       fill_pairs(props).flatMap(pair => pair ? [...pair] : []))
@@ -312,7 +312,7 @@ class Arrow extends Element<ArrowProps> {
 }
 
 class ArrowHead extends Element<ArrowHeadProps> {
-  static defaults: Partial<ArrowHeadProps> = { fill: 'black' }
+  static defaults: Partial<ArrowHeadProps> = { fill: 'theme:foreground' }
   static data_bounds(props: ArrowHeadProps) {
     return mark_bounds(props, [props.tip ?? { x: 1, y: 0.5 }])
   }
@@ -339,7 +339,7 @@ class Ray extends Element<RayProps> {
 }
 
 class Points extends Element<PointsData, PointsProps> {
-  static defaults: Partial<PointsData> = { fill: 'black', stroke: 'none' }
+  static defaults: Partial<PointsData> = { fill: 'theme:foreground', stroke: 'none' }
   static normalize({ points = [], point_size = px(6), shape = new Circle(), ...props }: PointsProps): PointsData {
     return { ...props,
       markers: points.flatMap((value, index) => {

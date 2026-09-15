@@ -15,6 +15,7 @@ import { available, exact, natural, make_request, finish_size, shape_size } from
 import { make_size, make_point, make_rect } from './engine/geometry'
 import { make_fragment, place_fragment } from './engine/fragment'
 import { draw_rect } from './engine/drawing'
+import { THEMES, theme_color } from './engine/theme'
 import * as constants from './lib/constants'
 import * as math from './lib/math'
 import * as arrays from './lib/arrays'
@@ -42,7 +43,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
   const { scope = {}, name = 'gum-next.jsx', seed } = options
   const rng = new RNG(seed)
   const bindings = {
-    ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG,
+    ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
     Svg, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,

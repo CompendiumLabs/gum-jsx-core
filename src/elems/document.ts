@@ -1,4 +1,5 @@
 import type { LayoutQuery } from '../engine/pass'
+import { theme_color } from '../engine/theme'
 import { Box, box_layout } from './box'
 import type { BoxProps } from './box'
 import { Element, content_child, element_children } from '../engine/element'
@@ -164,8 +165,9 @@ class Slide extends Element<SlideData, SlideProps> {
     const inner = deflate_size(size, padding)
     const fragment = query.child(props.body, make_request({ width: exact(inner.width), height: exact(inner.height) }), inner)
     const area = make_rect(0, 0, size.width, size.height)
+    const background = theme_color(props.background ?? 'none', query.style.theme)
     return make_fragment({ size, content: make_rect(padding.left, padding.top, inner.width, inner.height),
-      draw: [draw_rect(area, { fill: props.background ?? 'white', stroke: 'none', stroke_width: 0,
+      draw: background === 'none' ? [] : [draw_rect(area, { fill: background, stroke: 'none', stroke_width: 0,
         opacity: query.style.opacity })],
       children: [place_fragment(fragment, make_point(padding.left, padding.top))],
       clip: props.clip ? area : undefined })

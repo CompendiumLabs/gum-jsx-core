@@ -1,4 +1,6 @@
 import { DEFAULTS } from './defaults'
+import { resolve_theme, theme_color } from './theme'
+import type { ThemeName } from './theme'
 import { finite, nonnegative } from '../lib/checks'
 import type { Paint } from './drawing'
 import type { Size } from './geometry'
@@ -9,6 +11,7 @@ type FontStyle = 'normal' | 'italic'
 type LineCap = 'butt' | 'round' | 'square'
 type LineJoin = 'miter' | 'round' | 'bevel'
 type StyleSpec = Readonly<{
+  theme?: ThemeName
   font_size?: Length
   font_family?: string
   font_weight?: number
@@ -25,6 +28,9 @@ type StyleSpec = Readonly<{
   opacity?: number
 }>
 type Style = Readonly<{
+  theme: ThemeName
+  // Keep semantic paints so a nested theme can re-resolve inherited defaults.
+  theme_paints?: Readonly<Partial<Record<'color' | 'fill' | 'stroke', string>>>
   font_size: number
   font_family: string
   font_weight: number
@@ -42,6 +48,8 @@ type Style = Readonly<{
 }>
 
 const DEFAULT_STYLE: Style = Object.freeze({
+  theme: 'light',
+  theme_paints: Object.freeze({ color: 'theme:foreground', stroke: 'theme:foreground' }),
   font_size: DEFAULTS.font_size,
   font_family: DEFAULTS.font_family,
   font_weight: DEFAULTS.font_weight,
@@ -59,14 +67,25 @@ const DEFAULT_STYLE: Style = Object.freeze({
 
 // Resolve inherited font size before sizing. Paint lengths await shape geometry.
 function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = 'root'): Style {
+  const theme = resolve_theme(spec.theme ?? inherited.theme)
+  const theme_paints: Partial<Record<'color' | 'fill' | 'stroke', string>> = {}
+  const paint = (key: 'color' | 'fill' | 'stroke') => {
+    const token = inherited.theme_paints?.[key]
+    // A caller may supply a resolved style with an explicitly replaced paint.
+    const source = spec[key] ?? (token && theme_color(token, inherited.theme) === inherited[key]
+      ? token : inherited[key])
+    const value = theme_color(source, theme)
+    if (source.startsWith('theme:')) theme_paints[key] = source
+    return value
+  }
   const font_size = resolve_font_size(spec.font_size, inherited.font_size, `${path}.font_size`)
   const font_family = spec.font_family ?? inherited.font_family
   const font_weight = finite(spec.font_weight ?? inherited.font_weight, 'font_weight')
   const font_style = spec.font_style ?? inherited.font_style
   const line_height = normalize_length(spec.line_height ?? inherited.line_height)
-  const color = spec.color ?? inherited.color
-  const fill = spec.fill ?? inherited.fill
-  const stroke = spec.stroke ?? inherited.stroke
+  const color = paint('color')
+  const fill = paint('fill')
+  const stroke = paint('stroke')
   if ([font_family, color, fill, stroke].some(value => typeof value !== 'string')) {
     throw new TypeError(`${path}: font family and paints must be strings`)
   }
@@ -86,6 +105,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = '
     return length
   }))
   return Object.freeze({
+    theme, theme_paints: Object.freeze(theme_paints),
     font_size, font_family, font_weight, font_style, line_height, color,
     fill, stroke, stroke_width,
     stroke_linecap: spec.stroke_linecap ?? inherited.stroke_linecap,

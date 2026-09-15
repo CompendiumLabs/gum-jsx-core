@@ -1,4 +1,6 @@
 export { DEFAULTS } from './engine/defaults'
+export { THEMES, resolve_theme, theme_color } from './engine/theme'
+export type { ThemeName, ThemePalette } from './engine/theme'
 export {
   sans, mono, light, regular, bold,
   none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
