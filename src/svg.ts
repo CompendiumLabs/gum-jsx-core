@@ -40,6 +40,10 @@ function render_rect(rect: Rect, radius?: RectRadii, paint = ''): string {
 
 // Each drawing kind has an explicit vocabulary, with no arbitrary attribute injection.
 function render_drawing(draw: Drawing): string {
+  if (draw.kind === 'image') {
+    return `<image ${rect_attributes(draw.rect)} xlink:href="${escape_xml(draw.data)}"`
+      + ` preserveAspectRatio="none"${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : ''}/>`
+  }
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
     stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw
   const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`
@@ -116,7 +120,8 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   }
 
   const body = render_fragment(fragment)
-  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"`,
+  const image_namespace = body.includes('<image ') ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ''
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg"${image_namespace} width="${width}" height="${height}"`,
     ` viewBox="0 0 ${width} ${height}" overflow="hidden">`]
   if (title !== undefined) parts.push(`<title>${escape_xml(title)}</title>`)
   if (definitions.length) parts.push(`<defs>${definitions.join('')}</defs>`)

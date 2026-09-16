@@ -20,7 +20,10 @@ type EllipseDraw = Readonly<{ kind: 'ellipse'; center: Point; radius: Point } & 
 type PathDraw = Readonly<{
   kind: 'path'; commands: readonly PathCommand[]; bounds: PixelRect | null
 } & Paint>
-type Drawing = RectDraw | EllipseDraw | PathDraw
+// Images carry opacity but cannot carry vector fill or stroke settings.
+type ImageDraw = Readonly<{ kind: 'image'; rect: PixelRect; data: string; opacity?: number }
+  & { [Key in Exclude<keyof Paint, 'opacity'>]?: never }>
+type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw
 
 // Own paint records at the drawing boundary, including optional SVG stroke policy.
 function copy_paint(paint: Paint): Paint {
@@ -76,11 +79,21 @@ function draw_path(
   })
 }
 
+function draw_image(rect: PixelRect, data: string, opacity = 1): ImageDraw {
+  if (typeof data !== 'string' || !data.startsWith('data:image/png;base64,')) {
+    throw new TypeError('Image drawing requires a base64 PNG data URL')
+  }
+  finite(opacity, 'opacity')
+  if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
+  return Object.freeze({ kind: 'image', rect: make_rect(rect.x, rect.y, rect.width, rect.height), data, opacity })
+}
+
 function copy_drawing(draw: Drawing): Drawing {
   switch (draw.kind) {
     case 'rect': return draw_rect(draw.rect, draw, draw.radius)
     case 'ellipse': return draw_ellipse(draw.center, draw.radius, draw)
     case 'path': return draw_path(draw.commands, draw, draw.bounds)
+    case 'image': return draw_image(draw.rect, draw.data, draw.opacity)
     default: throw new TypeError('Unknown drawing kind')
   }
 }
@@ -89,6 +102,7 @@ function copy_drawing(draw: Drawing): Drawing {
 // and miter joins. Zero-area rects/ellipses paint nothing; a stroked line can.
 function drawing_ink(draw: Drawing): PixelRect | null {
   if (draw.opacity === 0) return null
+  if (draw.kind === 'image') return draw.rect.width && draw.rect.height ? draw.rect : null
   let bounds: PixelRect | null
   switch (draw.kind) {
     case 'rect': bounds = draw.rect; break
@@ -118,5 +132,5 @@ function drawing_ink(draw: Drawing): PixelRect | null {
   return make_rect(x - pad, y - pad, width + 2 * pad, height + 2 * pad)
 }
 
-export { draw_rect, draw_ellipse, draw_path, copy_drawing, drawing_ink }
-export type { Paint, RectDraw, EllipseDraw, PathDraw, Drawing }
+export { draw_rect, draw_ellipse, draw_path, draw_image, copy_drawing, drawing_ink }
+export type { Paint, RectDraw, EllipseDraw, PathDraw, ImageDraw, Drawing }

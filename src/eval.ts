@@ -3,6 +3,7 @@ import { runJSX } from './lib/parse'
 import { Element, define_element, define_component, element_children } from './engine/element'
 import { prefix_split, prefix_join } from './lib/props'
 import { Svg } from './elems/svg'
+import { PngImage } from './elems/image'
 import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
 import { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
 import { Box, Frame, Fit } from './elems/box'
@@ -47,7 +48,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
-    Svg, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
+    Svg, PngImage, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
     Graph, Plot, BarPlot, Legend, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
