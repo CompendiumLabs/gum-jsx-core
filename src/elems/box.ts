@@ -12,7 +12,7 @@ import {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets,
   resolve_insets, deflate_size, map_radii, read_point,
 } from '../engine/geometry'
-import type { RectRadii, Size, InsetSpec } from '../engine/geometry'
+import type { Rect, RectRadii, Size, InsetSpec } from '../engine/geometry'
 import { make_request, finish_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { resolve_rect_radius } from './shapes'
@@ -38,17 +38,31 @@ type FitProps = ElementProps & Readonly<{
 // Clip a twice-wide stroke to the frame: exactly one border width remains
 // inside, even when corners are rounded or the border fills the entire box.
 // The clipped-away half is drawing construction, not layout overflow.
-function frame_border(size: Size, width: number, color: string, radius: RectRadii, opacity = 1): Fragment {
+function frame_border(size: Size, width: number, color: string, radius: RectRadii, opacity = 1, cutout?: Rect): Fragment {
   const rect = make_rect(0, 0, size.width, size.height)
   const draw = draw_rect(rect, { fill: 'none', stroke: color, stroke_width: 2 * width, opacity }, radius)
-  return make_fragment({ name: 'Border', size, draw: [draw], ink: opacity ? rect : null,
+  const border = make_fragment({ name: 'Border', size, draw: [draw], ink: opacity ? rect : null,
     clip: make_clip(rect, radius) })
+  if (!cutout) return border
+  const left = Math.max(0, Math.min(size.width, cutout.x))
+  const right = Math.max(left, Math.min(size.width, cutout.x + cutout.width))
+  const top = Math.max(0, Math.min(size.height, cutout.y))
+  const bottom = Math.max(top, Math.min(size.height, cutout.y + cutout.height))
+  const regions = [
+    make_rect(0, 0, size.width, top),
+    make_rect(0, bottom, size.width, size.height - bottom),
+    make_rect(0, top, left, bottom - top),
+    make_rect(right, top, size.width - right, bottom - top),
+  ]
+  return make_fragment({ name: 'Border', size, children: regions
+    .filter(region => region.width > 0 && region.height > 0)
+    .map(clip => place_fragment(make_fragment({ size, children: [place_fragment(border)], clip }))) })
 }
 
 // Decoration is local to this frame; inherited fill/stroke still style children.
 // Border width is resolved before measurement, so fractions use the established
 // parent's shorter side. Padding uses the corresponding parent axis on each side.
-function box_layout(props: BoxProps, query: LayoutQuery) {
+function box_layout(props: BoxProps, query: LayoutQuery, border_cutout?: (size: Size) => Rect) {
   const { font_size } = query.style
   const basis = { font_size, reference: query.reference, path: query.path }
   const padding = resolve_insets(props.padding, basis)
@@ -88,7 +102,8 @@ function box_layout(props: BoxProps, query: LayoutQuery) {
     children.splice(0, 1, place_fragment(clipped))
   }
   if (border_width > 0 && border_color !== 'none') {
-    children.push(place_fragment(frame_border(size, border_width, border_color, corners, query.style.opacity)))
+    children.push(place_fragment(frame_border(size, border_width, border_color, corners, query.style.opacity,
+      border_cutout?.(size))))
   }
   return make_fragment({ size, content, guides, overflow, draw, children })
 }

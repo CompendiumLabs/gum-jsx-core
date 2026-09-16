@@ -108,6 +108,8 @@ function clamp_size(value: number, sizing: AxisSizing): number {
 }
 
 // Parent allocations win; otherwise offer the child its resolved size policy.
+// A preferred ratio derives an unresolved axis before layout, so every element
+// sees the same definite allocation for reflow, fractions, and child alignment.
 function prepare_request(request: LayoutRequest, sizing: Sizing): LayoutRequest {
   function prepare_axis(axis: AxisRequest, rule: AxisSizing): AxisRequest {
     if (axis.kind === 'exact') return axis
@@ -115,10 +117,21 @@ function prepare_request(request: LayoutRequest, sizing: Sizing): LayoutRequest 
     if (axis.kind === 'available') return available(clamp_size(axis.value, rule))
     return rule.max < Infinity ? available(rule.max) : natural()
   }
-  return make_request({
-    width: prepare_axis(request.width, sizing.width),
-    height: prepare_axis(request.height, sizing.height),
-  })
+  const width = prepare_axis(request.width, sizing.width)
+  const height = prepare_axis(request.height, sizing.height)
+  if (sizing.aspect !== undefined) {
+    const w = width.kind === 'exact' ? width.value
+      : sizing.width.min === sizing.width.max ? sizing.width.min : undefined
+    const h = height.kind === 'exact' ? height.value
+      : sizing.height.min === sizing.height.max ? sizing.height.min : undefined
+    if (w !== undefined || h !== undefined) {
+      return make_request({
+        width: exact(w ?? clamp_size(h! * sizing.aspect, sizing.width)),
+        height: exact(h ?? clamp_size(w! / sizing.aspect, sizing.height)),
+      })
+    }
+  }
+  return make_request({ width, height })
 }
 
 // Select the allocated box after measurement. An available budget is advisory.
@@ -127,10 +140,18 @@ function finish_size(content: Size, request: LayoutRequest, sizing: Sizing): Siz
   function finish_axis(value: number, axis: AxisRequest, rule: AxisSizing): number {
     return axis.kind === 'exact' ? axis.value : clamp_size(value, rule)
   }
-  return make_size(
-    finish_axis(content.width, prepared.width, sizing.width),
-    finish_axis(content.height, prepared.height, sizing.height),
-  )
+  let width = finish_axis(content.width, prepared.width, sizing.width)
+  let height = finish_axis(content.height, prepared.height, sizing.height)
+  if (sizing.aspect !== undefined && prepared.width.kind !== 'exact' && prepared.height.kind !== 'exact') {
+    // Neither axis was established: grow the measured box to the requested
+    // ratio, without shrinking/scaling content or turning offers into fill.
+    const ratio_width = height * sizing.aspect
+    // Repeated finishing must be stable despite division/multiplication rounding.
+    const tolerance = Number.EPSILON * 8 * Math.max(width, Number.isFinite(ratio_width) ? ratio_width : 0)
+    if (width < ratio_width - tolerance) width = clamp_size(ratio_width, sizing.width)
+    else if (width > ratio_width + tolerance) height = clamp_size(width / sizing.aspect, sizing.height)
+  }
+  return make_size(width, height)
 }
 
 // Without an aspect, each axis fills its offer or uses the finite natural fallback.
@@ -148,10 +169,6 @@ function shape_size(request: LayoutRequest, sizing: Sizing = resolve_sizing()): 
     )
   } else if (width.kind === 'exact' && height.kind === 'exact') {
     size = make_size(width.value, height.value)
-  } else if (width.kind === 'exact') {
-    size = make_size(width.value, width.value / aspect)
-  } else if (height.kind === 'exact') {
-    size = make_size(height.value * aspect, height.value)
   } else {
     const max_width = width.kind === 'available' ? width.value : Infinity
     const max_height = height.kind === 'available' ? height.value : Infinity

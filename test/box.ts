@@ -129,6 +129,75 @@ const tests: Record<string, () => void> = {
     assert.ok(loose.overflow.right > 0 && loose.overflow.bottom > 0)
   },
 
+  'frame aspects derive missing axes before child layout, including padding and borders'() {
+    const pass = new LayoutPass()
+    for (const Container of [Box, Frame]) {
+      const child = new Fixed({ content_width: px(40), content_height: px(20) })
+      const props = { aspect: 2, padding: px(10), border_width: px(2), align: 'center' as const, children: child }
+      const frame = pass.layout(new Container({ ...props, width: px(200) }))
+      assert.deepEqual(frame.size, { width: 200, height: 100 })
+      assert.deepEqual(frame.content, { x: 12, y: 12, width: 176, height: 76 })
+      assert.deepEqual(frame.children[0].offset, { x: 80, y: 40 })
+      assert.equal(frame.guides.baseline, 56)
+      assert.deepEqual(pass.layout(new Container({ ...props, height: px(100) })).size, frame.size)
+      assert.deepEqual(pass.layout(new Container({ ...props, width: 'fill' }),
+        make_request({ width: available(200) })).size, frame.size)
+      assert.deepEqual(pass.layout(new Container({ ...props, min_width: px(200), max_width: px(200) })).size,
+        frame.size)
+      const fractions = pass.layout(new Container({ ...props, width: px(200), children:
+        new Rect({ width: 0.5, height: 0.5, stroke: 'none' }) }))
+      assert.deepEqual(fractions.children[0].fragment.size, { width: 88, height: 38 })
+      const stretched = pass.layout(new Container({ ...props, width: px(200), align: 'stretch' }))
+      assert.deepEqual(stretched.children[0].fragment.size, { width: 176, height: 76 })
+    }
+  },
+
+  'natural frame aspects add space without scaling content or inventing percentage references'() {
+    const source = new Frame({ aspect: 1, padding: px(10), border_width: px(2), align: 'center',
+      children: new Fixed({ content_width: px(40), content_height: px(20) }) })
+    const before = JSON.stringify(source), pass = new LayoutPass()
+    const frame = pass.layout(source, make_request({ width: available(200) }))
+    assert.deepEqual(frame.size, { width: 64, height: 64 })
+    assert.deepEqual(frame.children[0].fragment.size, { width: 40, height: 20 })
+    assert.deepEqual(frame.children[0].offset, { x: 12, y: 22 })
+    assert.deepEqual(pass.layout(new Box({ aspect: 1 })).size, make_size())
+    assert.deepEqual(pass.layout(new Box({ aspect: 1, min_width: px(100) })).size, { width: 100, height: 100 })
+    assert.throws(() => pass.layout(new Box({ aspect: 1, children: new Rect({ width: 0.5 }) }),
+      make_request({ width: available(200) })), /definite fraction reference/)
+    assert.equal(pass.layout(source, make_request({ width: available(200) })), frame)
+    assert.equal(JSON.stringify(source), before)
+  },
+
+  'fixed-height frame aspects establish width before text reflow'() {
+    const pass = new LayoutPass()
+    const props = { height: px(100), padding: px(8), children: new Text({
+      text: 'This paragraph wraps using the width derived from the frame aspect.', font_size: px(20),
+    }) }
+    const frame = pass.layout(new Frame({ ...props, aspect: 2 }))
+    const explicit = pass.layout(new Frame({ ...props, width: px(200) }))
+    assert.equal(render_svg(frame), render_svg(explicit))
+    assert.ok(frame.children[0].fragment.children.length > 1)
+  },
+
+  'frame aspect yields to exact sizes and limits, with honest overflow and clipping'() {
+    const pass = new LayoutPass()
+    const props = { width: px(200), aspect: 2, padding: px(10), children:
+      new Fixed({ content_width: px(300), content_height: px(120), fill: 'teal' }) }
+    assert.deepEqual(pass.layout(new Frame({ ...props, height: px(60) })).size, { width: 200, height: 60 })
+    assert.deepEqual(pass.layout(new Frame({ ...props, max_height: px(60) })).size, { width: 200, height: 60 })
+    assert.deepEqual(pass.layout(new Frame({ ...props, min_height: px(150) })).size, { width: 200, height: 150 })
+    const source = new Frame(props)
+    assert.deepEqual(pass.layout(source, make_request({ width: exact(80), height: exact(40) })).size,
+      { width: 80, height: 40 })
+    const visible = pass.layout(source), clipped = pass.layout(new Frame({ ...props, clip: true }))
+    assert.ok(visible.overflow.right > 0 && visible.overflow.bottom > 0)
+    assert.deepEqual(clipped.overflow, visible.overflow)
+    assert.deepEqual(clipped.ink, { x: 0, y: 0, width: 200, height: 100 })
+    const zero = pass.layout(source, make_request({ width: exact(0) }))
+    assert.deepEqual(zero.size, make_size())
+    assert.doesNotMatch(render_svg(zero), /NaN|Infinity/)
+  },
+
   'each box resolves em padding with its own font before measuring children'() {
     const pass = new LayoutPass()
     const source = new Svg({ font_size: px(10), children: new Box({

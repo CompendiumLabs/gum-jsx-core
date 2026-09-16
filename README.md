@@ -33,8 +33,8 @@ The rendering command now lives in [gum-jsx-cli](../gum-jsx-cli/README.md).
 From the workspace root, render an example with:
 
 ```sh
-bun run gum gum-jsx-docs/elements/code/Frame.jsx -f tree --stats
-bun run gum gum-jsx-docs/elements/code/Box.jsx --width 220 -o /tmp/card.png
+bun run gum gum-jsx-docs/docs/elements/code/Frame.jsx -f tree --stats
+bun run gum gum-jsx-docs/docs/elements/code/Box.jsx --width 220 -o /tmp/card.png
 ```
 
 The CLI accepts a JSX file or stdin and defaults to kitty graphics on stdout.
@@ -157,8 +157,13 @@ The precedence is:
 2. Otherwise an explicit dimension, clamped to its own min/max, becomes exact.
 3. Otherwise available space is clamped to min/max before measuring. A natural
    request with a finite maximum becomes an available offer at that maximum.
-4. Completion clamps measured dimensions to min/max; it does not clamp them to
-   advisory offers. An exact axis always reports its allocation.
+4. An explicit `aspect` derives a missing axis from an exact dimension or equal
+   min/max limits before layout. The derived axis is clamped to its own limits;
+   two established axes take precedence over the preferred ratio.
+5. Completion clamps measured dimensions to min/max; it does not clamp them to
+   advisory offers. With neither axis established, an explicit aspect adds space
+   to the measured box to reach the ratio, subject to limits. An exact axis always
+   reports its allocation.
 
 `resolve_sizing` requires definite bases even for a preferred dimension that a
 later exact allocation overrides. Missing references and invalid min/max ranges
@@ -169,12 +174,18 @@ are errors in the source sizing policy. An omitted maximum is represented by
 unoffered axis uses the 16px natural fallback, independently of the other axis.
 Preferred dimensions and min/max limits apply through the shared sizing policy.
 
-An explicit `aspect`, or the intrinsic 1:1 aspect supplied by Square and Circle,
-couples the axes: two exact axes win; one exact axis derives the other; otherwise
-the shape fits the available axes while preserving aspect. With two natural axes
-it uses the default height. Own min/max limits can also override aspect. Other
-content uses its measured natural size; `finish_size` does not impose a shape's
-ratio on text or containers.
+`aspect` is a shared Element sizing property: a positive finite width/height
+ratio of the complete allocated box. Text, stacks, Svg, math, and custom elements
+use the same `prepare_request`/`finish_size` rules as frames and shapes. A known
+axis derives the other before reflow and child allocation; a wholly content-sized
+element grows its measured allocation to the ratio. Contents are not scaled.
+
+Shape-specific measurement still supplies a natural size or fits advisory offers.
+An explicit aspect, or the intrinsic 1:1 aspect supplied by Square and Circle,
+preserves that ratio while fitting those offers; with two natural axes, shapes use
+the default height. Intrinsic ratios stay local to their elements and are not
+inferred from a container's children. Explicit dimensions and limits can override
+both intrinsic and explicit preferred ratios.
 
 ## Insets and fragments
 
@@ -242,7 +253,7 @@ Named constants are available both in evaluated JSX and as imports from
 `lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
 For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
-[style reference](../gum-jsx-docs/topics/text/Style.md) for their exact values.
+[style reference](../gum-jsx-docs/docs/gallery/text/Style.md) for their exact values.
 
 JSX attribute names also accept dashes: `font-size` becomes `font_size`, and
 `stroke-dasharray` becomes `stroke_dasharray`. This applies to built-in elements
@@ -318,7 +329,7 @@ source data belongs in props, with no ordinary instance field initializers.
 `Element` is available inside JSX as well as through imports. `define_element(name,
 layout, defaults?, options?)` remains a convenience using the same machinery; its
 defaults are captured at the factory call. Both forms support normalization and
-data bounds; see [Custom elements](../gum-jsx-docs/topics/text/CustomElements.md).
+data bounds; see [Custom elements](../gum-jsx-docs/docs/gallery/text/CustomElements.md).
 The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
@@ -350,14 +361,14 @@ content box, when provided, in dashed blue. The flag applies only to that elemen
 children can opt in separately. SVG output draws the boxes above the artwork,
 following placement transforms and bypassing content clips within the viewport.
 These diagnostics do not change layout, ink, or overflow and also appear in PNG
-and terminal output. See [Debugging layout](../gum-jsx-docs/topics/text/Rendering.md#debugging-layout).
+and terminal output. See [Debugging layout](../gum-jsx-docs/docs/gallery/text/Rendering.md#debugging-layout).
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
 size policy; an incorrect exact size is an error. Fixed content can draw its natural
 geometry inside a smaller allocated frame and record overflow. See the synthetic
 [fixed, expanding, and wrapping leaves](./test/fixtures/leaves.ts) and the custom parent
-in [repeated.jsx](../gum-jsx-docs/topics/code/repeated.jsx). These fixtures exercise custom layout
+in [repeated.jsx](../gum-jsx-docs/docs/gallery/code/repeated.jsx). These fixtures exercise custom layout
 policies independently of Text and the standard containers.
 
 Natural queries and constrained queries use this same method. Cache entries are
@@ -388,8 +399,8 @@ This is a complete 100×100 document, with no manual placement or root dimension
 
 Square reports 64×64. Box adds 16px padding and a 2px border on each side; Svg
 adopts its 100×100 result. Each element receives one layout query. See the
-[Box](../gum-jsx-docs/elements/text/Box.md) and
-[Frame](../gum-jsx-docs/elements/text/Frame.md) examples for related composition.
+[Box](../gum-jsx-docs/docs/elements/text/Box.md) and
+[Frame](../gum-jsx-docs/docs/elements/text/Frame.md) examples for related composition.
 
 Box has at most one content element; put text in an ordinary `Text` child. It
 hugs measured content unless its own sizing or an exact request fixes an axis.
@@ -401,6 +412,7 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | Prop | Meaning |
 |---|---|
 | `width`, `height`, `min_width`, etc. | The shared sizing policy, applied to the border box. |
+| `aspect` | Optional preferred width/height ratio of the border box. |
 | `padding` | Length, side/axis object, or `[h, v]` / `[t, b, l, r]`; default zero. |
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
@@ -413,6 +425,18 @@ Background and border are local decoration. Ordinary `fill`, `stroke`, and font
 props still inherit to children. `Frame` is Box with a default 1px border.
 The border paints above the child, wholly inside the frame, even when thicker
 than half the box. Its drawing construction introduces no extra ink overflow.
+
+Box and Frame honor an explicit `aspect`: `width={px(200)} aspect={1}` makes a
+200×200 frame, with padding and border inside. One established axis derives the
+other before child layout; two fixed axes and min/max limits take precedence.
+Without an established axis, measured content grows to the ratio without scaling
+the child or treating an advisory offer as a fill instruction.
+
+For TitleFrame, generic `aspect` includes the raised title, just as width and
+height do. Use `frame_aspect` for the bordered body instead: `width={px(480)}
+frame_aspect={1}` gives a square border and adds the title overhang automatically.
+Explicit outer allocations, including those derived from `aspect`, take precedence
+over the body's preferred ratio.
 
 Radius objects use `t`, `b`, `l`, `r`, `tl`, `tr`, `bl`, and `br` (bottom-right).
 For example, `radius={{ t: px(8) }}` rounds only the top corners;
@@ -432,8 +456,9 @@ axes; it cannot depend on the unresolved size that it helps determine. Radius
 is decoration and resolves against Box's final rectangle. Prefer `px()` or `em()`
 for border width in a naturally sized tree.
 
-Only an exact axis or equal min/max limits establish a content reference before
-measurement. For example, `<Svg width={px(360)}><Box width={1}>…</Box></Svg>`
+An exact axis, equal min/max limits, or an axis derived from one of these by an
+explicit aspect establishes a content reference before measurement.
+For example, `<Svg width={px(360)}><Box width={1}>…</Box></Svg>`
 gives Box a definite width, then gives its child that width minus padding and
 border. Box and Svg can both hug height. A nonzero fractional child height on
 that unresolved axis produces a property-path error, without iteration.
@@ -528,7 +553,7 @@ unless their own sizing or an exact request requires more space.
 
 The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
 12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
-and Svg hugs the row's height. See [HStack](../gum-jsx-docs/elements/text/HStack.md)
+and Svg hugs the row's height. See [HStack](../gum-jsx-docs/docs/elements/text/HStack.md)
 for a runnable mixed row; try different viewport widths. For plain JSX text,
 outer blank lines and common indentation are removed automatically. Internal
 text newlines still become line breaks; keep each paragraph on one content line
@@ -598,7 +623,7 @@ even without a budget, where content can overflow a zero allocation.
 `grow={1}` gives an unsized item an equal share of remaining space alongside
 other such items, subject to limits. `basis="auto" grow={1}` adds equal surplus
 to potentially unequal natural bases. See the runnable
-[growth bases example](../gum-jsx-docs/topics/code/stack_basis.jsx).
+[growth bases example](../gum-jsx-docs/docs/gallery/code/stack_basis.jsx).
 `width={0.5}` instead means half the stack's **full established
 width**, before subtracting gaps. Two half-width children plus a gap overflow
 unless shrinking is enabled. A fraction used as `basis` follows the same rule.
@@ -721,9 +746,9 @@ its region. Use a positioned `Fit` when the intent is to scale a completed drawi
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
 See the [Group implementation](./src/elems/group.ts) and the
-[canvas](../gum-jsx-docs/elements/text/Group.md),
-[anchors](../gum-jsx-docs/topics/text/group_anchors.md), and
-[clipping](../gum-jsx-docs/topics/text/group_clip.md) examples. Stage 6(a) covers
+[canvas](../gum-jsx-docs/docs/elements/text/Group.md),
+[anchors](../gum-jsx-docs/docs/gallery/text/group_anchors.md), and
+[clipping](../gum-jsx-docs/docs/gallery/text/group_clip.md) examples. Stage 6(a) covers
 this positioned canvas. Wrapping stacks, content-sized overlays, grid tracks, and
 the optional common-height figure policy remain later work.
 
@@ -781,7 +806,7 @@ For exact spaces or blank lines, use an explicit string with `whitespace="pre"`,
 such as `<Text whitespace="pre">{'  Revenue  \n'}</Text>`. The whitespace prop
 controls layout after parsing; it does not disable source normalization. Element
 containers and text stacks ignore blank strings between children. See the
-[JSX reference](../gum-jsx-docs/topics/text/JSX.md#jsx-whitespace) for more examples.
+[JSX reference](../gum-jsx-docs/docs/gallery/text/JSX.md#jsx-whitespace) for more examples.
 
 Automatic hyphenation, emergency word splitting, full paragraph
 bidi, fallback font chains, and color emoji are outside this stage's coverage.
@@ -880,7 +905,7 @@ allowed: `<Line from={[px(12), 0.5]} to={[1, 0.5]} />`. `zip(xs, ys)` can be pas
 directly as `points`. Callbacks and generated geometry retain named `{x,y}` records.
 TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengths;
 `Point` and `Position` remain record types. See the
-[point values reference](../gum-jsx-docs/topics/text/PointValues.md) and its runnable example.
+[point values reference](../gum-jsx-docs/docs/gallery/text/PointValues.md) and its runnable example.
 
 ```jsx
 <Path width={px(120)} height={px(60)} stroke_width={px(2)}
@@ -915,11 +940,11 @@ original public utility set is available alongside additional Math aliases,
 
 | Group | Reference and examples |
 |---|---|
-| Scalars, reductions, interpolation | [Math helpers](../gum-jsx-docs/topics/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
-| Sequences and arrays | [Arrays](../gum-jsx-docs/topics/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
-| Vector and complex arithmetic | [Vectors](../gum-jsx-docs/topics/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
-| Color interpolation | [Colors](../gum-jsx-docs/topics/text/Colors.md): interp, palette |
-| Reproducible samples | [Random](../gum-jsx-docs/topics/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
+| Scalars, reductions, interpolation | [Math helpers](../gum-jsx-docs/docs/gallery/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
+| Sequences and arrays | [Arrays](../gum-jsx-docs/docs/gallery/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
+| Vector and complex arithmetic | [Vectors](../gum-jsx-docs/docs/gallery/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
+| Color interpolation | [Colors](../gum-jsx-docs/docs/gallery/text/Colors.md): interp, palette |
+| Reproducible samples | [Random](../gum-jsx-docs/docs/gallery/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
 
 `range` excludes its stop; `linspace` includes its endpoint by default and keeps
 the existing 101-sample default. Pass false as its fourth argument for periodic
@@ -935,7 +960,7 @@ Each `evaluate` call owns a fresh random stream, defaulting to seed 42; pass
 share a separate host stream; `new RNG(seed)` creates an independent one.
 `integer` excludes its upper bound. Layout and rendering never consume random
 samples, so resizing preserves the data. See the
-[migration notes](../gum-jsx-docs/topics/text/Migration.md#numeric-helpers) for
+[migration notes](../gum-jsx-docs/docs/gallery/text/Migration.md#numeric-helpers) for
 differences from the original helpers.
 
 ## Graphs and plotting
@@ -966,10 +991,10 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Capability | Elements / reference |
 |---|---|
 | Curves, points, fills, arrows | CoordLine, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
-| Plot composition | [Plot](../gum-jsx-docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
+| Plot composition | [Plot](../gum-jsx-docs/docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
-| Sampling | [Sampling](../gum-jsx-docs/topics/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
+| Sampling | [Sampling](../gum-jsx-docs/docs/gallery/text/Sampling.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
@@ -983,7 +1008,7 @@ Clearance uses the resolved shaft stroke, cap style, and head width after data
 mapping. Original head tips, unheaded endpoints, and inferred limits stay fixed.
 Short terminal segments are consumed without reversing the shaft; if the whole
 route is consumed, only the heads remain. Field arrows share the same rule.
-See the [cap comparison](../gum-jsx-docs/topics/code/arrow_caps.jsx) for thick straight, curved, and
+See the [cap comparison](../gum-jsx-docs/docs/gallery/code/arrow_caps.jsx) for thick straight, curved, and
 rounded arrows.
 
 Tick counts are targets using 1/2/5 intervals. Explicit ticks may be numbers or
@@ -1001,7 +1026,7 @@ defaults to 101. SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
-and [coordinate helpers](../gum-jsx-docs/topics/text/Coordinates.md) can also be
+and [coordinate helpers](../gum-jsx-docs/docs/gallery/text/Coordinates.md) can also be
 used directly. `static normalize(input)` consumes raw input once before source
 defaults are merged; `Element<SourceProps, InputProps>` types the two separately.
 The same hook is available through define_element's fourth options argument.
@@ -1054,9 +1079,9 @@ straight routes via `curve={false}`, rounded routes via `radius`, and optional
 `gap` clearance. Equal endpoint IDs produce a self loop. Duplicate or missing IDs
 fail during layout. Node placement and obstacle avoidance remain explicit.
 
-See [Network](../gum-jsx-docs/elements/text/Network.md),
-[Edge](../gum-jsx-docs/elements/text/Edge.md), and the
-[transformed connection example](../gum-jsx-docs/topics/code/network_connections.jsx).
+See [Network](../gum-jsx-docs/docs/elements/text/Network.md),
+[Edge](../gum-jsx-docs/docs/elements/text/Edge.md), and the
+[transformed connection example](../gum-jsx-docs/docs/gallery/code/network_connections.jsx).
 
 ## Scoped component props
 
@@ -1077,7 +1102,8 @@ dashes or underscores; direct JavaScript uses underscores:
 | Plot, BarPlot | `tick_`, `label_`, `title_`, `xlabel_`, `ylabel_` | Tick styles and generated text options |
 | Plot, BarPlot | `grid_`, `xgrid_`, `ygrid_`, `legend_` | Mesh/Legend options, including `legend_label_font_size` |
 | Legend | `label_` | Generated label TextOptions |
-| TitleBox, TitleFrame, Slide | `title_` | Generated title TextOptions |
+| TitleBox, Slide | `title_` | Generated title TextOptions |
+| TitleFrame | `title_` | Title text and box styling; `title_position` defaults to centered across the top border |
 | TextFigure | `caption_` | Generated caption TextOptions |
 
 TextOptions includes styles, sizing, wrapping, whitespace, and text alignment;
@@ -1101,7 +1127,7 @@ prefix, followed by the remaining props, without mutating the input. The longest
 matching prefix wins; optional exact `keep` keys stay in the remaining props.
 Joining adds a prefix to each key. Values remain unmodified, including units and
 callbacks. `Prefixed<'label', TextOptions>` derives the corresponding TypeScript
-prop names and value types. See [Custom elements](../gum-jsx-docs/topics/text/CustomElements.md).
+prop names and value types. See [Custom elements](../gum-jsx-docs/docs/gallery/text/CustomElements.md).
 
 Scopes are constructor-input syntax. `static defaults` still contains canonical
 source props and merges after normalization; for example Arrow defaults use

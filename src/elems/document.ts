@@ -1,21 +1,23 @@
 import type { LayoutQuery } from '../engine/pass'
+import { nonnegative } from '../lib/checks'
+import { resolve_alignment, definite_reference } from '../lib/composition'
 import { theme_color } from '../engine/theme'
-import { Box, box_layout } from './box'
+import { Box, Frame, box_layout } from './box'
 import type { BoxProps } from './box'
 import { Element, content_child, element_children } from '../engine/element'
 import type { Child, ElementProps } from '../engine/element'
-import { make_fragment, place_fragment } from '../engine/fragment'
-import { make_point, make_rect, resolve_insets, deflate_size } from '../engine/geometry'
+import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
+import { make_point, make_rect, make_size, make_insets, resolve_insets, deflate_size } from '../engine/geometry'
 import type { InsetSpec } from '../engine/geometry'
 import { graph_size } from './graph'
-import { exact, make_request } from '../engine/layout'
+import { available, exact, make_request, deflate_request, prepare_request, finish_size } from '../engine/layout'
 import { HStack, VStack, stack_layout } from './stack'
 import type { StackProps } from './stack'
 import { scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Text, Span } from './text'
 import type { TextOptions } from './text'
-import { em, px } from '../engine/units'
+import { em, px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 import { draw_rect } from '../engine/drawing'
 
@@ -26,6 +28,17 @@ type TextFigureProps = BoxProps & Prefixed<'caption', TextOptions> & Readonly<{
 }>
 type TitleBoxProps = BoxProps & Prefixed<'title', TextOptions>
   & Readonly<{ title?: Child; title_style?: TextOptions; gap?: Length }>
+type TitleFrameTitleStyle = TextOptions & Pick<BoxProps,
+  'padding' | 'border_width' | 'border_color' | 'background' | 'radius' | 'align'>
+type TitleFrameProps = BoxProps & Prefixed<'title', TitleFrameTitleStyle> & Readonly<{
+  title?: Child; title_style?: TitleFrameTitleStyle; gap?: Length
+  title_position?: 'start' | 'center' | 'end' | number
+  frame_aspect?: number
+}>
+type TitleFrameData = BoxProps & Readonly<{
+  title_box?: Element; title_position?: TitleFrameProps['title_position']; gap?: Length
+  frame_aspect?: number
+}>
 type SlideProps = ElementProps & Prefixed<'title', TextOptions> & Readonly<{
   title?: Child; title_style?: TextOptions; padding?: InsetSpec
   gap?: Length; background?: string; clip?: boolean
@@ -119,8 +132,76 @@ class TitleBox extends Element<BoxProps, TitleBoxProps> {
   static layout = box_layout
 }
 
-class TitleFrame extends TitleBox {
-  static defaults: Partial<BoxProps> = { border_width: px(1) }
+class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
+  static defaults: Partial<TitleFrameProps> = { padding: em(0.75), border_width: px(1) }
+  static normalize(input: TitleFrameProps): TitleFrameData {
+    const { title, title_style = {}, title_position = 'center', gap = em(0.6), children, ...props }
+      = scope_props(input, ['title'], ['title_position'])
+    const { padding = [em(0.6), em(0.3)], border_width = props.border_width,
+      border_color = props.border_color, background = props.background,
+      radius = em(0.3), align = 'center', font_size, ...text } = title_style
+    return { ...props, gap, title_position,
+      children: new VStack({ gap, align: 'stretch', children: text_children(children) }),
+      title_box: title == null ? undefined : new Frame({
+        width: 'fit', padding, border_width, border_color, background, radius, align, font_size,
+        children: text_element(title, text),
+      }),
+    }
+  }
+  static layout(props: TitleFrameData, query: LayoutQuery) {
+    const frame_aspect = props.frame_aspect === undefined ? undefined
+      : nonnegative(props.frame_aspect, `${query.path}.frame_aspect`)
+    if (frame_aspect === 0) throw new RangeError(`${query.path}.frame_aspect must be positive`)
+    if (!props.title_box) {
+      const sizing = { ...query.sizing, aspect: query.sizing.aspect ?? frame_aspect }
+      return box_layout(props, { ...query, sizing, request: prepare_request(query.request, sizing) })
+    }
+    const position = resolve_alignment(props.title_position ?? 'center').x
+    if (typeof position !== 'number') throw new TypeError('Title position must select a point')
+    const fixed = definite_reference(query.request, query.sizing)
+    const title = query.child(props.title_box, make_request({
+      width: query.request.width.kind === 'natural' ? query.request.width : available(query.request.width.value),
+    }), fixed, 1)
+    const half = title.size.height / 2
+    const padding = resolve_insets(props.padding,
+      { font_size: query.style.font_size, reference: query.reference, path: query.path })
+    const gap = nonnegative(resolve_length(props.gap ?? em(0.6), {
+      font_size: query.style.font_size,
+      fraction: fixed.height,
+    }, `${query.path}.gap`), 'gap')
+    const body_request = deflate_request(query.request, make_insets({ top: half }))
+    const height = query.sizing.height
+    const body_sizing = { ...query.sizing,
+      aspect: frame_aspect,
+      width: { ...query.sizing.width,
+        min: Math.min(query.sizing.width.max, Math.max(query.sizing.width.min, title.size.width)) },
+      height: { ...height,
+        preferred: height.preferred === undefined ? undefined : Math.max(0, height.preferred - half),
+        min: Math.max(0, height.min - half), max: Math.max(0, height.max - half) },
+    }
+    // The generic aspect belongs to the complete element. Only frame_aspect
+    // applies to the bordered body, whose allocation excludes the title overhang.
+    const layout_body = (request = body_request) => box_layout({ ...props, padding: {
+      left: px(padding.left), right: px(padding.right), bottom: px(padding.bottom),
+      top: px(Math.max(padding.top, half + gap)),
+    } }, { ...query, request: prepare_request(request, body_sizing), sizing: body_sizing },
+    size => make_rect((size.width - title.size.width) * position, 0, title.size.width, half))
+    let body = layout_body()
+    const measured = make_size(body.size.width, body.size.height + half)
+    const size = finish_size(measured, query.request, query.sizing)
+    // A natural outer aspect can add space after measurement. Redraw the body
+    // at that allocation so its border and aligned content follow the final box.
+    const body_height = Math.max(0, size.height - half)
+    if (measured.width !== size.width || measured.height !== size.height) {
+      body = layout_body(make_request({ width: exact(size.width), height: exact(body_height) }))
+    }
+    return make_fragment({ size,
+      guides: transform_guides(body.guides, half),
+      content: body.content && make_rect(body.content.x, body.content.y + half, body.content.width, body.content.height),
+      children: [place_fragment(body, make_point(0, half)),
+        place_fragment(title, make_point((size.width - title.size.width) * position, 0))],
+    })
+  }
 }
 
 class Bullets extends Element<StackProps, BulletsProps> {
@@ -176,4 +257,4 @@ class Slide extends Element<SlideData, SlideProps> {
 
 export { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
   text_element, text_children }
-export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, BulletsProps, SlideProps }
+export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, TitleFrameProps, TitleFrameTitleStyle, BulletsProps, SlideProps }
