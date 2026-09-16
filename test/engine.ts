@@ -73,7 +73,11 @@ const tests: Record<string, () => void> = {
     assert.equal(child.props.fill, '#e66b45')
     const fragment = new LayoutPass().layout(root)
     assert.deepEqual(fragment.children[0].fragment.size, { width: 80, height: 32 })
-    assert.throws(() => evaluate('return 42'), /one next Element/)
+    assert.equal(evaluate('return 42'), 42)
+    for (const value of ['hello', false, 0, null, undefined, { answer: 42 }, [1, 2], () => 42]) {
+      assert.equal(evaluate('return value', { scope: { value } }), value)
+    }
+    assert.equal(evaluate('const value = 42'), undefined)
     assert.throws(() => evaluate('<Rect>'), /./)
   },
 

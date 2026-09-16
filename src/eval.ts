@@ -40,8 +40,8 @@ import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, 
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>
 
-// Evaluation constructs descriptions only. Component functions can return other elements.
-function evaluate(code: string, options: EvaluateOptions = {}): Element {
+// Evaluation returns the source's result unchanged, without performing layout.
+function evaluate(code: string, options: EvaluateOptions = {}): any {
   const { scope = {}, name = 'gum.jsx', seed } = options
   const rng = new RNG(seed)
   const bindings = {
@@ -65,9 +65,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): Element {
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...scope,
   }
-  const result = runJSX(code, bindings, false, name)
-  if (!(result instanceof Element)) throw new TypeError('JSX must return one next Element')
-  return result
+  return runJSX(code, bindings, false, name)
 }
 
 export { evaluate }
