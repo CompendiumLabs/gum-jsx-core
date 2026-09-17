@@ -31,10 +31,11 @@ const tests: Record<string, () => void> = {
       </Svg>
     `))
     assert.equal(fragment.draw.length, 0)
-    assert.equal(named(fragment, 'Border').draw[0]?.stroke, 'white')
-    assert.equal(named(fragment, 'Rect').draw[0]?.stroke, 'white')
+    assert.equal(named(fragment, 'Border').draw[0]?.stroke, THEMES.dark.foreground)
+    assert.equal(named(fragment, 'Rect').draw[0]?.stroke, THEMES.dark.foreground)
     const text = nodes(fragment).filter(node => node.name === 'Text')
-    assert.deepEqual([...new Set(drawings(text[0]!).map(draw => draw.fill))], ['white', 'black'])
+    assert.deepEqual([...new Set(drawings(text[0]!).map(draw => draw.fill))],
+      [THEMES.dark.foreground, THEMES.light.foreground])
     assert.ok(drawings(text[1]!).every(draw => draw.fill === 'tomato'))
     assert.ok(!render_svg(fragment).includes('theme:'))
   },
@@ -46,8 +47,8 @@ const tests: Record<string, () => void> = {
     const light = new Svg({ theme: 'light', children: child })
     const a = pass.layout(dark), b = pass.layout(light)
     assert.notEqual(named(a, 'Text'), named(b, 'Text'))
-    assert.equal(drawings(named(a, 'Text'))[0]?.fill, 'white')
-    assert.equal(drawings(named(b, 'Text'))[0]?.fill, 'black')
+    assert.equal(drawings(named(a, 'Text'))[0]?.fill, THEMES.dark.foreground)
+    assert.equal(drawings(named(b, 'Text'))[0]?.fill, THEMES.light.foreground)
     assert.equal(named(a, 'HMesh').draw[0]?.stroke, THEMES.dark.grid)
     assert.equal(named(b, 'HMesh').draw[0]?.stroke, THEMES.light.grid)
     assert.equal(pass.layout(dark), a)
@@ -71,7 +72,7 @@ const tests: Record<string, () => void> = {
     }))
     assert.equal(drawings(named(fragment, 'Text'))[0]?.fill, 'red')
     assert.equal(named(fragment, 'Rect').draw[0]?.stroke, 'navy')
-    assert.equal(named(fragment, 'Dot').draw[0]?.fill, 'black')
+    assert.equal(named(fragment, 'Dot').draw[0]?.fill, THEMES.light.foreground)
     const dark = resolve_style({ theme: 'dark', fill: 'theme:accent' })
     assert.equal(resolve_style({ theme: 'light' }, dark).fill, THEMES.light.accent)
     assert.equal(resolve_style({}, { ...dark, color: 'purple' }).color, 'purple')
@@ -83,13 +84,13 @@ const tests: Record<string, () => void> = {
       const colors = THEMES[theme]
       const fragment = pass.layout(new Svg({ theme, width: px(480), height: px(320),
         children: new Slide({ title: 'Results', children: new BarPlot({ values: [1, 3],
-          border_width: px(1), title: 'Counts', legend: [{ label: 'Series' }],
+          grid: true, border_width: px(1), title: 'Counts', legend: [{ label: 'Series' }],
         }) }),
       }))
       assert.equal(named(fragment, 'Slide').draw.length, 0)
       assert.equal(named(fragment, 'HMesh').draw[0]?.stroke, colors.grid)
-      assert.equal(named(fragment, 'HAxis').draw[0]?.stroke, colors.muted)
-      assert.equal(named(fragment, 'Bars').draw[0]?.fill, colors.accent)
+      assert.equal(named(fragment, 'HAxis').draw[0]?.stroke, colors.foreground)
+      assert.equal(named(fragment, 'Bars').draw[0]?.fill, colors.area)
       assert.equal(named(fragment, 'PlotBorder').draw[0]?.stroke, colors.border)
       assert.equal(named(fragment, 'Legend').draw.length, 0)
       assert.equal(named(named(fragment, 'Legend'), 'Border').draw[0]?.stroke, colors.border)
@@ -108,7 +109,7 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass()
     const fragment = pass.layout(new Svg({ theme: 'dark', background: 'none',
       children: new BarPlot({ width: px(300), height: px(200), values: [1, 2],
-        color: 'red', stroke: 'green', fill: 'orange', grid_style: { stroke: 'purple' },
+        color: 'red', stroke: 'green', fill: 'orange', grid: true, grid_style: { stroke: 'purple' },
         border_width: px(1), border_color: 'pink', background: 'navy',
         legend: [{ label: 'Explicit', color: 'yellow' }],
         legend_style: { background: 'beige', border_color: 'brown' },

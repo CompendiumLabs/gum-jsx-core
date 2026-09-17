@@ -102,7 +102,7 @@ const tests: Record<string, () => void> = {
       xaxis: { label_style: { color: 'purple', font_weight: 700 }, tick_style: { stroke_dasharray: [px(2)] } },
       xaxis_label_color: 'navy', xaxis_tick_stroke_width: px(4), xaxis_tick_size: px(8),
       xlabel_color: 'purple', ylabel_font_weight: 700, title_wrap: false,
-      grid_style: { stroke: 'gray', stroke_width: px(2) }, xgrid_stroke: 'blue',
+      grid: true, grid_style: { stroke: 'gray', stroke_width: px(2) }, xgrid_stroke: 'blue',
       legend: [{ label: 'Sample' }], legend_style: { label_color: 'red', label_style: { font_size: px(10) } },
       legend_label_style: { color: 'green' }, legend_label_font_weight: 700 })
     const [x, y] = plot.props.axes as readonly HAxis[]
