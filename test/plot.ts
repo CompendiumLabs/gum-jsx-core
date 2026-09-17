@@ -171,6 +171,23 @@ const tests: Record<string, () => void> = {
     assert.ok(!svg.includes('outside'))
   },
 
+  'axis label anchors attach rotated labels by a selected edge'() {
+    const axis = new HAxis({ lim: [0, 1], ticks: [[0.5, 'Category']], rotate: -45,
+      tick_size: px(0), label_offset: px(0), label_anchor: ['end', 'start'] })
+    assert.deepEqual(axis.props.label_style?.anchor, ['end', 'start'])
+    const fragment = new LayoutPass().layout(axis, fixed)
+    const label = fragment.children[0]
+    near(label.offset.x + label.fragment.size.width, 100)
+    near(label.offset.y, 100)
+
+    const plot = new Plot({ xlim: [0, 1], xticks: [[0.5, 'Category']],
+      xaxis_rotate: -45, xaxis_label_anchor: ['end', 'start'] })
+    assert.deepEqual((plot.props.axes[0] as HAxis).props.label_style?.anchor, ['end', 'start'])
+    assert.throws(() => new LayoutPass().layout(new HAxis({
+      ticks: [[0.5, 'Category']], label_anchor: 'stretch' as unknown as 'start',
+    }), fixed), /label anchor selects a point/)
+  },
+
   'axes can point ticks independently from labels'() {
     const axis = new HAxis({ lim: [0, 1], ticks: [0.5], side: 'bottom',
       tick_side: 'inner', tick_size: px(8), label_offset: px(4) })

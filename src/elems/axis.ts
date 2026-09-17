@@ -1,4 +1,5 @@
 import { finite, nonnegative } from '../lib/checks'
+import { resolve_alignment } from '../lib/composition'
 import { copy_limit, infer_coordinates, map_axis } from '../engine/coordinates'
 import type { Limit } from '../engine/coordinates'
 import { draw_path } from '../engine/drawing'
@@ -75,7 +76,11 @@ function axis_data(input: AxisProps): AxisData {
     const value = typeof tick === 'number' ? tick : tick[0]
     const content = typeof tick === 'number' ? format(tick, i) : tick[1]
     const text = content instanceof Element ? content : new Text({ text: String(content), ...props.label_style })
-    const label = props.rotate ? new Rotate({ angle: props.rotate, children: text }) : text
+    // Placement metadata belongs to the label seen by Axis. Preserve it when
+    // rotation introduces a wrapper around generated or supplied content.
+    const label = props.rotate
+      ? new Rotate({ angle: props.rotate, anchor: text.props.anchor, children: text })
+      : text
     return { value, label }
   })
   return { ...props, lim, items }
@@ -128,8 +133,15 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
     const { width, height } = fragment.size
     const label_tick_size = tick_side === side ? tick_size : 0
     const a = along(item.value), b = cross + sign * (label_tick_size + gap)
-    const offset = horizontal ? make_point(a - width / 2, b - (positive ? 0 : height))
-      : make_point(b - (positive ? 0 : width), a - height / 2)
+    const fallback = horizontal
+      ? { x: 0.5, y: positive ? 0 : 1 }
+      : { x: positive ? 0 : 1, y: 0.5 }
+    const anchor = resolve_alignment(item.label.props.anchor ?? fallback, `${query.path}.label_anchor`)
+    if (typeof anchor.x !== 'number' || typeof anchor.y !== 'number') {
+      throw new TypeError('Axis label anchor selects a point')
+    }
+    const position = horizontal ? make_point(a, b) : make_point(b, a)
+    const offset = make_point(position.x - width * anchor.x, position.y - height * anchor.y)
     return place_fragment(fragment, offset)
   }) : []
   return make_fragment({ size, draw, children })
