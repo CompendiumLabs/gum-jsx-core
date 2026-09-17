@@ -1,3 +1,5 @@
+import { white, black, blue, lightgray, darkgray, gray } from '../lib/constants'
+
 type ThemeName = 'light' | 'dark'
 type ThemePalette = Readonly<{
   foreground: string
@@ -11,12 +13,22 @@ type ThemePalette = Readonly<{
 
 const THEMES: Readonly<Record<ThemeName, ThemePalette>> = Object.freeze({
   light: Object.freeze({
-    foreground: 'black', text: '#334155', muted: '#64748b',
-    border: '#cbd5e1', grid: '#e2e8f0', accent: '#2563eb', area: '#dbeafe',
+    foreground: black,
+    text: black,
+    border: black,
+    muted: darkgray,
+    grid: gray,
+    accent: blue,
+    area: blue,
   }),
   dark: Object.freeze({
-    foreground: 'white', text: '#e2e8f0', muted: '#94a3b8',
-    border: '#475569', grid: '#334155', accent: '#60a5fa', area: '#1e3a5f',
+    foreground: white,
+    text: white,
+    border: white,
+    muted: lightgray,
+    grid: gray,
+    accent: blue,
+    area: blue,
   }),
 })
 

@@ -75,14 +75,19 @@ const tests: Record<string, () => void> = {
 
   'axis scopes keep owner geometry and typography while accepting text options'() {
     const base = { ticks: [[0, 'First'], [1, 'Last']] as const,
-      tick_size: px(8), label_offset: px(6), line_height: em(1.7), font_size: px(13) }
+      tick_size: px(8), tick_side: 'top' as const, label_offset: px(6),
+      line_height: em(1.7), font_size: px(13) }
     const axis = new HAxis({ ...base, line_stroke: 'blue', tick_stroke_width: px(3),
       label_color: 'red', label_wrap: false, label_text_align: 'right' })
     assert.equal(svg(axis), svg(new HAxis({ ...base, line_style: { stroke: 'blue' },
       tick_style: { stroke_width: px(3) }, label_style: { color: 'red', wrap: false, text_align: 'right' } })))
     assert.deepEqual(axis.props.line_height, em(1.7))
     assert.deepEqual(axis.props.tick_size, px(8))
+    assert.equal(axis.props.tick_side, 'top')
     assert.deepEqual(axis.props.label_offset, px(6))
+    const arrow = new HAxis({ arrow: true, arrow_style: { open: true, stroke: 'red' },
+      arrow_open: false, arrow_curve: 0.7 })
+    assert.deepEqual(arrow.props.arrow_style, { open: false, stroke: 'red', curve: 0.7 })
     assert.equal((axis.props.items[0].label as Text).props.wrap, false)
     assert.equal(svg(new Label({ children: 'A label', label_color: 'red', label_wrap: false })),
       svg(new Label({ children: 'A label', label_style: { color: 'red', wrap: false } })))

@@ -42,7 +42,7 @@ type PlotProps = GraphProps & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
   & Prefixed<'tick', StyleSpec> & Prefixed<'label' | 'title' | 'xlabel' | 'ylabel', TextOptions>
   & Prefixed<'grid' | 'xgrid' | 'ygrid', MeshProps> & Prefixed<'legend', LegendOptions> & Readonly<{
   axis?: boolean; xaxis?: boolean | AxisProps; yaxis?: boolean | AxisProps
-  xticks?: TickSpec; yticks?: TickSpec; grid?: boolean
+  xticks?: TickSpec; yticks?: TickSpec; grid?: boolean; xgrid?: boolean; ygrid?: boolean
   title?: string | Element; xlabel?: string | Element; ylabel?: string | Element
   legend?: readonly LegendEntry[] | Element
   margin?: InsetSpec; label_gap?: Length; background?: string; plot_background?: string
@@ -105,9 +105,10 @@ function plot_data(input: PlotProps): PlotData {
       axis === 'x' ? xprops : yprops)
     const lim = axis === 'x' ? coordinates.xlim : coordinates.ylim
     const ticks = (axis === 'x' ? props.xticks : props.yticks) ?? options.ticks ?? 5
-    const args = { ...options, lim, ticks }
+    const args = { lim, ticks, ...options }
     if (option) axes.push(axis === 'x' ? new HAxis(args) : new VAxis(args))
-    if (props.grid ?? true) {
+    const agrid = axis === 'x' ? props.xgrid : props.ygrid
+    if (props.grid ?? agrid ?? false) {
       const args = { interval: options.interval, ...grid_style,
         ...(axis === 'x' ? xgrid_style : ygrid_style), lim, ticks }
       meshes.push(axis === 'x' ? new HMesh(args) : new VMesh(args))
@@ -116,7 +117,7 @@ function plot_data(input: PlotProps): PlotData {
   // Callback-bearing options have been consumed by the part constructors.
   return { ...props, coordinates, axes, meshes,
     title_element: title === undefined ? undefined : text_element(title,
-      { font_size: em(1.35), font_weight: 700, ...title_style }),
+      { font_size: em(1.35), ...title_style }),
     x_label: xlabel === undefined ? undefined : text_element(xlabel, { ...label_style, ...xlabel_style }),
     y_label: ylabel === undefined ? undefined : new Rotate({ angle: -90,
       children: text_element(ylabel, { ...label_style, ...ylabel_style }) }),
@@ -189,7 +190,6 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
 }
 
 class Plot extends Element<PlotData, PlotProps> {
-  static defaults: Partial<PlotData> = { font_size: px(12), color: 'theme:text', stroke: 'theme:muted' }
   static normalize = plot_data
   static data_bounds() {
     return null
@@ -198,14 +198,13 @@ class Plot extends Element<PlotData, PlotProps> {
 }
 
 class BarPlot extends Element<PlotData, BarPlotProps> {
-  static defaults: Partial<PlotData> = { font_size: px(12), color: 'theme:text', stroke: 'theme:muted' }
   static data_bounds() {
     return null
   }
   static normalize({ values, positions, bases, bar_width, styles, direction, radius, children, ...props }: BarPlotProps): PlotData {
     return plot_data({
       ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, radius,
-        fill: props.fill ?? 'theme:accent' }),
+        fill: props.fill ?? 'theme:area' }),
         ...element_children(children)],
     })
   }

@@ -8,6 +8,7 @@ import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point } from '../engine/geometry'
 import { make_request, shape_size } from '../engine/layout'
 import { arrow_draw, line_path, resolve_arrow_head } from './marks'
+import type { ArrowHeadStyle } from './marks'
 import { Rotate } from './placement'
 import type { Side } from './placement'
 import { scope_props, merge_scoped } from '../lib/props'
@@ -23,14 +24,18 @@ import type { LayoutQuery } from '../engine/pass'
 
 type Tick = number | readonly [number, string | number | Element]
 type TickSpec = number | readonly Tick[]
+type TickSide = Side | 'inner' | 'outer'
 type AxisOptions = ElementProps & Readonly<{
   lim?: Limit; ticks?: TickSpec; interval?: number; side?: Side; at?: number
-  tick_size?: Length; label_offset?: Length; rotate?: number
+  tick_size?: Length; tick_side?: TickSide; label_offset?: Length; rotate?: number
   labels?: boolean; line?: boolean; arrow?: boolean
+  arrow_size?: Length; arrow_width?: number
   format?: (value: number, index: number) => string
   line_style?: StyleSpec; tick_style?: StyleSpec; label_style?: TextOptions
+  arrow_style?: ArrowHeadStyle
 }>
-type AxisProps = AxisOptions & Prefixed<'line' | 'tick', StyleSpec> & Prefixed<'label', TextOptions>
+type AxisProps = AxisOptions & Prefixed<'line' | 'tick', StyleSpec>
+  & Prefixed<'label', TextOptions> & Prefixed<'arrow', ArrowHeadStyle>
 type AxisItem = Readonly<{ value: number; label: Element }>
 type AxisData = Omit<AxisOptions, 'ticks' | 'format'> & Readonly<{ items: readonly AxisItem[]; lim: Limit }>
 type LabelProps = Omit<AxisProps, 'ticks'> & Readonly<{ value?: number; label?: string | number | Element }>
@@ -52,13 +57,15 @@ function tick_values(ticks: TickSpec = 5, lim: Limit = [0, 1], interval?: number
 }
 
 function axis_props<Props extends AxisProps>(props: Props): Props {
-  return scope_props(props, ['line', 'tick', 'label'], ['line_height', 'tick_size', 'label_offset'])
+  return scope_props(props, ['line', 'tick', 'label', 'arrow'],
+    ['line_height', 'tick_size', 'tick_side', 'label_offset', 'arrow_size', 'arrow_width'])
 }
 
 // Normalize each specificity level before merging so flat and nested spellings
 // obey the same precedence, retaining unrelated fields of shared part options.
 function merge_axis_props(...layers: readonly (AxisProps | undefined)[]): AxisOptions {
-  return merge_scoped(layers, ['line', 'tick', 'label'], ['line_height', 'tick_size', 'label_offset'])
+  return merge_scoped(layers, ['line', 'tick', 'label', 'arrow'],
+    ['line_height', 'tick_size', 'tick_side', 'label_offset', 'arrow_size', 'arrow_width'])
 }
 
 function axis_data(input: AxisProps): AxisData {
@@ -81,6 +88,14 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
   const { side = 'bottom', lim, items } = props
   if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown axis side')
   const horizontal = side === 'top' || side === 'bottom', positive = side === 'bottom' || side === 'right'
+  const tick_side = props.tick_side === 'inner'
+    ? side === 'top' ? 'bottom' : side === 'right' ? 'left' : side === 'bottom' ? 'top' : 'right'
+    : props.tick_side === undefined || props.tick_side === 'outer' ? side : props.tick_side
+  if (horizontal ? tick_side !== 'top' && tick_side !== 'bottom'
+    : tick_side !== 'left' && tick_side !== 'right') {
+    throw new TypeError('Tick side must be parallel to the axis side')
+  }
+  const tick_positive = tick_side === 'bottom' || tick_side === 'right'
   const coord = query.coordinates ?? infer_coordinates([], horizontal ? { xlim: lim } : { ylim: lim })
   const extent = horizontal ? size.width : size.height
   const along = (value: number) => map_axis(value, horizontal ? coord.xlim : coord.ylim,
@@ -93,16 +108,17 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
   const basis = { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }
   const tick_size = nonnegative(resolve_length(props.tick_size ?? px(5), basis, 'tick_size'), 'tick_size')
   const gap = nonnegative(resolve_length(props.label_offset ?? px(4), basis, 'label_offset'), 'label_offset')
-  const sign = positive ? 1 : -1
+  const sign = positive ? 1 : -1, tick_sign = tick_positive ? 1 : -1
   const line_style = resolve_style(props.line_style, query.style)
   const paint = resolve_paint(line_style, size, query.path)
   const draw = mode === 'axis' && (props.line ?? true) ? arrow_draw(
     [point(along(lim[0]), cross), point(along(lim[1]), cross)], paint,
-    resolve_arrow_head({ head_size: px(props.arrow ? 7 : 0) }, size, line_style, query.path, paint),
-    { end_head: props.arrow }) : []
+    resolve_arrow_head({ head_size: props.arrow_size ?? px(7), head_width: props.arrow_width,
+      ...props.arrow_style }, size, line_style, query.path, paint),
+    { end_head: props.arrow ?? false }) : []
   if (mode !== 'labels' && tick_size) {
     const ticks = items.flatMap(item => line_path([
-      point(along(item.value), cross), point(along(item.value), cross + sign * tick_size),
+      point(along(item.value), cross), point(along(item.value), cross + tick_sign * tick_size),
     ]))
     const tick_paint = resolve_paint(resolve_style(props.tick_style, query.style), size, query.path)
     draw.push(draw_path(ticks, { ...tick_paint, fill: 'none' }))
@@ -110,7 +126,8 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
   const children = mode !== 'scale' && (props.labels ?? true) ? items.map((item, index) => {
     const fragment = query.child(item.label, make_request(), size, index, { coordinates: null })
     const { width, height } = fragment.size
-    const a = along(item.value), b = cross + sign * (tick_size + gap)
+    const label_tick_size = tick_side === side ? tick_size : 0
+    const a = along(item.value), b = cross + sign * (label_tick_size + gap)
     const offset = horizontal ? make_point(a - width / 2, b - (positive ? 0 : height))
       : make_point(b - (positive ? 0 : width), a - height / 2)
     return place_fragment(fragment, offset)
@@ -235,4 +252,4 @@ class Mesh2D extends Element<ElementProps, Mesh2DProps> {
 
 export { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D, tick_values, merge_axis_props }
-export type { Tick, TickSpec, AxisProps, LabelProps, MeshProps, Mesh2DProps }
+export type { Tick, TickSpec, TickSide, AxisProps, LabelProps, MeshProps, Mesh2DProps }

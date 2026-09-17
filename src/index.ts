@@ -95,7 +95,7 @@ export { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 export type { PerBar, BarStyle, BarProps, BarsProps } from './elems/bars'
 export { HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
-export type { Tick, TickSpec, AxisProps, LabelProps, MeshProps, Mesh2DProps } from './elems/axis'
+export type { Tick, TickSpec, TickSide, AxisProps, LabelProps, MeshProps, Mesh2DProps } from './elems/axis'
 export { Plot, BarPlot, Legend, OuterLabel } from './elems/plot'
 export type { PlotProps, BarPlotProps, LegendProps, LegendEntry, OuterLabelProps } from './elems/plot'
 export { linear_ticks, format_tick } from './lib/ticks'

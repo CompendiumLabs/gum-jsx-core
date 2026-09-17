@@ -171,6 +171,48 @@ const tests: Record<string, () => void> = {
     assert.ok(!svg.includes('outside'))
   },
 
+  'axes can point ticks independently from labels'() {
+    const axis = new HAxis({ lim: [0, 1], ticks: [0.5], side: 'bottom',
+      tick_side: 'inner', tick_size: px(8), label_offset: px(4) })
+    const fragment = new LayoutPass().layout(axis, fixed)
+    const tick = fragment.draw[1] as PathDraw
+    assert.deepEqual(tick.commands, [
+      { kind: 'M', x: 100, y: 100 }, { kind: 'L', x: 100, y: 92 },
+    ])
+    assert.equal(fragment.children[0].offset.y, 104)
+    const plot = new Plot({ axis_tick_side: 'inner' })
+    assert.equal((plot.props.axes[0] as HAxis).props.tick_side, 'inner')
+    assert.equal((plot.props.axes[1] as HAxis).props.tick_side, 'inner')
+    new LayoutPass().layout(plot, fixed)
+    const jsx = evaluate('<HAxis ticks={[0.5]} tick-side="top" />')
+    const jsxTick = new LayoutPass().layout(jsx, fixed).draw[1] as PathDraw
+    assert.deepEqual(jsxTick.commands[1], { kind: 'L', x: 100, y: 95 })
+    assert.throws(() => new LayoutPass().layout(
+      new HAxis({ tick_side: 'left' }), fixed), /Tick side must be parallel/)
+  },
+
+  'axis arrows forward scoped head geometry, shape, and paint options'() {
+    const axis = new HAxis({ arrow: true, arrow_size: px(12), arrow_width: 1,
+      arrow_open: true, arrow_curve: 0.7, arrow_barb: 'left',
+      arrow_stroke: 'red', arrow_stroke_width: px(2) })
+    assert.deepEqual(axis.props.arrow_style, {
+      open: true, curve: 0.7, barb: 'left', stroke: 'red', stroke_width: px(2),
+    })
+    assert.deepEqual(axis.props.arrow_size, px(12))
+    assert.equal(axis.props.arrow_width, 1)
+    const fragment = new LayoutPass().layout(axis, fixed)
+    const head = fragment.draw[1] as PathDraw
+    assert.equal(head.fill, 'none')
+    assert.equal(head.stroke, 'red')
+    assert.equal(head.stroke_width, 2)
+    assert.ok(head.commands.some(command => command.kind === 'C'))
+    const plot = new Plot({ xaxis_arrow: true, xaxis_arrow_open: true })
+    assert.deepEqual((plot.props.axes[0] as HAxis).props.arrow_style, { open: true })
+    const jsx = evaluate('<HAxis arrow arrow-open arrow-barb="right" />')
+    assert.equal((jsx as HAxis).props.arrow_style?.open, true)
+    assert.equal((jsx as HAxis).props.arrow_style?.barb, 'right')
+  },
+
   'plot fills its viewport and reserves measured margins for titles and large tick labels'() {
     const plot = new Plot({ title: 'A long title that can wrap when the plot becomes narrow',
       xlabel: 'Elapsed time', ylabel: 'Revenue', xlim: [0, 2], ylim: [0, 1000000],
