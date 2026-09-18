@@ -34,29 +34,36 @@ const tests: Record<string, () => void> = {
       { width: 16, height: 16 })
   },
 
-  'fractional widths and gaps use the full stack even after flex shrinks each slot'() {
+  'fractional lengths refer to the stack length left after gaps'() {
     let calls = 0
     const Probe = define_element('Probe', (_, q) => {
       calls++
-      assert.deepEqual(q.reference, { width: 200, height: 40 })
-      assert.equal(q.sizing.width.preferred, 100)
+      assert.deepEqual(q.reference, { width: 180, height: 40 })
+      assert.equal(q.sizing.width.preferred, 90)
       assert.deepEqual(q.request.width, exact(90))
       return make_fragment({ size: finish_size(make_size(16, 16), q.request, q.sizing) })
     })
     const pass = new LayoutPass()
     const row = pass.layout(new HStack({ width: px(200), height: px(40), gap: 0.1,
-      children: [new Probe({ width: 0.5, shrink: 1 }), new Probe({ width: 0.5, shrink: 1 })] }))
+      children: [new Probe({ width: 0.5 }), new Probe({ width: 0.5 })] }))
     assert.equal(calls, 2)
     assert.equal(row.children[1].offset.x, 110)
+    assert.equal(row.overflow.right, 0)
     const equal = pass.layout(new HStack({ width: px(200), height: px(40), gap: 0.1,
       children: [new Rect({ basis: 0, grow: 1 }), new Rect({ basis: 0, grow: 1 })] }))
     assert.deepEqual(equal.children.map(child => child.fragment.size), [
       { width: 90, height: 40 }, { width: 90, height: 40 },
     ])
-    const fractions = pass.layout(new HStack({ width: px(200), gap: 0.1,
-      children: [new Rect({ basis: 0.5, stroke: 'none' }), new Rect({ basis: 0.5, stroke: 'none' })] }))
-    assert.deepEqual(fractions.children.map(child => child.fragment.size.width), [100, 100])
-    assert.equal(fractions.overflow.right, 20)
+    // The gap itself still resolves against the full stack; bases follow widths.
+    const uneven = pass.layout(new HStack({ width: px(200), gap: 0.1,
+      children: [new Rect({ basis: 0.3, stroke: 'none' }), new Rect({ basis: 0.7, stroke: 'none' })] }))
+    uneven.children.forEach((child, index) => near(child.fragment.size.width, [54, 126][index]))
+    near(uneven.children[1].offset.x, 74)
+    assert.equal(uneven.overflow.right, 0)
+    const column = pass.layout(new VStack({ width: px(40), height: px(300), gap: px(30),
+      children: [0.25, 0.25, 0.5].map(height => new Rect({ height, stroke: 'none' })) }))
+    assert.deepEqual(column.children.map(child => child.fragment.size.height), [60, 60, 120])
+    assert.equal(column.children[2].offset.y, 180)
   },
 
   'shrink is explicit, weighted by basis, and cannot consume required minima'() {

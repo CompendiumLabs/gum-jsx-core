@@ -107,9 +107,14 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const gap = nonnegative(resolve_length(props.gap ?? 0, {
     font_size: query.style.font_size, fraction: reference[main],
   }, `${query.path}.gap`), `${query.path}.gap`)
-  const items = element_children(props.children).map((element, index) =>
-    stack_item(element, index, main, query, reference, align))
-  const gaps = Math.max(0, items.length - 1) * gap
+  // Gaps are reserved like padding: child fractions along the main axis refer
+  // to the length the children can occupy, so fractions summing to one tile it.
+  const elements = element_children(props.children)
+  const gaps = Math.max(0, elements.length - 1) * gap
+  const inner: ReferenceBox = reference[main] === undefined ? reference
+    : Object.freeze({ ...reference, [main]: Math.max(0, reference[main] - gaps) })
+  const items = elements.map((element, index) =>
+    stack_item(element, index, main, query, inner, align))
   const fills = (item: Item) => item.align !== 'baseline' && fills_axis(item.align, item.sizing[cross])
   const stretching = items.some(fills)
 
@@ -133,7 +138,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const column_stretch = main === 'height' && stretching && cross_size === undefined
   function measure(item: Item, request: AxisRequest): Fragment {
     return query.child(item.element, make_request({ [main]: request, [cross]: cross_request(item) }),
-      reference, item.index)
+      inner, item.index)
   }
   for (const item of items) {
     if (item.basis === undefined) item.fragment = measure(item, natural())

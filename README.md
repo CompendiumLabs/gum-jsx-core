@@ -627,9 +627,10 @@ even without a budget, where content can overflow a zero allocation.
 other such items, subject to limits. `basis="auto" grow={1}` adds equal surplus
 to potentially unequal natural bases. See the runnable
 [growth bases example](../gum-jsx-docs/docs/gallery/code/stack_basis.jsx).
-`width={0.5}` instead means half the stack's **full established
-width**, before subtracting gaps. Two half-width children plus a gap overflow
-unless shrinking is enabled. A fraction used as `basis` follows the same rule.
+`width={0.5}` instead means half the stack's established width **after
+subtracting gaps**, which a stack reserves the way a Box reserves padding. Two
+half-width children tile a row with any gap. A fraction used as `basis` or as a
+main-axis limit follows the same rule.
 
 Length bases, preferred sizes, and limits resolve using the child's local font size;
 the gap uses the stack's font size. A fractional gap uses the stack's established
