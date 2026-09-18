@@ -11,6 +11,17 @@ import { probes } from './fixtures/contracts'
 
 // Test contracts at their boundaries and in small compositions, using literal results.
 const tests: Record<string, () => void> = {
+  'requests treat omitted, undefined, and null axes as natural'() {
+    const empty = make_request()
+    assert.deepEqual(empty, { width: natural(), height: natural() })
+    assert.deepEqual(make_request({ width: undefined, height: null }), empty)
+    assert.deepEqual(make_request({ width: null, height: exact(0) }), { width: natural(), height: exact(0) })
+    const budget: number | undefined = undefined
+    assert.deepEqual(make_request({ width: budget && available(budget), height: available(20) }),
+      make_request({ height: available(20) }))
+    assert.ok(Object.isFrozen(make_request({ width: null })))
+  },
+
   'lengths retain units and normalize without mutating source values'() {
     const source = { value: 2, unit: 'em' as const }
     const length = normalize_length(source)

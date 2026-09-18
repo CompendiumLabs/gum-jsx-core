@@ -55,7 +55,13 @@ function transformed_layout(props: ElementProps & { resize?: boolean }, query: L
   const resize = props.resize ?? true
   const size = finish_size(resize ? make_size(bounds.width, bounds.height) : fragment.size,
     query.request, query.sizing)
-  const offset = resize ? make_point(-bounds.x, -bounds.y) : make_point()
+  // Natural transformed bounds start at the local origin. If an exact parent
+  // allocation overrides that natural size, keep those bounds centered in the
+  // resulting frame instead of pinning them to its top-left corner.
+  const offset = resize ? make_point(
+    -bounds.x + (size.width - bounds.width) / 2,
+    -bounds.y + (size.height - bounds.height) / 2,
+  ) : make_point()
   // A horizontal guide remains representable through translation, scaling,
   // or a half turn. A tilted/vertical baseline has no single y coordinate.
   const guides = Math.abs(transform[1]) < 1e-12

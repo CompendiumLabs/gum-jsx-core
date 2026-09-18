@@ -5,7 +5,7 @@ import { arc_path, rounded_path, spline_path } from '../lib/curves'
 import { arrow_barb } from '../lib/arrows'
 import { draw_path } from '../engine/drawing'
 import type { Paint } from '../engine/drawing'
-import { Element, element_children } from '../engine/element'
+import { Element, content_child, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point, read_point } from '../engine/geometry'
@@ -18,6 +18,7 @@ import { prefix_split, scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Circle, is_position } from './shapes'
 import type { Position, PositionValue, Radius } from './shapes'
+import { Rotate, TransformBox } from './placement'
 import { resolve_paint, resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
 import { px, resolve_length } from '../engine/units'
@@ -57,6 +58,29 @@ type PointsProps = MarkProps & Readonly<{
 }>
 type Marker = Readonly<{ point: Position; size: PointSize; shape: Element }>
 type PointsData = MarkProps & Readonly<{ markers: readonly Marker[] }>
+
+const MARKER_TRANSFORMS = new Set([new Rotate().type.layout, new TransformBox().type.layout])
+const SIZED_MARKERS = new WeakMap<Element, Map<string, Element>>()
+
+// Point dimensions belong to the marker drawing, including when a transparent
+// transform wrapper naturally measures its child. Rebuild only the immutable
+// marker description; layout state and resolved geometry remain in LayoutPass.
+function sized_marker(shape: Element, width: number, height: number): Element {
+  const variants = SIZED_MARKERS.get(shape) ?? new Map<string, Element>()
+  SIZED_MARKERS.set(shape, variants)
+  const key = `${width},${height}`
+  const cached = variants.get(key)
+  if (cached) return cached
+  const child = MARKER_TRANSFORMS.has(shape.type.layout) ? content_child(shape.props.children) : undefined
+  const sized = new Element(shape.type, {
+    ...shape.props,
+    width: px(width),
+    height: px(height),
+    ...(child ? { children: sized_marker(child, width, height) } : {}),
+  })
+  variants.set(key, sized)
+  return sized
+}
 
 // New marks use ambient data coordinates inside Graph; space="local" opts out.
 // Without a Graph they use the same fractional/px/em geometry as ordinary shapes.
@@ -441,7 +465,8 @@ class Points extends Element<PointsData, PointsProps> {
         { font_size: query.style.font_size, fraction }, 'point_size'), 'point_size')
       const width = dimension(pair.x, paired ? size.width : Math.min(size.width, size.height))
       const height = dimension(pair.y, paired ? size.height : Math.min(size.width, size.height))
-      const fragment = query.child(marker.shape, make_request({ width: exact(width), height: exact(height) }),
+      const fragment = query.child(sized_marker(marker.shape, width, height),
+        make_request({ width: exact(width), height: exact(height) }),
         { width, height }, index, { coordinates: null })
       const center = point(marker.point)
       return place_fragment(fragment, make_point(center.x - width / 2, center.y - height / 2))

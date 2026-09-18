@@ -129,8 +129,10 @@ There is no `unit_size` or implicit layout scaling.
 | `available(n)` | Offer an advisory pixel budget; the measured result can exceed it. |
 | `exact(n)` | Allocate exactly this many pixels, recording excess content as overflow. |
 
-`make_request()` defaults both axes to natural. Numeric requests must be finite
-and nonnegative; zero is an exact value, not an absent dimension.
+`make_request()` defaults both axes to natural, and treats `undefined` or `null`
+axes as omitted so optional dimensions forward without conditional spreads.
+Numeric requests must be finite and nonnegative; zero is an exact value, not an
+absent dimension.
 
 ```ts
 import {
@@ -1145,6 +1147,21 @@ layout or font work. Definition
 IDs are allocated per render and reused for repeated placements of a shared clip;
 speculative layout queries cannot consume IDs. Supply distinct `id_prefix` values
 when embedding several generated documents inline in one page.
+
+`render_element(value, options)` is the host entry point above these stages. A
+bare element is wrapped in `Svg`; an existing `Svg` keeps its layout descriptor
+and props, with `options.defaults` spread beneath them and `options.overrides`
+above them, while `options.wrap` props reach only a generated viewport, such as
+preview bounds an explicit `Svg` should not inherit (undefined entries are
+ignored throughout). The viewport is laid out under
+`options.request` by `options.pass`, or by a new pass seeded with `options.fonts`
+or the core fonts, and serialized with the remaining `render_svg` options. Fonts
+given alongside a pass are installed on it through `set_resource`. The result is
+tagged: `{ kind: 'svg', svg, size, fragment, pass }` for an element, or
+`{ kind: 'value', value }` for any other evaluated result, which hosts print
+instead. `layout_element` stops at the fragment and `make_viewport` performs only
+the wrapping. Both `render_element` and `layout_element` return the narrower
+element result when the argument is statically an `Element`.
 
 `inspect_fragment(fragment)` prints local sizes, content rectangles, offsets,
 matrices, ink, overflow, and guides. The CLI's `tree` format uses it; `json` exposes

@@ -35,10 +35,12 @@ function exact(value: number) {
   return Object.freeze({ kind: 'exact', value: nonnegative(value, 'exact') })
 }
 
-// Copy both axes to own their values, with natural requests for omitted axes.
-function make_request(axes: Partial<LayoutRequest> = {}): LayoutRequest {
-  function copy_axis(axis: AxisRequest = natural()): AxisRequest {
-    if (axis.kind === 'natural') return natural()
+// Copy both axes to own their values. Omitted, undefined, and null axes are
+// natural, so callers can forward optional dimensions without conditional spreads.
+type LayoutRequestInput = Readonly<Partial<Record<Axis, AxisRequest | null | undefined>>>
+function make_request(axes: LayoutRequestInput = {}): LayoutRequest {
+  function copy_axis(axis: AxisRequest | null | undefined): AxisRequest {
+    if (axis == null || axis.kind === 'natural') return natural()
     return axis.kind === 'exact' ? exact(axis.value) : available(axis.value)
   }
   return Object.freeze({

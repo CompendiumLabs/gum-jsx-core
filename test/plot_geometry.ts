@@ -35,7 +35,21 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(transformed.children[0].fragment.size, { width: 80, height: 20 })
     const exact_frame = pass.layout(new Rotate({ angle: 45, children: child }), fixed)
     assert.deepEqual(exact_frame.size, { width: 200, height: 100 })
+    near(exact_frame.ink!.x + exact_frame.ink!.width / 2, 100)
+    near(exact_frame.ink!.y + exact_frame.ink!.height / 2, 50)
     assert.throws(() => pass.layout(new Rotate({ angle: NaN, children: child })), /finite/)
+  },
+
+  'rotated point shapes stay visually centered on their marker coordinates'() {
+    const points = new Points({ points: [[0.5, 0.5]], point_size: px(8),
+      shape: new Rotate({ angle: 45, children: new Rect() }) })
+    const marker = new LayoutPass().layout(new Graph({ xlim: [0, 1], ylim: [0, 1], children: points }), fixed)
+      .children[0].fragment.children[0]
+    const ink = marker.fragment.ink!
+    near(ink.width, Math.sqrt(128))
+    near(ink.height, Math.sqrt(128))
+    near(marker.offset.x + ink.x + ink.width / 2, 100)
+    near(marker.offset.y + ink.y + ink.height / 2, 50)
   },
 
   'attachments and zero-size anchors position naturally measured children'() {

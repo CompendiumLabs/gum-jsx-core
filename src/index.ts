@@ -73,6 +73,10 @@ export { resolve_alignment, align_offset, definite_reference, layout_content, fi
 export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode } from './lib/composition'
 export { render_svg } from './svg'
 export type { SvgOptions } from './svg'
+export { make_viewport, layout_element, render_element } from './render'
+export type {
+  ViewportOptions, LayoutElementOptions, RenderElementOptions, LayoutElementResult, RenderElementResult,
+} from './render'
 export { inspect_fragment } from './inspect'
 export { evaluate } from './eval'
 export type { EvaluateOptions } from './eval'
