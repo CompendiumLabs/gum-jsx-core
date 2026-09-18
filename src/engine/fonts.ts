@@ -9,10 +9,14 @@ import type { FontStyle } from './style'
 
 // Measurements and outlines use a one-em font, with y down and baseline at zero.
 // A provider may replace Fontkit without changing text flow or SVG rendering.
+// A color face has no fillable outline. Its shapes carry measured source
+// clusters instead, which the host draws as live text in the named family.
+type LiveCluster = Readonly<{ text: string; x: number; advance: number; ink: Rect | null }>
 type GlyphShape = Readonly<{
   advance: number
   commands: readonly PathCommand[]
   ink: Rect | null
+  live?: Readonly<{ family: string; clusters: readonly LiveCluster[] }>
 }>
 type MeasuredFont = Readonly<{
   ascent: number
@@ -20,15 +24,20 @@ type MeasuredFont = Readonly<{
   has_glyphs: (text: string) => boolean
   shape: (text: string) => GlyphShape
 }>
+// A provider may name a face for text that the requested one cannot shape.
 interface FontProvider {
   resolve(family: string, weight: number, style: FontStyle): MeasuredFont
+  fallback?(text: string, weight: number, style: FontStyle): MeasuredFont | undefined
 }
-type FontOptions = Readonly<{ weight?: number; style?: FontStyle }>
+type FontOptions = Readonly<{ weight?: number; style?: FontStyle; fallback?: boolean }>
 type FontData = ArrayBuffer | Uint8Array
 type Face = {
-  family: string; weight: number; style: FontStyle; url?: URL; font?: Font
+  family: string; weight: number; style: FontStyle; fallback: boolean; url?: URL; font?: Font
   pending?: Promise<void>
 }
+
+// Hosts paint live emoji themselves, under this family name.
+const EMOJI_FAMILY = 'Noto Color Emoji'
 
 class FontNotLoadedError extends Error {
   constructor(readonly family: string) {
@@ -45,10 +54,12 @@ class MissingGlyphError extends Error {
   }
 }
 
-function font_options(family: string, { weight = 400, style = 'normal' }: FontOptions) {
+function font_options(family: string, { weight = 400, style = 'normal', fallback = false }: FontOptions) {
   if (!family || !Number.isFinite(weight) || weight < 1 || weight > 1000
-    || !['normal', 'italic'].includes(style)) throw new TypeError('Invalid font registration')
-  return { family, weight, style }
+    || !['normal', 'italic'].includes(style) || typeof fallback !== 'boolean') {
+    throw new TypeError('Invalid font registration')
+  }
+  return { family, weight, style, fallback }
 }
 
 // Access local files only on demand. Importing core performs no host I/O and
@@ -96,9 +107,64 @@ function font_command({ command, args }: FontCommand): PathCommand {
   }
 }
 
+// Bitmap and layered color glyphs cannot become one filled path, and Fontkit
+// builds no glyph at all for a CBDT face. Read only cmap and hmtx: every emoji
+// font gives its sequences one shared advance, so a grapheme cluster takes the
+// advance of its base. Joiners, selectors, and tags need no mapping of their own.
+const COLOR_TABLES = ['CBDT', 'sbix', 'COLR', 'SVG ']
+const IGNORABLE = /^[\u200c\u200d\ufe00-\ufe0f\u{e0020}-\u{e007f}\u{e0100}-\u{e01ef}]$/u
+type ColorFont = Font & {
+  directory: { tables: Record<string, unknown> }
+  _cmapProcessor: { lookup(code_point: number): number }
+  hmtx: { metrics: { length: number; get(index: number): { advance: number } } }
+}
+
+function is_color(font: Font): font is ColorFont {
+  const tables = (font as ColorFont).directory?.tables ?? {}
+  return COLOR_TABLES.some(tag => tag in tables)
+}
+
+function graphemes(text: string): string[] {
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  return [...segmenter.segment(text)].map(item => item.segment)
+}
+
+function measure_color(font: ColorFont, family: string): MeasuredFont {
+  const cache = new Map<string, GlyphShape>()
+  const scale = 1 / font.unitsPerEm
+  const ascent = nonnegative(font.ascent * scale, 'font ascent')
+  const descent = nonnegative(-font.descent * scale, 'font descent')
+  const missing = (cluster: string) => [...cluster].find((char, index) =>
+    !font.hasGlyphForCodePoint(char.codePointAt(0)!) && (index === 0 || !IGNORABLE.test(char)))
+  const has_glyphs = (text: string) => graphemes(text).every(cluster => missing(cluster) === undefined)
+  return Object.freeze({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
+    const cached = cache.get(text)
+    if (cached) return cached
+    let x = 0, ink: Rect | null = null
+    const clusters = graphemes(text).map(cluster => {
+      const absent = missing(cluster)
+      if (absent !== undefined) throw new MissingGlyphError(family, absent.codePointAt(0)!)
+      const glyph = font._cmapProcessor.lookup(cluster.codePointAt(0)!)
+      const metric = font.hmtx.metrics.get(Math.min(glyph, font.hmtx.metrics.length - 1))
+      const advance = nonnegative(metric.advance * scale, 'glyph advance')
+      // A color glyph fills its em box; blank clusters advance without painting.
+      const box = advance && cluster.trim() ? make_rect(x, -ascent, advance, ascent + descent) : null
+      ink = union_rects(ink, box)
+      const result = Object.freeze({ text: cluster, x, advance, ink: box })
+      x += advance
+      return result
+    })
+    const live = Object.freeze({ family, clusters: Object.freeze(clusters) })
+    const result = Object.freeze({ advance: x, commands: copy_path([]), ink, live })
+    cache.set(text, result)
+    return result
+  } })
+}
+
 // Keep real kerning and ligatures within each shaped run. Italic requests use
 // a matching face when available, or a 12-degree oblique of the normal outline.
 function measure_font(font: Font, family: string, oblique: boolean): MeasuredFont {
+  if (is_color(font)) return measure_color(font, family)
   const cache = new Map<string, GlyphShape>()
   const ascent = nonnegative(font.ascent / font.unitsPerEm, 'font ascent')
   const descent = nonnegative(-font.descent / font.unitsPerEm, 'font descent')
@@ -147,11 +213,17 @@ class Fonts implements FontProvider {
     for (const family of ['Sans', 'Mono']) {
       for (const [name, weight] of [['Light', 300], ['Regular', 400], ['Bold', 700]] as const) {
         this.#faces.push({
-          family: `IBM Plex ${family}`, weight, style: 'normal',
+          family: `IBM Plex ${family}`, weight, style: 'normal', fallback: false,
           url: new URL(`../fonts/IBMPlex${family}-${name}.ttf`, import.meta.url),
         })
       }
     }
+    // Emoji are only measured here: this small face holds the coverage and advances
+    // of Noto Color Emoji (scripts/emoji-metrics.ts), and no glyph data at all.
+    this.#faces.push({
+      family: EMOJI_FAMILY, weight: 400, style: 'normal', fallback: true,
+      url: new URL('../fonts/NotoColorEmoji-Metrics.ttf', import.meta.url),
+    })
   }
 
   get version(): number { return this.#version; }
@@ -168,7 +240,7 @@ class Fonts implements FontProvider {
     const face = { ...font_options(family, options), url: new URL(url.href) }
     const old = this.#faces.find(item => item.family === family
       && item.weight === face.weight && item.style === face.style)
-    if (old?.url?.href === face.url.href) return
+    if (old?.url?.href === face.url.href && old.fallback === face.fallback) return
     this.#register(face)
   }
 
@@ -219,7 +291,17 @@ class Fonts implements FontProvider {
     this.#measured.set(key, measured)
     return measured
   }
+
+  // Fallback families apply in registration order, and load only once needed.
+  fallback(text: string, weight: number, style: FontStyle): MeasuredFont | undefined {
+    const families = new Set(this.#faces.filter(face => face.fallback).map(face => face.family))
+    for (const family of families) {
+      const font = this.resolve(family, weight, style)
+      if (font.has_glyphs(text)) return font
+    }
+  }
 }
 
-export { Fonts, FontNotLoadedError, MissingGlyphError }
-export type { GlyphShape, MeasuredFont, FontProvider, FontOptions, FontData }
+export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY }
+export { graphemes }
+export type { GlyphShape, LiveCluster, MeasuredFont, FontProvider, FontOptions, FontData }

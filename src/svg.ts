@@ -44,6 +44,13 @@ function render_drawing(draw: Drawing): string {
     return `<image ${rect_attributes(draw.rect)} xlink:href="${escape_xml(draw.data)}"`
       + ` preserveAspectRatio="none"${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : ''}/>`
   }
+  if (draw.kind === 'text') {
+    // Quote the family as one CSS string; an unquoted name must be identifiers.
+    const family = `'${draw.font_family.replace(/[\\']/g, '\\$&')}'`
+    return `<text x="${draw.origin.x + draw.advance / 2}" y="${draw.origin.y}" text-anchor="middle"`
+      + ` font-family="${escape_xml(family)}" font-size="${draw.font_size}" fill="${escape_xml(draw.fill)}"`
+      + `${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : ''}>${escape_xml(draw.text)}</text>`
+  }
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
     stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw
   const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`

@@ -4,10 +4,11 @@ import { parse } from 'opentype.js'
 import { create } from 'fontkit'
 import type { Font } from 'fontkit'
 import {
-  Fonts, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
+  Fonts, EMOJI_FAMILY, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
   resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point,
 } from '../src/index'
-import type { FontProvider, Fragment } from '../src/index'
+import type { Drawing, FontProvider, Fragment } from '../src/index'
+import { color_font } from './fixtures/color_font'
 
 const regular = readFileSync(new URL('../src/fonts/IBMPlexSans-Regular.ttf', import.meta.url))
 const mono = readFileSync(new URL('../src/fonts/IBMPlexMono-Regular.ttf', import.meta.url))
@@ -18,6 +19,13 @@ function near(actual: number, expected: number): void {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`)
 }
 function lines(fragment: Fragment): number { return fragment.children.length; }
+function drawings(fragment: Fragment): Drawing[] {
+  return [...fragment.draw, ...fragment.children.flatMap(child => drawings(child.fragment))]
+}
+// Emoji, a joined family, a keycap, and a space share one advance, as in real emoji
+// fonts. The private use character is one that no bundled face covers.
+const emoji = color_font([[0x20, 1200], [0x31, 1200], [0x20e3, 1200], [0x200d, 0], [0xe000, 1200],
+  [0x1f468, 1200], [0x1f469, 1200], [0x1f600, 1200]])
 
 const tests: Record<string, () => void> = {
   'glyph advances, kerning, ink, and baselines come from the actual bundled font'() {
@@ -177,6 +185,116 @@ const tests: Record<string, () => void> = {
     assert.equal(render_svg(before), svg)
     assert.throws(() => pass.layout(new Text({ font_family: 'missing', text: 'x' })), /Unknown font family/)
     assert.throws(() => pass.layout(new Text({ text: '\u{10ffff}' })), /U\+10FFFF/)
+  },
+
+  'a color face measures whole clusters from cmap and hmtx, with no outlines'() {
+    for (const table of ['CBDT', 'sbix', 'COLR', 'SVG ']) {
+      const fonts = new Fonts()
+      fonts.register('Emoji', color_font([[0x1f600, 1200]], { table }))
+      const shape = fonts.resolve('Emoji', 700, 'italic').shape('\u{1f600}')
+      assert.equal(shape.commands.length, 0); assert.equal(shape.live?.family, 'Emoji')
+    }
+    const fonts = new Fonts()
+    fonts.register("Joe's Emoji", emoji)
+    const font = fonts.resolve("Joe's Emoji", 400, 'normal')
+    near(font.ascent, 0.9); near(font.descent, 0.25)
+    // A joiner and an unmapped selector ride on their base: one cluster, one advance.
+    const text = '\u{1f600}\u{1f468}\u200d\u{1f469} 1\ufe0f\u20e3'
+    assert.ok(font.has_glyphs(text))
+    const shape = font.shape(text)
+    assert.equal(font.shape(text), shape); assert.ok(Object.isFrozen(shape.live!.clusters[0]))
+    assert.deepEqual(shape.live!.clusters.map(cluster => cluster.text),
+      ['\u{1f600}', '\u{1f468}\u200d\u{1f469}', ' ', '1\ufe0f\u20e3'])
+    near(shape.advance, 4.8); near(shape.live!.clusters[3].x, 3.6)
+    assert.deepEqual(shape.ink, { x: 0, y: -0.9, width: shape.ink!.width, height: 1.15 })
+    near(shape.ink!.width, 4.8)
+    assert.equal(shape.live!.clusters[2].ink, null)
+    // A selector needs a base, and ordinary letters remain another face's work.
+    assert.ok(!font.has_glyphs('\ufe0f')); assert.ok(!font.has_glyphs('A'))
+    assert.throws(() => font.shape('\u{1f600}A'), /Joe's Emoji has no glyph for U\+0041/)
+
+    const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
+    const fragment = pass.layout(new Text({ text: '\u{1f600} \u{1f600}', font_family: "Joe's Emoji",
+      font_size: px(20), color: '#123', opacity: 0.5 }))
+    near(fragment.size.width, 3 * 24)
+    const draw = drawings(fragment)
+    assert.equal(draw.length, 2)
+    const last = draw[1]
+    assert.ok(last.kind === 'text' && Object.isFrozen(last))
+    assert.deepEqual([last.text, last.font_family, last.font_size, last.fill, last.opacity],
+      ['\u{1f600}', "Joe's Emoji", 20, '#123', 0.5])
+    near(last.origin.x, 48); near(last.origin.y, fragment.guides.baseline!); near(last.advance, 24)
+    near(fragment.ink!.x, 0); near(fragment.ink!.width, 72); near(fragment.ink!.height, 23)
+    near(fragment.ink!.y, fragment.guides.baseline! - 18)
+    const svg = render_svg(fragment)
+    assert.match(svg, /<text x="60" y="[\d.]+" text-anchor="middle" font-family="&apos;Joe\\&apos;s Emoji&apos;"/)
+    assert.match(svg, / font-size="20" fill="#123" opacity="0.5">\u{1f600}<\/text>/u)
+    assert.doesNotMatch(svg, /<path/)
+  },
+
+  'uncovered clusters move to fallback faces while covered text keeps its face'() {
+    // The bundled metrics face makes emoji work with no setup. It holds the coverage
+    // and advances of Noto Color Emoji, and hosts paint that family themselves.
+    const bundled = new Fonts()
+    const noto = bundled.resolve(EMOJI_FAMILY, 400, 'normal')
+    near(noto.shape('\u{1f600}').advance, 1275 / 1024); near(noto.ascent, 950 / 1024); near(noto.descent, 250 / 1024)
+    assert.equal(bundled.fallback('\u{1f468}\u200d\u{1f469}\u200d\u{1f467}\u{1f1fa}\u{1f1f8}', 400, 'normal'), noto)
+    const ready = new LayoutPass().layout(new Text({ text: 'hi \u{1f600}' }))
+    const [word, face] = drawings(ready)
+    assert.ok(word.kind === 'path' && face.kind === 'text' && face.font_family === 'Noto Color Emoji')
+    near(face.advance, 16 * 1275 / 1024)
+    // A provider with no fallback hook keeps the strict error.
+    const strict: FontProvider = { resolve: (family, weight, style) => bundled.resolve(family, weight, style) }
+    assert.throws(() => new LayoutPass({ fonts: { value: strict, version: 0 } })
+      .layout(new Text({ text: 'hi \u{1f600}' })), /IBM Plex Sans has no glyph for U\+1F600/)
+    // Registration alone makes a family available; only the flag makes it a fallback,
+    // and fallbacks apply in registration order, after the bundled face.
+    bundled.register('Private', emoji)
+    assert.equal(bundled.fallback('\ue000', 400, 'normal'), undefined)
+    assert.throws(() => bundled.register('Private', emoji, { fallback: 1 as unknown as boolean }), /Invalid font/)
+    bundled.register('Private', emoji, { fallback: true })
+    assert.equal(bundled.fallback('\ue000', 400, 'normal'), bundled.resolve('Private', 400, 'normal'))
+    assert.equal(bundled.fallback('\u{1f600}', 400, 'normal'), bundled.resolve(EMOJI_FAMILY, 400, 'normal'))
+
+    // Registering the bundled family again replaces it, here with exact test metrics.
+    const fonts = new Fonts()
+    fonts.register(EMOJI_FAMILY, emoji, { fallback: true })
+    assert.equal(fonts.fallback('\u{1f600}', 700, 'italic'), fonts.resolve(EMOJI_FAMILY, 700, 'italic'))
+    assert.equal(fonts.fallback('\u{1f680}', 400, 'normal'), undefined)
+    const sans = fonts.resolve('IBM Plex Sans', 400, 'normal')
+    const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
+
+    // Digits and spaces stay in Plex, although the emoji face also maps them. The
+    // keycap moves as a whole cluster because Plex lacks its selector and cap.
+    const text = 'AV1 \u{1f600}\u{1f468}\u200d\u{1f469}1\ufe0f\u20e3 AV'
+    const fragment = pass.layout(new Text({ text }))
+    const space = sans.shape(' ').advance
+    near(fragment.size.width, 16 * (sans.shape('AV1').advance + sans.shape('AV').advance + 2 * space + 3 * 1.2))
+    near(fragment.size.height, 16 * 1.2)
+    assert.equal(fragment.label, text)
+    const draw = drawings(fragment)
+    assert.deepEqual(draw.map(item => item.kind), ['path', 'text', 'text', 'text', 'path'])
+    const live = draw.filter(item => item.kind === 'text')
+    assert.deepEqual(live.map(item => item.text), ['\u{1f600}', '\u{1f468}\u200d\u{1f469}', '1\ufe0f\u20e3'])
+    near(live[1].origin.x - live[0].origin.x, 16 * 1.2)
+    assert.ok(live.every(item => item.font_family === EMOJI_FAMILY && item.font_size === 16))
+
+    // Emoji inside a word, around an inline element, and across a wrap stay intact.
+    const mixed = pass.layout(new Text({ children: ['a\u{1f600}b ', new Rect({ width: px(10), height: px(10) }), ' \u{1f600}'] }))
+    assert.equal(drawings(mixed).filter(item => item.kind === 'text').length, 2)
+    assert.equal(lines(pass.layout(new Text({ text: '\u{1f600} \u{1f600} \u{1f600}' }), make_request({ width: exact(45) }))), 2)
+    // Text that no face covers still reports the requested family.
+    assert.throws(() => pass.layout(new Text({ text: '\u{1f600} \u{1f680}' })), /IBM Plex Sans has no glyph for U\+1F680/)
+
+    // An outlined fallback face is drawn as paths like any other. Plex Mono lacks Greek.
+    const outlined = new Fonts()
+    assert.throws(() => outlined.resolve('IBM Plex Mono', 400, 'normal').shape('a\u03a9'), /U\+03A9/)
+    outlined.register('Greek', regular, { fallback: true })
+    const greek = new LayoutPass({ fonts: { value: outlined, version: outlined.version } })
+    const replaced = greek.layout(new Text({ text: 'a\u03a9', font_family: 'IBM Plex Mono' }))
+    assert.deepEqual(drawings(replaced).map(item => item.kind), ['path', 'path'])
+    near(replaced.size.width, 16 * (outlined.resolve('IBM Plex Mono', 400, 'normal').shape('a').advance
+      + sans.shape('\u03a9').advance))
   },
 
   'outlined SVG is self-contained, escaped, and renderable without a font resource'() {

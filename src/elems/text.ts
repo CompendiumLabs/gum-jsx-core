@@ -1,9 +1,11 @@
 /// <reference path="../types/linebreak.d.ts" />
 import LineBreaker from 'linebreak'
 import { DEFAULTS } from '../engine/defaults'
-import { draw_path } from '../engine/drawing'
+import { draw_path, draw_text } from '../engine/drawing'
+import type { Drawing } from '../engine/drawing'
 import { Element } from '../engine/element'
 import type { Child, ElementProps } from '../engine/element'
+import { MissingGlyphError, graphemes } from '../engine/fonts'
 import type { FontProvider, GlyphShape, MeasuredFont } from '../engine/fonts'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import type { Fragment } from '../engine/fragment'
@@ -113,6 +115,24 @@ function font_metrics(style: Style, fonts: FontProvider): Metrics {
   return { font, above, below: height - above }
 }
 
+// The requested face shapes whatever it covers, keeping its kerning. Only after
+// a missing glyph do whole grapheme clusters move to a registered fallback face,
+// so an emoji sequence never splits. Uncovered text still reports the requested face.
+function shape_run(value: string, font: MeasuredFont, style: Style, fonts: FontProvider): GlyphShape[] {
+  try { return [font.shape(value)] } catch (error) {
+    if (!(error instanceof MissingGlyphError) || !fonts.fallback) throw error
+  }
+  const pieces: { text: string; font: MeasuredFont }[] = []
+  for (const cluster of graphemes(value)) {
+    const chosen = font.has_glyphs(cluster) ? font
+      : fonts.fallback(cluster, style.font_weight, style.font_style) ?? font
+    const last = pieces.at(-1)
+    if (last?.font === chosen) last.text += cluster
+    else pieces.push({ text: cluster, font: chosen })
+  }
+  return pieces.map(piece => piece.font.shape(piece.text))
+}
+
 // Break the entire logical string before intersecting it with style runs. Span
 // boundaries therefore never introduce word breaks. Each legal break unit is
 // measured once; subsequent offers only pack these prepared advances into lines.
@@ -168,8 +188,7 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
       const from = Math.max(start, run.start)
       const to = Math.min(boundary, run.end)
       const value = text.slice(from, Math.max(from, to)).replace(/\u200b/g, '')
-      if (value) {
-        const shape = metrics.font.shape(value)
+      for (const shape of value ? shape_run(value, metrics.font, run.style, fonts) : []) {
         parts.push({ shape, style: run.style, width: shape.advance * run.style.font_size })
       }
       const space = text.slice(Math.max(from, boundary), Math.min(limit, run.end))
@@ -249,22 +268,30 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   const size = finish_size(make_size(width, height), query.request, query.sizing)
   let y = 0
   const children = lines.map(line => {
-    const glyph = ({ shape, style }: GlyphPart, x: number) => {
+    const glyph = ({ shape, style }: GlyphPart, x: number): Drawing[] => {
       const scale = style.font_size
       const matrix = [scale, 0, 0, scale, x, line.above] as const
+      const paint = { fill: style.color, opacity: style.opacity }
+      // A color face has no outline to transform; its clusters stay live text.
+      if (shape.live) {
+        const font = { family: shape.live.family, size: scale }
+        return shape.live.clusters.filter(cluster => cluster.ink).map(cluster => draw_text(
+          cluster.text, make_point(x + cluster.x * scale, line.above), cluster.advance * scale,
+          font, paint, transform_rect(cluster.ink, make_point(), matrix)))
+      }
       const commands = transform_path(shape.commands, matrix)
       const ink = transform_rect(shape.ink, make_point(), matrix)
-      return draw_path(commands, { fill: style.color, stroke: 'none', stroke_width: 0, opacity: style.opacity }, ink)
+      return [draw_path(commands, { ...paint, stroke: 'none', stroke_width: 0 }, ink)]
     }
     const height = line.above + line.below
     const inline = line.parts.some(part => 'fragment' in part)
-    const draw = inline ? [] : line.parts.map(part => glyph(part as GlyphPart, part.x))
+    const draw = inline ? [] : line.parts.flatMap(part => glyph(part as GlyphPart, part.x))
     // Keep source painting order when glyphs and elements overlap. Pure prose
     // retains its compact line drawing, with no additional run fragments.
     const content = inline ? line.parts.map(part => 'fragment' in part
       ? place_fragment(part.fragment, make_point(part.x, line.above - part.baseline))
       : place_fragment(make_fragment({ name: 'Run', size: make_size(part.width, height),
-          guides: { baseline: line.above }, draw: [glyph(part, 0)] }), make_point(part.x, 0))) : []
+          guides: { baseline: line.above }, draw: glyph(part, 0) }), make_point(part.x, 0))) : []
     const fragment = make_fragment({
       name: 'Line', size: make_size(Math.max(0, line.width), height), guides: { baseline: line.above }, draw, children: content,
     })

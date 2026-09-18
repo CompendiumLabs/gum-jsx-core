@@ -25,7 +25,8 @@ Runtime dependencies are `acorn`, `acorn-jsx`, `fontkit`, and `linebreak`.
 development dependencies. Runtime code lives in `src/`, with `src/index.ts` as
 the package entry point. The JSX parser and its source-error helpers live in
 `src/lib/`, declarations in `src/types/`, and the six bundled IBM Plex faces in
-`src/fonts/` with their OFL license. Tests and tools live in `test/` and `scripts/`;
+`src/fonts/` with their OFL license, beside a metrics-only face derived from Noto
+Color Emoji under its own OFL license. Tests and tools live in `test/` and `scripts/`;
 runnable examples live in [gum-jsx-docs](../gum-jsx-docs/README.md).
 No files or packages from the old core checkout are needed.
 
@@ -810,9 +811,11 @@ controls layout after parsing; it does not disable source normalization. Element
 containers and text stacks ignore blank strings between children. See the
 [JSX reference](../gum-jsx-docs/docs/gallery/text/JSX.md#jsx-whitespace) for more examples.
 
-Automatic hyphenation, emergency word splitting, full paragraph
-bidi, fallback font chains, and color emoji are outside this stage's coverage.
-Unknown families and missing glyphs produce errors instead of silent substitution.
+Automatic hyphenation, emergency word splitting, and full paragraph bidi are
+outside this stage's coverage. Unknown families and missing glyphs produce errors
+instead of silent substitution; only a face registered with `fallback: true`
+receives the grapheme clusters that the requested face lacks. The one bundled
+fallback measures emoji.
 
 Text hugs its measured width under a natural or available request. An exact width
 fixes the frame and reflows its lines; an unbreakable word can overflow it, including
@@ -867,6 +870,31 @@ the pass, and source elements contain no resource objects.
 so SVG and PNG agree without installing or embedding fonts. Text retains an escaped
 accessible label. Outlines make output larger and text is not selectable/searchable
 as native SVG text; an optional native-text rendering route can be added later.
+
+**Color fonts are the exception.** A face with a `CBDT`, `sbix`, `COLR`, or `SVG `
+table has no outline that one fill can paint, so emoji stay live text. This works
+with no setup: `<Text>Ship it 🚀</Text>` outlines its Plex words and emits the
+rocket as `<text font-family="'Noto Color Emoji'">`.
+
+A color face only measures. Each grapheme cluster, including joined, flag, keycap,
+and skin tone sequences, takes the advance of its base glyph from `cmap` and
+`hmtx`, and its ink is that advance by the font's ascent and descent. `Fonts`
+therefore bundles `NotoColorEmoji-Metrics.ttf` as its default fallback: 8 KB that
+hold the coverage and advances of Noto Color Emoji, and no glyph data. Regenerate
+it with `bun scripts/emoji-metrics.ts` after updating `@fontsource/noto-color-emoji`.
+
+The host that displays the SVG paints the emoji, so it should supply the family
+exported as `EMOJI_FAMILY`, for example as a web font. Each cluster is a separate
+`text` drawing centered in its advance, so a substituted host font, such as a
+system emoji font, cannot drift along the line. To measure with another emoji font,
+register its bytes; the same family name replaces the bundled face:
+
+```ts
+fonts.register('My Emoji', emoji_bytes, { fallback: true })
+```
+
+Without the `fallback` flag a family is still usable through `font_family`. The
+PDF back end reports live text as an error, since it embeds no font data.
 
 ## Shapes and paths
 

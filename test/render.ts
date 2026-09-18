@@ -10,7 +10,7 @@ function nodes(fragment: Fragment): Fragment[] {
 }
 function strokes(fragment: Fragment): string[] {
   return [...new Set(nodes(fragment).flatMap(node => node.draw)
-    .map(draw => draw.kind === 'image' ? '' : draw.stroke).filter(Boolean))]
+    .map(draw => draw.kind === 'image' || draw.kind === 'text' ? '' : draw.stroke).filter(Boolean))]
 }
 
 const tests: Record<string, () => void> = {

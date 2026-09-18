@@ -23,7 +23,15 @@ type PathDraw = Readonly<{
 // Images carry opacity but cannot carry vector fill or stroke settings.
 type ImageDraw = Readonly<{ kind: 'image'; rect: PixelRect; data: string; opacity?: number }
   & { [Key in Exclude<keyof Paint, 'opacity'>]?: never }>
-type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw
+// Live text is the one drawing that needs a host font: a color face has no
+// outline to fill. Core measured the advance; the named family must paint it.
+type TextDraw = Readonly<{
+  kind: 'text'; text: string; origin: Point; advance: number
+  font_family: string; font_size: number; fill: string; opacity?: number
+  bounds: PixelRect | null
+} & { [Key in Exclude<keyof Paint, 'fill' | 'opacity'>]?: never }>
+type TextFont = Readonly<{ family: string; size: number }>
+type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw | TextDraw
 
 // Own paint records at the drawing boundary, including optional SVG stroke policy.
 function copy_paint(paint: Paint): Paint {
@@ -88,12 +96,35 @@ function draw_image(rect: PixelRect, data: string, opacity = 1): ImageDraw {
   return Object.freeze({ kind: 'image', rect: make_rect(rect.x, rect.y, rect.width, rect.height), data, opacity })
 }
 
+// The origin is the baseline start of a measured advance. Hosts center the text
+// within that advance, so a substituted host font cannot drift along a line.
+function draw_text(
+  text: string, origin_value: PointValue, advance: number, font: TextFont,
+  paint: Pick<Paint, 'fill' | 'opacity'>, bounds: PixelRect | null,
+): TextDraw {
+  const origin = read_point(origin_value, 'origin')
+  const { fill, opacity = 1 } = paint
+  if (typeof text !== 'string' || !text) throw new TypeError('Text drawing requires text')
+  if (typeof font.family !== 'string' || !font.family) throw new TypeError('Text drawing requires a font family')
+  if (typeof fill !== 'string') throw new TypeError('Drawing paints must be strings')
+  nonnegative(advance, 'advance'); nonnegative(font.size, 'font_size')
+  finite(opacity, 'opacity')
+  if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
+  return Object.freeze({
+    kind: 'text', text, origin: make_point(origin.x, origin.y), advance,
+    font_family: font.family, font_size: font.size, fill, opacity,
+    bounds: bounds && make_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+  })
+}
+
 function copy_drawing(draw: Drawing): Drawing {
   switch (draw.kind) {
     case 'rect': return draw_rect(draw.rect, draw, draw.radius)
     case 'ellipse': return draw_ellipse(draw.center, draw.radius, draw)
     case 'path': return draw_path(draw.commands, draw, draw.bounds)
     case 'image': return draw_image(draw.rect, draw.data, draw.opacity)
+    case 'text': return draw_text(draw.text, draw.origin, draw.advance,
+      { family: draw.font_family, size: draw.font_size }, draw, draw.bounds)
     default: throw new TypeError('Unknown drawing kind')
   }
 }
@@ -103,6 +134,8 @@ function copy_drawing(draw: Drawing): Drawing {
 function drawing_ink(draw: Drawing): PixelRect | null {
   if (draw.opacity === 0) return null
   if (draw.kind === 'image') return draw.rect.width && draw.rect.height ? draw.rect : null
+  // A color glyph paints its own palette, whatever the requested fill.
+  if (draw.kind === 'text') return draw.bounds?.width && draw.bounds.height ? draw.bounds : null
   let bounds: PixelRect | null
   switch (draw.kind) {
     case 'rect': bounds = draw.rect; break
@@ -132,5 +165,5 @@ function drawing_ink(draw: Drawing): PixelRect | null {
   return make_rect(x - pad, y - pad, width + 2 * pad, height + 2 * pad)
 }
 
-export { draw_rect, draw_ellipse, draw_path, draw_image, copy_drawing, drawing_ink }
-export type { Paint, RectDraw, EllipseDraw, PathDraw, ImageDraw, Drawing }
+export { draw_rect, draw_ellipse, draw_path, draw_image, draw_text, copy_drawing, drawing_ink }
+export type { Paint, RectDraw, EllipseDraw, PathDraw, ImageDraw, TextDraw, TextFont, Drawing }
