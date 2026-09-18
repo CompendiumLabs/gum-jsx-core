@@ -3,6 +3,7 @@ import { Element } from './element'
 import { Fonts } from './fonts'
 import { make_fragment } from './fragment'
 import type { Fragment } from './fragment'
+import { make_rect } from './geometry'
 import { finish_size, make_request, prepare_request, resolve_sizing } from './layout'
 import type { LayoutRequest, Sizing } from './layout'
 import { resolve_style } from './style'
@@ -157,8 +158,12 @@ class LayoutPass {
         if (size.width !== result.size.width || size.height !== result.size.height) {
           throw new Error('Element returned a size outside its sizing policy; use finish_size')
         }
+        // An id makes any element connectable; elements may refine the boundary.
+        const { id } = element.props
+        const connection = id === undefined ? result.connection
+          : { id, boundary: result.connection?.boundary ?? make_rect(0, 0, size.width, size.height) }
         const fragment = make_fragment({ ...result, name: element.type.name,
-          debug: element.props.debug ?? result.debug })
+          debug: element.props.debug ?? result.debug, connection })
         cache.set(key, fragment)
         return fragment
       } finally {

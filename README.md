@@ -1058,21 +1058,24 @@ examples, and current limits.
 </Svg>
 ```
 
-Node is a compact TextFrame with `width="fit"`, a centered placement anchor,
-and an optional ID. Network uses Graph sizing and coordinates, inferring limits
-from node centers and edge waypoints with 0.2 default data padding. Explicit node
+Any element with an `id` is a node. Node is the conventional one: a compact
+TextFrame with `width="fit"` and a centered placement anchor. Network uses Graph sizing and coordinates, inferring limits
+from child x/y positions and edge waypoints with 0.2 default data padding. Explicit node
 widths wrap labels at their ordinary font size. Put edges first to paint them
 behind nodes; source order remains paint order independently of measurement order.
 
-Each named node's fragment exposes `connection: { id, boundary }`, where boundary
-is its outer rounded frame in local pixels. Network lays out ordinary children
+Each identified element's fragment exposes `connection: { id, boundary }` in local
+pixels. Boxes, rectangles, squares, circles, and ellipses report their rounded or
+elliptical outline; LayoutPass supplies the allocation rectangle for the rest. Network lays out ordinary children
 first, then follows their placements to locate these boundaries through Box,
 Fit, Rotate, and other containers. Ports and normals follow the composed transforms,
 including when the visible frame differs from its surrounding allocation.
-Nested networks set `connection_scope` to keep their IDs local. Custom elements
-can supply the same connection metadata without adding any paint.
+Identified containers stay transparent, so a group and its members are both
+addressable. Nested networks set `connection_scope` to keep their IDs local, and
+an ID on the nested network makes it one node of the outer one. Custom elements
+can refine their boundary with `frame_connection(props.id, boundary)`.
 
-Edges are direct Network children. `start`/`end` accept IDs or node elements with
+Edges are direct Network children. `start`/`end` accept IDs or elements with
 IDs; references do not insert nodes into the diagram. Automatic sides face the
 other node or adjacent waypoint. `start_side`/`end_side` and `start_loc`/`end_loc`
 override the ports in each node's local frame. Rounded corners use the actual

@@ -6,7 +6,7 @@ import { theme_color } from '../engine/theme'
 import { draw_rect } from '../engine/drawing'
 import { Element, content_child } from '../engine/element'
 import type { ElementProps } from '../engine/element'
-import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
+import { make_fragment, place_fragment, transform_guides, frame_connection } from '../engine/fragment'
 import type { Fragment } from '../engine/fragment'
 import {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets,
@@ -105,7 +105,8 @@ function box_layout(props: BoxProps, query: LayoutQuery, border_cutout?: (size: 
     children.push(place_fragment(frame_border(size, border_width, border_color, corners, query.style.opacity,
       border_cutout?.(size))))
   }
-  return make_fragment({ size, content, guides, overflow, draw, children })
+  return make_fragment({ size, content, guides, overflow, draw, children,
+    ...frame_connection(props.id, make_clip(rect, corners)) })
 }
 
 class Box extends Element<BoxProps> {

@@ -26,14 +26,15 @@ function collect_connections(children: readonly Placement[]): ReadonlyMap<string
   const nodes = new Map<string, PlacedConnection>()
   function visit(placement: Placement, parent: Transform) {
     const { fragment } = placement
-    if (fragment.connection_scope) return
     const transform = placement_transform(parent, placement)
+    // An identified container stays transparent: its members remain addressable.
+    // A nested network is itself a node, but keeps its own members private.
     if (fragment.connection) {
       const { id } = fragment.connection
       if (nodes.has(id)) throw new TypeError(`Duplicate node id: ${id}`)
       nodes.set(id, { ...fragment.connection, transform })
-      return
     }
+    if (fragment.connection_scope) return
     for (const child of fragment.children) visit(child, transform)
   }
   for (const child of children) visit(child, identity)

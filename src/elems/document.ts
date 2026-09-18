@@ -6,13 +6,14 @@ import { Box, Frame, box_layout } from './box'
 import type { BoxProps } from './box'
 import { Element, content_child, element_children } from '../engine/element'
 import type { Child, ElementProps } from '../engine/element'
-import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
-import { make_point, make_rect, make_size, make_insets, resolve_insets, deflate_size } from '../engine/geometry'
+import { make_fragment, place_fragment, transform_guides, frame_connection } from '../engine/fragment'
+import { make_point, make_rect, make_size, make_clip, make_insets, resolve_insets, deflate_size } from '../engine/geometry'
 import type { InsetSpec } from '../engine/geometry'
 import { graph_size } from './graph'
 import { available, exact, make_request, deflate_request, prepare_request, finish_size } from '../engine/layout'
 import { HStack, VStack, stack_layout } from './stack'
 import type { StackProps } from './stack'
+import { resolve_rect_radius } from './shapes'
 import { scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Text, Span } from './text'
@@ -181,7 +182,9 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     }
     // The generic aspect belongs to the complete element. Only frame_aspect
     // applies to the bordered body, whose allocation excludes the title overhang.
-    const layout_body = (request = body_request) => box_layout({ ...props, padding: {
+    // The body is a part, not a node: only the complete element carries the id.
+    const { id, ...frame } = props
+    const layout_body = (request = body_request) => box_layout({ ...frame, padding: {
       left: px(padding.left), right: px(padding.right), bottom: px(padding.bottom),
       top: px(Math.max(padding.top, half + gap)),
     } }, { ...query, request: prepare_request(request, body_sizing), sizing: body_sizing },
@@ -195,7 +198,14 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     if (measured.width !== size.width || measured.height !== size.height) {
       body = layout_body(make_request({ width: exact(size.width), height: exact(body_height) }))
     }
-    return make_fragment({ size,
+    // One outline spans the frame and its overhanging title, so a centered anchor
+    // and the side ports agree. Only the body's lower corners reach that outline.
+    const round = make_clip(make_rect(0, 0, body.size.width, body.size.height),
+      resolve_rect_radius(props.radius ?? 0, body.size, query)).radius!
+    const corner = (key: 'bl' | 'br') => 'tl' in round ? round[key] : round
+    const boundary = make_clip(make_rect(0, 0, size.width, size.height),
+      { tl: make_point(), tr: make_point(), bl: corner('bl'), br: corner('br') })
+    return make_fragment({ size, ...frame_connection(id, boundary),
       guides: transform_guides(body.guides, half),
       content: body.content && make_rect(body.content.x, body.content.y + half, body.content.width, body.content.height),
       children: [place_fragment(body, make_point(0, half)),

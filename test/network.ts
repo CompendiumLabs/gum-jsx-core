@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import {
-  Network, Node, Edge, Box, Fit, Rotate, TransformBox, Text, LayoutPass, define_element, define_component,
+  Network, Node, Edge, Box, Fit, Rotate, TransformBox, Text, Circle, Rect, VStack, TitleFrame, LayoutPass,
+  define_element, define_component,
   evaluate, make_request, exact, make_fragment, make_size, make_rect, px, em, render_svg,
 } from '../src/index'
+import * as core from '../src/index'
 import type { Element, Fragment, PathDraw, Point, Side } from '../src/index'
 
 const fixed = make_request({ width: exact(600), height: exact(300) })
@@ -117,6 +119,80 @@ const tests: Record<string, () => void> = {
     near_point(ends(result.children[0].fragment)[0], { x: 110, y: 90 })
   },
 
+  'any identified element is a node and framed shapes supply their visible outline'() {
+    const circle = new Circle({ id: 'c', x: 0.25, y: 0.5, anchor: 'center', width: px(80), height: px(80) })
+    const rect = new Rect({ id: 'r', x: 0.75, y: 0.5, anchor: 'center', width: px(100), height: px(60),
+      radius: [px(30), px(20)] })
+    const result = layout([new Edge({ start: circle, end: rect, start_side: 'top', start_loc: 0.25,
+      end_side: 'top', end_loc: 0.1, ...plain }), circle, rect])
+    const [start, end] = ends(result.children[0].fragment)
+    // A quarter along the top of a circle lies on the arc, not the bounding square.
+    near_point(start, { x: 130, y: 150 - 40 * Math.sqrt(0.75) })
+    near_point(end, { x: 410, y: 120 + 20 - 20 * Math.sqrt(1 - 4 / 9) })
+    const pass = new LayoutPass()
+    assert.deepEqual(pass.layout(circle).connection, { id: 'c',
+      boundary: { ...make_rect(0, 0, 80, 80), radius: { x: 40, y: 40 } } })
+    assert.equal(pass.layout(new Circle({ width: px(80) })).connection, undefined)
+
+    // Elements without a frame of their own connect at their allocation.
+    const label = new Text({ id: 't', text: 'Plain text', x: 0.5, y: 0.2, anchor: 'center' })
+    const text = layout([new Edge({ start: 't', end: 'r', start_side: 'bottom', ...plain }), label, rect])
+    const placed = text.children[1]
+    assert.deepEqual(placed.fragment.connection!.boundary,
+      make_rect(0, 0, placed.fragment.size.width, placed.fragment.size.height))
+    near_point(ends(text.children[0].fragment)[0],
+      { x: 300, y: placed.offset.y + placed.fragment.size.height })
+  },
+
+  'identified containers stay transparent while nested networks are single nodes'() {
+    const group = new VStack({ id: 'group', x: 0.25, y: 0.5, anchor: 'center', width: px(100), gap: px(20),
+      children: [new Rect({ id: 'top', height: px(40) }), new Rect({ id: 'bottom', height: px(40) })] })
+    const inner = new Network({ ...limits, id: 'inner', x: 0.75, y: 0.5, anchor: 'center',
+      width: px(120), height: px(80), children: node('hidden', 0.5, 0.5) })
+    const result = layout([new Edge({ start: 'group', end: 'inner', ...plain }),
+      new Edge({ start: 'bottom', end: 'inner', start_side: 'right', end_side: 'bottom', ...plain }),
+      group, inner])
+    const [whole, member] = result.children.slice(0, 2).map(child => ends(child.fragment))
+    near_point(whole[0], { x: 200, y: 150 }); near_point(whole[1], { x: 390, y: 150 })
+    near_point(member[0], { x: 200, y: 180 }); near_point(member[1], { x: 450, y: 190 })
+    assert.throws(() => layout([new Edge({ start: 'group', end: 'hidden' }), group, inner]),
+      /Unknown node id: hidden/)
+    assert.throws(() => layout([group, new Rect({ id: 'top' })]), /Duplicate node id: top/)
+  },
+
+  'compound elements publish one connection however they compose their parts'() {
+    const titled = new TitleFrame({ id: 'titled', title: 'Title', x: 0.3, y: 0.5, anchor: 'center',
+      width: px(160), radius: px(12), children: 'Body' })
+    const result = layout([new Edge({ start: 'titled', end: 'b', start_side: 'top', ...plain }),
+      new Edge({ start: 'titled', end: 'b', start_side: 'right', ...plain }), titled, node('b', 0.85, 0.5)])
+    const placed = result.children[2], { width, height } = placed.fragment.size
+    // The outline spans the overhanging title, with only the body's lower corners rounded.
+    const zero = { x: 0, y: 0 }, round = { x: 12, y: 12 }
+    assert.deepEqual(placed.fragment.connection, { id: 'titled',
+      boundary: { ...make_rect(0, 0, width, height), radius: { tl: zero, tr: zero, br: round, bl: round } } })
+    assert.ok(placed.fragment.children.every(child => child.fragment.connection === undefined))
+    near_point(ends(result.children[0].fragment)[0], { x: 180, y: placed.offset.y })
+    near_point(ends(result.children[1].fragment)[0], { x: 180 + width / 2, y: 150 })
+
+    // No element class may forward its id into a part that is also laid out.
+    const variants = [{}, { title: 'Title' }, { text: 'Body' }, { caption: 'Caption' }, { items: ['a', 'b'] },
+      { title: 'Title', children: new Text({ text: 'Child' }) }]
+    let connected = 0
+    for (const [name, value] of Object.entries(core)) {
+      if (typeof value !== 'function' || !(value.prototype instanceof core.Element)) continue
+      if (name === 'Network' || name === 'Edge') continue
+      const Type = value as new (props: object) => Element
+      for (const extra of variants) {
+        let element: Element
+        try { element = new Type({ id: 'n', x: 0.5, y: 0.5, width: px(120), height: px(80), ...extra }) }
+        catch { continue }
+        try { layout([new Edge({ start: 'n', end: 'b' }), element, node('b', 0.9, 0.9)]); connected++ }
+        catch (error) { assert.doesNotMatch(String(error), /Duplicate node id/, name) }
+      }
+    }
+    assert.ok(connected > 100)
+  },
+
   'curved arrows keep both head tips and tangents on the selected ports'() {
     for (const props of [{}, { flip_x: true }, { xlim: [1, 0] as const }, { flip_y: false }]) {
       const result = layout([new Edge({ start: 'a', end: 'b', start_side: 'top', end_side: 'left',
@@ -190,6 +266,15 @@ const tests: Record<string, () => void> = {
     near(result.children[2].offset.x + result.children[2].fragment.size.width / 2, 450)
     near(result.children[1].offset.y + result.children[1].fragment.size.height / 2, 225)
     assert.deepEqual(new LayoutPass().layout(new Network()).size, { width: 480, height: 320 })
+    const shapes = new LayoutPass().layout(evaluate(`
+      return <Network padding={0.5} width={px(600)} height={px(300)}>
+        <Circle id="a" x={2} y={0} anchor="center" width={px(40)} />
+        <Square id="b" x={8} y={0} anchor="center" width={px(40)} />
+        <Edge start="a" end="b" />
+      </Network>
+    `))
+    near(shapes.children[0].offset.x, 130)
+    near(shapes.children[1].offset.x, 430)
   },
 
   'named components retain Edge behavior and zero-tension heads follow the shaft'() {
@@ -208,6 +293,8 @@ const tests: Record<string, () => void> = {
 
   'invalid references, duplicate ids, ports, and singular transforms fail clearly'() {
     assert.throws(() => new Node({ id: '' }), /nonempty string/)
+    assert.throws(() => new Circle({ id: 7 as unknown as string }), /nonempty string/)
+    assert.throws(() => new Edge({ start: new Circle(), end: 'b' }), /nonempty string/)
     assert.throws(() => new Edge({ start: new Node(), end: 'b' }), /nonempty string/)
     assert.throws(() => new LayoutPass().layout(new Edge({ start: 'a', end: 'b' })), /direct child of Network/)
     assert.throws(() => layout([node('a', 0, 0), node('a', 1, 1)]), /Duplicate node id: a/)

@@ -32,7 +32,7 @@ export type {
   AxisRequest, LayoutRequest, SizeMode, SizeSpec, AxisSizing, Sizing,
 } from './engine/layout'
 export { union_rects, intersect_rects, make_transform, transform_rect } from './engine/geometry'
-export { make_fragment, place_fragment, content_bounds, transform_guides } from './engine/fragment'
+export { make_fragment, place_fragment, content_bounds, transform_guides, frame_connection } from './engine/fragment'
 export type { Transform, Guides, Connection, Fragment, Placement, FragmentSpec } from './engine/fragment'
 export { draw_rect, draw_ellipse, draw_path, draw_image, drawing_ink } from './engine/drawing'
 export type { Paint, Drawing, RectDraw, EllipseDraw, PathDraw, ImageDraw } from './engine/drawing'

@@ -11,7 +11,7 @@ import type { Clip, Insets, Point, PointValue, Rect, Size, Transform } from './g
 
 // Named guides are vertical positions, including text baselines and the math axis.
 type Guides = Readonly<Partial<Record<string, number>>>
-// A connection follows the node's frame, independently of allocation and ink.
+// A connection follows an identified element's frame, independently of ink.
 // Parents discover these records through placements, including their transforms.
 type Connection = Readonly<{ id: string; boundary: Clip }>
 const OWNED = Symbol('next.fragment')
@@ -141,8 +141,14 @@ function make_fragment(spec: FragmentSpec): Fragment {
   return Object.freeze(fragment)
 }
 
+// Framed elements publish their visible outline when identified. LayoutPass
+// falls back to the whole allocation for elements that describe no frame.
+function frame_connection(id: string | undefined, boundary: Clip): Pick<FragmentSpec, 'connection'> {
+  return id === undefined ? {} : { connection: { id, boundary } }
+}
+
 // Guides (including baseline) use pixels from the local origin. Ink describes
 // painted bounds after clipping; overflow records excess content before clipping.
 // An explicit transform acts in child coordinates, before the placement offset.
-export { make_fragment, place_fragment, content_bounds, transform_guides }
+export { make_fragment, place_fragment, content_bounds, transform_guides, frame_connection }
 export type { Transform, Guides, Connection, Fragment, Placement, FragmentSpec }

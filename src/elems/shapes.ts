@@ -3,9 +3,9 @@ import { DEFAULTS } from '../engine/defaults'
 import { draw_rect, draw_ellipse, draw_path } from '../engine/drawing'
 import { Element, define_component, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
-import { make_fragment } from '../engine/fragment'
-import { make_size, make_point, make_rect, read_point } from '../engine/geometry'
-import type { PointValue, Size, RectRadii } from '../engine/geometry'
+import { make_fragment, frame_connection } from '../engine/fragment'
+import { make_size, make_point, make_rect, make_clip, read_point } from '../engine/geometry'
+import type { Point, PointValue, Size, RectRadii } from '../engine/geometry'
 import { shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { map_path } from '../engine/path'
@@ -86,12 +86,18 @@ function resolve_rect_radius(radius: RectRadius, size: Size, query: LayoutQuery)
   return resolve_radius(radius as Radius, size, query)
 }
 
+// Edges meet the drawn ellipse: a clip whose corner radii span its whole box.
+function ellipse_boundary(center: Point, radius: Point) {
+  return make_clip(make_rect(center.x - radius.x, center.y - radius.y, 2 * radius.x, 2 * radius.y), radius)
+}
+
 // Rect and RoundedRect share geometry; the latter supplies a convenient default.
 function rect_layout(props: RectProps, query: LayoutQuery, radius: Radius = 0) {
   const { size, paint } = shape_context(props, query)
   const rect = make_rect(0, 0, size.width, size.height)
   const corners = resolve_rect_radius(props.radius ?? radius, size, query)
-  return make_fragment({ size, draw: [draw_rect(rect, paint, corners)] })
+  return make_fragment({ size, draw: [draw_rect(rect, paint, corners)],
+    ...frame_connection(props.id, make_clip(rect, corners)) })
 }
 
 class Rect extends Element<RectProps> {
@@ -111,7 +117,8 @@ class Square extends Element<RectProps> {
     const side = Math.min(size.width, size.height)
     const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side)
     const radius = resolve_rect_radius(props.radius ?? 0, make_size(side, side), query)
-    return make_fragment({ size, draw: [draw_rect(rect, paint, radius)] })
+    return make_fragment({ size, draw: [draw_rect(rect, paint, radius)],
+      ...frame_connection(props.id, make_clip(rect, radius)) })
   }
 }
 
@@ -120,7 +127,8 @@ class Circle extends Element<CircleProps> {
     const { size, paint } = shape_context(props, query, 1)
     const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center')
     const radius = resolve_radius(props.radius ?? 0.5, size, query)
-    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] })
+    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)],
+      ...frame_connection(props.id, ellipse_boundary(center, radius)) })
   }
 }
 
@@ -129,7 +137,8 @@ class Ellipse extends Element<EllipseProps> {
     const { size, paint } = shape_context(props, query)
     const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center')
     const radius = resolve_radius(props.radius ?? { x: 0.5, y: 0.5 }, size, query)
-    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)] })
+    return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)],
+      ...frame_connection(props.id, ellipse_boundary(center, radius)) })
   }
 }
 

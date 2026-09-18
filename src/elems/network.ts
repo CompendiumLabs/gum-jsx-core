@@ -2,10 +2,12 @@ import { nonnegative } from '../lib/checks'
 import { collect_connections, connection_center, connection_port, connection_side } from '../lib/connections'
 import type { PlacedConnection } from '../lib/connections'
 import { coordinate_length, infer_coordinates, point_bounds } from '../engine/coordinates'
+import type { DataBounds } from '../engine/coordinates'
 import { Element, element_children } from '../engine/element'
+import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import type { Placement } from '../engine/fragment'
-import { make_point, make_rect, make_clip, read_point } from '../engine/geometry'
+import { make_point, make_rect, read_point } from '../engine/geometry'
 import type { Point } from '../engine/geometry'
 import { exact, make_request } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
@@ -13,6 +15,7 @@ import { resolve_paint } from '../engine/style'
 import { em, px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 import { box_layout } from './box'
+import type { BoxProps } from './box'
 import { TextBox } from './document'
 import type { TextBoxProps } from './document'
 import { graph_child, graph_size } from './graph'
@@ -20,9 +23,8 @@ import type { GraphProps } from './graph'
 import { arrow_draw, arrow_head_options, head_scope, resolve_arrow_head } from './marks'
 import type { ArrowProps } from './marks'
 import type { Side } from './placement'
-import { resolve_rect_radius } from './shapes'
 
-type NodeProps = TextBoxProps & Readonly<{ id?: string }>
+type NodeProps = TextBoxProps
 type EdgeProps = Omit<ArrowProps, 'from' | 'to'> & Readonly<{
   start: string | Element; end: string | Element
   start_side?: Side; end_side?: Side; start_loc?: number; end_loc?: number
@@ -39,27 +41,22 @@ function node_id(id: unknown): string {
   return id
 }
 
-class Node extends Element<NodeProps> {
-  static defaults: Partial<NodeProps> = {
+// Numeric x/y locate a child in data space, whatever kind of element it is.
+function position_bounds({ x, y }: ElementProps): DataBounds {
+  return { ...(typeof x === 'number' ? { xlim: [x, x] as const } : {}),
+    ...(typeof y === 'number' ? { ylim: [y, y] as const } : {}) }
+}
+
+// Any element with an id is a node. Node is the conventional one: a centered,
+// framed label whose connection boundary comes from its box like any other.
+class Node extends Element<BoxProps, NodeProps> {
+  static defaults: Partial<BoxProps> = {
     x: 0, y: 0, anchor: 'center', width: 'fit', align: 'center',
     padding: em(0.6), border_width: px(1), radius: em(0.3),
   }
-  static normalize(props: NodeProps): NodeProps {
-    if (props.id !== undefined) node_id(props.id)
-    return TextBox.normalize(props)
-  }
-  static data_bounds({ x = 0, y = 0 }: NodeProps) {
-    return { ...(typeof x === 'number' ? { xlim: [x, x] as const } : {}),
-      ...(typeof y === 'number' ? { ylim: [y, y] as const } : {}) }
-  }
-  static layout(props: NodeProps, query: LayoutQuery) {
-    const fragment = box_layout(props, query)
-    if (props.id === undefined) return fragment
-    const { width, height } = fragment.size
-    const boundary = make_clip(make_rect(0, 0, width, height),
-      resolve_rect_radius(props.radius ?? 0, fragment.size, query))
-    return make_fragment({ ...fragment, connection: { id: node_id(props.id), boundary } })
-  }
+  static normalize = TextBox.normalize
+  static data_bounds = position_bounds
+  static layout = box_layout
 }
 
 // An Edge describes a relationship. Network resolves it against completed node
@@ -70,8 +67,7 @@ class Edge extends Element<EdgeData, EdgeProps> {
     edge_layouts.add(this.type.layout)
   }
   static normalize(props: EdgeProps): EdgeData {
-    const endpoint = (value: string | Element) => node_id(value instanceof Element
-      ? (value.props as NodeProps).id : value)
+    const endpoint = (value: string | Element) => node_id(value instanceof Element ? value.props.id : value)
     return { ...head_scope(props), start: endpoint(props.start), end: endpoint(props.end) }
   }
   static data_bounds(props: EdgeData) {
@@ -142,7 +138,9 @@ class Network extends Element<NetworkProps> {
   static layout(props: NetworkProps, query: LayoutQuery) {
     const size = graph_size(query)
     const elements = element_children(props.children)
-    const coordinates = query.prepare('coordinates', () => infer_coordinates(elements, props))
+    // Positioned children are nodes or annotations alike; both belong in view.
+    const coordinates = query.prepare('coordinates', () => infer_coordinates(elements, props,
+      elements.filter(element => !is_edge(element)).map(element => position_bounds(element.props))))
     const children: Placement[] = []
     elements.forEach((element, index) => {
       if (!is_edge(element)) children[index] = graph_child(element, query, size, coordinates, index)

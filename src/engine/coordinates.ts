@@ -72,8 +72,9 @@ function data_bounds(element: Element): DataBounds | null {
   return merge_bounds(collect(element.props.children))
 }
 
-function infer_coordinates(children: Child, spec: CoordinateSpec = {}): Coordinates {
-  const bounds = merge_bounds(element_children(children).map(data_bounds))
+function infer_coordinates(children: Child, spec: CoordinateSpec = {},
+  extra: readonly (DataBounds | null)[] = []): Coordinates {
+  const bounds = merge_bounds([...element_children(children).map(data_bounds), ...extra])
   if (spec.coord && spec.coord.length !== 4) throw new TypeError('coord needs [xmin, ymin, xmax, ymax]')
   const raw = spec.padding ?? 0
   // Retain the original axis-object form as an alias for horizontal/vertical.

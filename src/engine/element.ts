@@ -10,6 +10,8 @@ import type { DataBounds } from './coordinates'
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
 type ElementProps = SizeSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
   children?: Child
+  // Any identified element is a connection target for the enclosing Network.
+  id?: string
   // Outline this element's allocated and content boxes without inheriting to children.
   debug?: boolean
   // Only the immediate stack parent interprets this placement override.
@@ -153,6 +155,10 @@ class Element<Props extends ElementProps = ElementProps, Input extends ElementPr
       const input = args[0] === undefined ? {} as Input : args[0]
       const source = definition.normalize ? definition.normalize(input) : input
       this.props = copy_data({ ...definition.defaults, ...source } as Props)
+    }
+    const { id } = this.props
+    if (id !== undefined && (typeof id !== 'string' || !id.length)) {
+      throw new TypeError('An element id must be a nonempty string')
     }
     Object.freeze(this)
   }
