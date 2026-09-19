@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   Box, Frame, Text, Span, HStack, VStack, Svg, Spacer, Overlay, Attach, Anchor,
-  Rotate, TransformBox, Fit, Rect, Square, Circle, Graph, Group, Slide, TitleFrame,
+  Rotate, TransformBox, Rect, Square, Circle, Graph, Group, Slide, TitleFrame,
   LayoutPass, define_element, make_fragment, make_size, make_request,
   exact, available, px, resolve_sizing, prepare_request, finish_size, render_svg,
 } from '../src/index'
@@ -52,7 +52,7 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass()
     const leaf = new Fixed({ content_width: px(30), content_height: px(10) })
     for (const Container of [Box, Frame, HStack, VStack, Svg, Overlay, Attach, Anchor,
-      Rotate, TransformBox, Fit, Group, Graph, Slide, TitleFrame]) {
+      Rotate, TransformBox, Group, Graph, Slide, TitleFrame]) {
       const fragment = pass.layout(new Container({ width: px(200), aspect: 2, children: leaf }))
       assert.deepEqual(fragment.size, { width: 200, height: 100 }, Container.name)
     }

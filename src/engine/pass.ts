@@ -14,6 +14,7 @@ import { copy_coordinates } from './coordinates'
 import type { Coordinates } from './coordinates'
 import { copy_math_context } from './math'
 import type { MathContext } from './math'
+import { fitting_mode, fitting_requests, fit_fragment } from './fitting'
 
 type LayoutContext = Readonly<{
   style?: Style; reference?: ReferenceBox; path?: string; coordinates?: Coordinates | null
@@ -133,8 +134,16 @@ class LayoutPass {
       active.add(key)
       try {
         const basis = { font_size: style.font_size, reference, path }
-        const sizing = resolve_sizing(element.props, { ...basis, request })
-        const prepared = prepare_request(request, sizing)
+        const own_sizing = resolve_sizing(element.props, { ...basis, request })
+        // Only a complete formula entering ordinary layout fits automatically.
+        // Internal TeX queries carry a math context; inline text measures its
+        // operands naturally. Explicit fit (including false) always takes precedence.
+        const auto_fit = element.type.auto_fit && !math && (request.width.kind !== 'natural'
+          || request.height.kind !== 'natural' || own_sizing.width.max < Infinity || own_sizing.height.max < Infinity)
+        const fit = fitting_mode(element.props.fit === undefined && auto_fit ? true : element.props.fit)
+        const fitting = fit && fitting_requests(request, own_sizing)
+        const sizing = fitting ? fitting.intrinsic : own_sizing
+        const prepared = fitting ? fitting.natural : prepare_request(request, sizing)
         const query: LayoutQuery = Object.freeze({
           request: prepared, sizing, style, reference, path, coordinates, math,
           child: (child, offer, basis = {}, index = 0, context = {}) => this.layout(child, offer, {
@@ -152,16 +161,34 @@ class LayoutPass {
           },
         })
 
-        this.#layouts++
-        const result = element.type.layout(element, query)
+        // Resizing a fitted element can reuse its natural drawing. This key
+        // includes every input visible to the source layout, but not the target.
+        const intrinsic_key = fitting
+          ? `intrinsic:${query_key(prepared, style, reference, this.#epoch, coordinates, math)}` : undefined
+        let result = intrinsic_key ? cache.get(intrinsic_key) : undefined
+        if (result) this.#hits++
+        else {
+          this.#layouts++
+          result = element.type.layout(element, query)
+        }
         const size = finish_size(result.size, prepared, sizing)
         if (size.width !== result.size.width || size.height !== result.size.height) {
           throw new Error('Element returned a size outside its sizing policy; use finish_size')
         }
+        if (fitting) {
+          cache.set(intrinsic_key!, result)
+          // Attach a leaf's fallback connection before scaling so its boundary
+          // follows the visible source, not a potentially letterboxed target.
+          if (element.props.id !== undefined && result.connection === undefined) {
+            result = make_fragment({ ...result,
+              connection: { id: element.props.id, boundary: make_rect(0, 0, size.width, size.height) } })
+          }
+          result = fit_fragment(result, fitting.request, fitting.target, fit!, element.props.fit_align)
+        }
         // An id makes any element connectable; elements may refine the boundary.
         const { id } = element.props
         const connection = id === undefined ? result.connection
-          : { id, boundary: result.connection?.boundary ?? make_rect(0, 0, size.width, size.height) }
+          : { id, boundary: result.connection?.boundary ?? make_rect(0, 0, result.size.width, result.size.height) }
         const fragment = make_fragment({ ...result, name: element.type.name,
           debug: element.props.debug ?? result.debug, connection })
         cache.set(key, fragment)

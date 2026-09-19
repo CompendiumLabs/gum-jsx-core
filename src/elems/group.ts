@@ -48,7 +48,7 @@ class Group extends Element<GroupProps> {
       }
 
       // Preferred child dimensions create sized regions through ordinary layout.
-      // Text reflows, shapes resize, and explicit Fit children can scale drawings.
+      // Text reflows, shapes resize, and fitted children can scale drawings.
       const fragment = query.child(element, request, size, index)
       const offset = make_point(point.x - fragment.size.width * align.x,
         point.y - fragment.size.height * align.y)

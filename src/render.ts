@@ -11,7 +11,8 @@ import type { SvgOptions } from './svg'
 
 // Source props beat defaults; overrides beat source props, as when a host theme wins.
 // Wrap props configure only the viewport generated around a bare element, such as
-// canvas bounds; an existing Svg ignores them. Undefined entries are absent, so
+// maximum canvas bounds with shrink-to-fit; an existing Svg ignores them.
+// Undefined entries are absent, so
 // optional caller settings can be forwarded directly.
 type ViewportOptions = Readonly<{ defaults?: SvgProps; overrides?: SvgProps; wrap?: SvgProps }>
 // A reused pass keeps its cache; otherwise fonts, or the core defaults, seed a new one.

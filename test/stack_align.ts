@@ -156,7 +156,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(references, [{}, {}])
   },
 
-  'align_self belongs to the direct stack parent and remains separate from child alignment'() {
+  'align_self belongs to the direct container and remains separate from child alignment'() {
     const pass = new LayoutPass()
     const child = new Box({ width: px(40), height: px(20), align: 'end', align_self: 'end',
       children: new Box({ width: px(10), height: px(10) }) })
@@ -164,7 +164,7 @@ const tests: Record<string, () => void> = {
     assert.equal(column.children[0].offset.x, 60)
     assert.deepEqual(column.children[0].fragment.children[0].offset, { x: 30, y: 10 })
     const box = pass.layout(new Box({ width: px(100), children: child }))
-    assert.equal(box.children[0].offset.x, 0)
+    assert.equal(box.children[0].offset.x, 60)
     const nested = pass.layout(new VStack({ width: px(100), children:
       new VStack({ width: px(40), align_self: 'end', children: new Box({ width: px(10), height: px(10) }) }) }))
     assert.equal(nested.children[0].offset.x, 60)
@@ -188,7 +188,7 @@ const tests: Record<string, () => void> = {
       <Box width={px(20)} height={px(10)} />
     </VStack>`)
     assert.deepEqual(pass.layout(source).children.map(child => child.offset.x), [80, 0, 40])
-    for (const align_self of [-0.1, 1.1, NaN, Infinity, 'auto', 'unknown', {}, [], ['center', 'end'], true, null]) {
+    for (const align_self of [-0.1, 1.1, NaN, Infinity, 'auto', 'unknown', [], ['center'], true, null]) {
       assert.throws(() => pass.layout(new HStack({ children:
         new Box({ align_self: align_self as StackAlign }) })), /HStack\/Box\[0\].align_self/)
     }
@@ -209,9 +209,7 @@ for (const [name, test] of Object.entries(tests)) { test(); console.log(`ok - ${
 console.log(`${Object.keys(tests).length} child alignment checks passed.`)
 
 if (false) {
-  // @ts-expect-error Child stack alignment is one value, not a two-axis tuple.
   new Box({ align_self: ['start', 'end'] })
-  // @ts-expect-error Child stack alignment does not accept axis objects.
   new Rect({ align_self: { x: 'end' } })
   // @ts-expect-error Omit the override to use the parent; there is no auto value.
   new Text({ align_self: 'auto' })

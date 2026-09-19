@@ -84,7 +84,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(named(fixed, 'Box').at(-1)!.size, { width: 120, height: 60 })
     const limited = pass.layout(new Slide({ children: new Graph({ max_width: px(200), max_height: px(100) }) }), request)
     assert.deepEqual(named(limited, 'Graph')[0].size, { width: 200, height: 100 })
-    const fit = pass.layout(new Slide({ children: new Text({ text: 'Compact', width: 'fit' }) }), request)
+    const fit = pass.layout(new Slide({ children: new Text({ text: 'Compact', align_self: { x: 'start' } }) }), request)
     assert.ok(named(fit, 'Text')[0].size.width < 100)
   },
 

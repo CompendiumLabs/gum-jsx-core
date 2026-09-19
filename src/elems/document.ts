@@ -91,13 +91,13 @@ class TextRow extends TextStack {
 }
 
 class TextCol extends TextStack {
-  static defaults: Partial<TextStackProps> = { width: 'fill', align: 'fill' }
+  static defaults: Partial<TextStackProps> = { align: 'fill' }
   static layout(props: TextStackProps, query: LayoutQuery) {
     return stack_layout(props, query, 'height')
   }
 }
 class TextBox extends Element<BoxProps, TextBoxProps> {
-  static defaults: Partial<BoxProps> = { width: 'fill', align: { x: 'fill' }, padding: em(0.6) }
+  static defaults: Partial<BoxProps> = { align: { x: 'fill' }, padding: em(0.6) }
   static normalize({ text, ...props }: TextBoxProps): BoxProps {
     return { ...props, children: text !== undefined ? new Text({ text }) : text_element(props.children) }
   }
@@ -145,7 +145,7 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     return { ...props, title_position,
       children: new VStack({ gap, align: 'stretch', children: text_children(children) }),
       title_box: title == null ? undefined : new Frame({
-        width: 'fit', padding, border_width, border_color, background, radius, align, font_size,
+        padding, border_width, border_color, background, radius, align, font_size,
         children: text_element(title, text),
       }),
     }

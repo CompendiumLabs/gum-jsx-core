@@ -12,9 +12,9 @@ type AxisRequest =
 type LayoutRequest = Readonly<Record<Axis, AxisRequest>>
 
 type SizeKey = Axis | `min_${Axis}` | `max_${Axis}`
-type SizeMode = 'fill' | 'fit'
-type SizeSpec = Readonly<Partial<Record<Exclude<SizeKey, 'width'>, Length>>
-  & { width?: Length | SizeMode; aspect?: number }>
+type SizeMode = 'fill'
+type SizeSpec = Readonly<Partial<Record<Exclude<SizeKey, Axis>, Length>>
+  & { width?: Length | SizeMode; height?: Length | SizeMode; aspect?: number }>
 type AxisSizing = Readonly<{ preferred?: number; mode?: SizeMode; min: number; max: number }>
 type Sizing = Readonly<Record<Axis, AxisSizing> & { aspect?: number }>
 
@@ -75,13 +75,16 @@ function resolve_sizing(spec: SizeSpec = {}, context: LengthContext & { request?
       if (length === undefined) return undefined
       const location = `${path}.${key}`
       if (typeof length === 'string') {
-        throw new TypeError(`${location}: expected a length${key === 'width' ? ', "fill", or "fit"' : ''}`)
+        if (((length as string) === 'fit' || (length as string) === 'hug') && (key === 'width' || key === 'height')) {
+          throw new TypeError(`${location}: omit the dimension for content sizing; use align_self to opt out of parent fill, or fit for scaling`)
+        }
+        throw new TypeError(`${location}: expected a length${key === 'width' || key === 'height' ? ' or "fill"' : ''}`)
       }
       return nonnegative(resolve_length(length, basis, location), location)
     }
 
     const value = spec[axis]
-    const mode = axis === 'width' && (value === 'fill' || value === 'fit') ? value : undefined
+    const mode = value === 'fill' ? value : undefined
     const offer = context.request?.[axis]
     const preferred = mode === undefined ? resolve(axis)
       : mode === 'fill' && offer?.kind === 'available' ? nonnegative(offer.value, `${path}.${axis}`) : undefined

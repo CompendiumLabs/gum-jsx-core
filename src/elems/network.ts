@@ -51,7 +51,7 @@ function position_bounds({ x, y }: ElementProps): DataBounds {
 // framed label whose connection boundary comes from its box like any other.
 class Node extends Element<BoxProps, NodeProps> {
   static defaults: Partial<BoxProps> = {
-    x: 0, y: 0, anchor: 'center', width: 'fit', align: 'center',
+    x: 0, y: 0, anchor: 'center', align: 'center',
     padding: em(0.6), border_width: px(1), radius: em(0.3),
   }
   static normalize = TextBox.normalize

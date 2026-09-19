@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Network, Node, Edge, Box, Fit, Rotate, TransformBox, Text, Circle, Rect, VStack, TitleFrame, LayoutPass,
+  Network, Node, Edge, Box, Rotate, TransformBox, Text, Circle, Rect, VStack, TitleFrame, LayoutPass,
   define_element, define_component,
   evaluate, make_request, exact, make_fragment, make_size, make_rect, px, em, render_svg,
 } from '../src/index'
@@ -62,7 +62,7 @@ const tests: Record<string, () => void> = {
   'connections follow fitted and padded node frames instead of wrapper allocations'() {
     const a = new Node({ id: 'a', width: px(60), height: px(30), radius: 0, text: 'A' })
     const wrappers: readonly [Element, Point][] = [
-      [new Fit({ x: 0.3, y: 0.5, anchor: 'center', width: px(180), height: px(100), children: a }),
+      [new Box({ fit: 'contain', x: 0.3, y: 0.5, anchor: 'center', max_width: px(180), max_height: px(100), children: a }),
         { x: 135, y: 195 }],
       [new Box({ x: 0.3, y: 0.5, anchor: 'center', width: px(180), height: px(100),
         padding: px(10), align: 'center', children: a }), { x: 165, y: 165 }],

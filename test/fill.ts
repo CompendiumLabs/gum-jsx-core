@@ -13,9 +13,9 @@ const widths = (fragment: ReturnType<LayoutPass['layout']>) =>
   fragment.children.map(child => child.fragment.size.width)
 
 const tests: Record<string, () => void> = {
-  'fill uses the actual offer and fit measures content, with natural fallback and exact precedence'() {
+  'fill uses the actual offer and omission measures content, with natural fallback and exact precedence'() {
     const pass = new LayoutPass()
-    for (const mode of ['fill', 'fit'] as const) {
+    for (const mode of ['fill', undefined] as const) {
       const box = new Box({ width: mode, max_width: px(120),
         children: new Fixed({ content_width: px(40) }) })
       const source = JSON.stringify(box)
@@ -42,9 +42,9 @@ const tests: Record<string, () => void> = {
       pass.layout(new Text({ text: 'Hi' })).size.width)
   },
 
-  'box fill respects explicit widths, fit, local units, and limits inside padding and borders'() {
+  'box fill respects explicit widths, self alignment, local units, and limits inside padding and borders'() {
     const cases: [ElementProps, number][] = [
-      [{}, 160], [{ width: 'fill' }, 160], [{ width: 'fit' }, 40],
+      [{}, 160], [{ width: 'fill' }, 160], [{ align_self: { x: 'start' } }, 40],
       [{ width: px(60) }, 60], [{ width: 0.5 }, 80], [{ width: 0 }, 0],
       [{ max_width: px(100) }, 100], [{ min_width: px(180) }, 180],
       [{ font_size: em(2), max_width: em(2) }, 64],
@@ -68,9 +68,9 @@ const tests: Record<string, () => void> = {
     assert.equal(zero.overflow.right, 96)
   },
 
-  'columns fill automatic widths and keep explicit, fitted, bounded, and aligned children'() {
+  'columns fill automatic widths and keep explicit, hugging, bounded, and aligned children'() {
     const column = new LayoutPass().layout(new VStack({ width: px(200), align: 'fill', children: [
-      new Fixed(), new Fixed({ width: 'fill' }), new Fixed({ width: 'fit' }),
+      new Fixed(), new Fixed({ width: 'fill' }), new Fixed({ align_self: 'start' }),
       new Fixed({ width: px(60) }), new Fixed({ width: 0.5 }), new Fixed({ max_width: px(80) }),
       new Fixed({ min_width: px(220) }), new Fixed({ align_self: 'end' }),
       new Fixed({ width: px(20), max_width: px(30), align_self: 'stretch' }),
@@ -83,12 +83,33 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(widths(override), [150])
   },
 
+  'self alignment overrides one box axis without losing the other and selects the stack cross axis'() {
+    const pass = new LayoutPass()
+    const result = pass.layout(new Frame({ width: px(202), height: px(102), align: 'fill', children:
+      new Fixed({ align_self: { x: 'end' }, content_width: px(40) }) }))
+    assert.deepEqual(result.children[0].fragment.size, { width: 40, height: 100 })
+    assert.deepEqual(result.children[0].offset, { x: 161, y: 1 })
+    const tuple = pass.layout(new Box({ width: px(200), height: px(100), align: 'fill', children:
+      new Fixed({ align_self: ['end', 'center'], content_width: px(40) }) }))
+    assert.deepEqual(tuple.children[0].fragment.size, { width: 40, height: 20 })
+    assert.deepEqual(tuple.children[0].offset, { x: 160, y: 40 })
+    for (const Container of [HStack, VStack]) {
+      const row = Container === HStack
+      const f = pass.layout(new Container({ width: px(200), height: px(100), align: 'fill', children:
+        new Fixed({ align_self: row ? { y: 'end' } : { x: 'end' }, content_width: px(40) }) }))
+      assert.equal(f.children[0].offset[row ? 'y' : 'x'], row ? 80 : 160)
+      const inherited = pass.layout(new Container({ width: px(200), height: px(100), align: 'fill', children:
+        new Fixed({ align_self: row ? { x: 'end' } : { y: 'end' } }) }))
+      assert.equal(inherited.children[0].fragment.size[row ? 'height' : 'width'], row ? 100 : 200)
+    }
+  },
+
   'natural fill columns select their width once and reflow within child limits'() {
     const pass = new LayoutPass()
     const text = new Text({ text: paragraph, max_width: px(80) })
     const expected = pass.layout(text)
     const column = pass.layout(new VStack({ align: 'fill', gap: px(4), children: [
-      text, new Fixed({ width: px(200) }), new Fixed({ width: 'fit', content_width: px(40) }),
+      text, new Fixed({ width: px(200) }), new Fixed({ align_self: 'start', content_width: px(40) }),
     ] }))
     assert.equal(column.size.width, 200)
     assert.equal(column.children[0].fragment.size.width, 80)
@@ -125,14 +146,14 @@ const tests: Record<string, () => void> = {
     assert.ok(narrow.size.height > wide.size.height)
   },
 
-  'document defaults carry width through nested content and preserve explicit opt-outs'() {
+  'one explicit document width carries through nested content and alignment selects compact children'() {
     const source = evaluate(`<Svg width={px(400)}>
-      <TextBox padding={px(20)}><TextCol gap={0}>
+      <TextBox width="fill" padding={px(20)}><TextCol gap={0}>
         <HStack><Text>Left</Text><Spacer /><Text>Right</Text></HStack>
         <Frame><Text>Content</Text></Frame>
         <TextFrame padding={px(10)}><TextCol gap={0}>
           <Box width={0.5} height={px(10)} />
-          <Frame width="fit"><Text>Small</Text></Frame>
+          <Frame align-self="start"><Text>Small</Text></Frame>
         </TextCol></TextFrame>
       </TextCol></TextBox>
     </Svg>`)
@@ -148,11 +169,11 @@ const tests: Record<string, () => void> = {
 
     for (const Container of [TextBox, TextFrame, TextCol]) {
       const child = new Fixed({ content_width: px(40) })
-      const natural = pass.layout(new Container({ width: 'fit', children: child }))
-      const offered = pass.layout(new Container({ width: 'fit', children: child }),
+      const natural = pass.layout(new Container({ children: child }))
+      const offered = pass.layout(new Container({ children: child }),
         make_request({ width: available(300) }))
       assert.deepEqual(offered.size, natural.size)
-      const filled = pass.layout(new Container({ children: child }), make_request({ width: available(300) }))
+      const filled = pass.layout(new Container({ width: 'fill', children: child }), make_request({ width: available(300) }))
       assert.equal(filled.size.width, 300)
     }
     const centered = pass.layout(new TextBox({ width: px(200), padding: 0, align: 'center',
@@ -163,14 +184,14 @@ const tests: Record<string, () => void> = {
     assert.equal(primitives.size.width, 96)
   },
 
-  'fill width adds no implicit flex weights and fit text still wraps'() {
+  'fill width adds no implicit flex weights and hugging text still wraps'() {
     const pass = new LayoutPass()
     const row = pass.layout(new HStack({ width: px(300), children: [
       new TextBox({ padding: 0, children: new Fixed({ content_width: px(40) }) }),
       new TextBox({ padding: 0, children: new Fixed({ content_width: px(60) }) }),
     ] }))
     assert.deepEqual(widths(row), [40, 60])
-    const text = new TextBox({ width: 'fit', padding: 0, children: paragraph })
+    const text = new TextBox({ padding: 0, children: paragraph })
     const wide = pass.layout(text, make_request({ width: available(300) }))
     const narrow = pass.layout(text, make_request({ width: available(120) }))
     assert.ok(narrow.size.height > wide.size.height)
@@ -200,16 +221,16 @@ const tests: Record<string, () => void> = {
 
   'fill is sizing alignment, not a point or main-axis packing value'() {
     for (const source of [
-      '<HStack justify="fill" />', '<Fit align="fill"><Text>A</Text></Fit>',
+      '<HStack justify="fill" />', '<Text fit fit-align="fill">A</Text>',
       '<Rotate origin="fill"><Text>A</Text></Rotate>',
       '<Group width={px(100)} height={px(100)}><Text anchor="fill">A</Text></Group>',
       '<Graph><Text anchor="fill">A</Text></Graph>',
       '<Overlay><Text>A</Text><Text anchor="fill">B</Text></Overlay>',
-    ]) assert.throws(() => new LayoutPass().layout(evaluate(source)), /grow|point|uniform scaling/)
+    ]) assert.throws(() => new LayoutPass().layout(evaluate(source)), /grow|point|never stretches/)
     for (const width of ['unknown', 'auto', '100%']) {
       assert.throws(() => new LayoutPass().layout(new Box({ width } as unknown as SizeSpec)), /Box.width/)
     }
-    for (const prop of ['height', 'min_width', 'max_width']) {
+    for (const prop of ['min_width', 'max_width', 'min_height', 'max_height']) {
       assert.throws(() => new LayoutPass().layout(new Box({ [prop]: 'fill' })), /expected a length/)
     }
   },

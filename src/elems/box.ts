@@ -1,19 +1,18 @@
 import { nonnegative } from '../lib/checks'
-import { layout_content, resolve_alignment, align_offset, fit_scale, definite_reference } from '../lib/composition'
-import type { Alignment, FitMode } from '../lib/composition'
+import { layout_content } from '../lib/composition'
+import type { Alignment } from '../lib/composition'
 import { DEFAULTS } from '../engine/defaults'
 import { theme_color } from '../engine/theme'
 import { draw_rect } from '../engine/drawing'
 import { Element, content_child } from '../engine/element'
 import type { ElementProps } from '../engine/element'
-import { make_fragment, place_fragment, transform_guides, frame_connection } from '../engine/fragment'
+import { make_fragment, place_fragment, frame_connection } from '../engine/fragment'
 import type { Fragment } from '../engine/fragment'
 import {
-  make_size, make_point, make_rect, make_clip, make_insets, add_insets,
+  make_point, make_rect, make_clip, make_insets, add_insets,
   resolve_insets, deflate_size, map_radii, read_point,
 } from '../engine/geometry'
 import type { Rect, RectRadii, Size, InsetSpec } from '../engine/geometry'
-import { make_request, finish_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { resolve_rect_radius } from './shapes'
 import type { RectRadius } from './shapes'
@@ -26,11 +25,6 @@ type BoxProps = ElementProps & Readonly<{
   border_color?: string
   background?: string
   radius?: RectRadius
-  align?: Alignment
-  clip?: boolean
-}>
-type FitProps = ElementProps & Readonly<{
-  mode?: FitMode
   align?: Alignment
   clip?: boolean
 }>
@@ -119,37 +113,5 @@ class Frame extends Element<BoxProps> {
   }
 }
 
-class Fit extends Element<FitProps> {
-  static layout(props: FitProps, query: LayoutQuery) {
-    const { mode = 'contain', align = 'center', clip = false } = props
-    const alignment = resolve_alignment(align)
-    if (typeof alignment.x !== 'number' || typeof alignment.y !== 'number') {
-      throw new TypeError('Fit uses uniform scaling; choose start, center, or end alignment')
-    }
-    const child = content_child(props.children)
-    // Fit deliberately occupies finite offers, establishing those axes before
-    // measuring its child naturally. Unoffered axes follow the scaled child.
-    const reference = { ...definite_reference(query.request, query.sizing) }
-    for (const axis of ['width', 'height'] as const) {
-      const offer = query.request[axis]
-      if (offer.kind !== 'natural') reference[axis] = offer.value
-    }
-    const fragment = child ? query.child(child, make_request(), reference) : undefined
-    const measured = fragment?.size ?? make_size()
-    const initial = fit_scale(measured, reference, mode)
-    const target = make_size(reference.width ?? measured.width * initial,
-      reference.height ?? measured.height * initial)
-    const size = finish_size(target, query.request, query.sizing)
-    const scale = fit_scale(measured, size, mode)
-    const scaled = make_size(measured.width * scale, measured.height * scale)
-    const offset = align_offset(size, scaled, alignment)
-    const children = fragment ? [place_fragment(fragment, offset, [scale, 0, 0, scale, 0, 0])] : []
-    return make_fragment({
-      size, children, guides: transform_guides(fragment?.guides ?? {}, offset.y, scale),
-      ...(clip ? { clip: make_rect(0, 0, size.width, size.height) } : {}),
-    })
-  }
-}
-
-export { Box, Frame, Fit, box_layout }
-export type { BoxProps, FitProps }
+export { Box, Frame, box_layout }
+export type { BoxProps }

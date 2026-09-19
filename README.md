@@ -98,10 +98,11 @@ horizontal insets use reference width; height and vertical insets use reference
 height. The reference is the parent's established content box before flex slots
 are allocated. Deflating an offer does not change that reference.
 
-Width additionally accepts `"fill"` and `"fit"`. Fill occupies an available width,
+Width and height additionally accept `"fill"`. Fill occupies an available dimension,
 clamped to own limits, and falls back to ordinary measurement without an offer.
-Fit uses ordinary measurement and opts out of a parent's fill alignment; text
-still wraps at its available width. These values are width policies, not lengths.
+Omitted dimensions use ordinary measurement; text still wraps at its available
+width. Use `align_self` to opt out of parent fill alignment. Fill is a sizing
+policy, not a length.
 `resolve_sizing` accepts an optional `request` in its context to resolve fill from
 the actual parent offer. The layout pass supplies it automatically. Resolving fill
 once keeps an own maximum from turning natural measurement into a full-width request.
@@ -281,6 +282,15 @@ axes become child percentage references and available-space offers. A hugging
 axis remains indefinite during measurement; its final size is never fed back as
 a percentage basis. An empty unsized Svg is 0×0.
 
+On hugging axes, `max_width` and `max_height` first provide layout offers, then
+uniformly scale down the completed figure if it exceeds either maximum. Both
+dimensions shrink together, including fonts, strokes, guides, and reserved
+outsets. Small figures are not enlarged. This lets preview hosts bound a figure
+without cropping it. An exact axis still keeps its allocation and clipping;
+ordinary `available()` offers alone never trigger scaling. Width-only rendering
+therefore retains normal reflow and natural height. Other elements' max props
+continue to constrain their allocations without scaling their content.
+
 The viewport follows layout bounds, not ink, and clips overflow at its edges.
 An unsized `Rect` fills both available viewport axes. Its stroke straddles its
 geometry, so half the stroke extends outside the layout rectangle; the fragment records that
@@ -357,8 +367,9 @@ alone does not establish that box.
 pass resolves shared style and sizing, runs the layout method, validates its size,
 and caches the fragment. Insets, placement, and decoration belong to elements.
 Element-specific properties are interpreted by the element's layout method.
-The direct stack parent interprets a child's `basis`, `grow`, `shrink`, and
-`align_self`; these properties introduce no policy in the layout pass and do not inherit.
+The direct stack parent interprets a child's `basis`, `grow`, and `shrink`.
+Stacks and single-content containers interpret `align_self`; these placement
+properties introduce no policy in the layout pass and do not inherit.
 Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
 do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
@@ -476,18 +487,19 @@ hug. Center/end alignment may give oversized children negative offsets. Baseline
 move with the child. Clipping changes visible ink and retains overflow.
 
 Fill uses the established content area but allocates only automatically sized
-children, respecting explicit dimensions, `width="fit"`, and min/max limits.
+children, respecting explicit dimensions and min/max limits.
 Remaining space stays at the end of a fill-aligned axis. Hard stretch continues
 to override child dimensions and limits.
 
-For document layouts, `TextBox` and `TextFrame` default to `width="fill"` and
-`align={{ x: "fill" }}`; `TextCol` defaults to `width="fill"` and `align="fill"`.
+For document layouts, `TextBox` and `TextFrame` default to `align={{ x: "fill" }}`;
+`TextCol` defaults to `align="fill"`. All are content-sized by default; set
+`width="fill"` at the document boundary to occupy the offered width.
 Their existing padding, border, and gap defaults remain. Heights are content-sized,
 and flexible row children still require explicit flex weights.
 
 ```jsx
 <Svg width={px(400)}>
-  <TextBox padding={em(1)}>
+  <TextBox width="fill" padding={em(1)}>
     <TextCol gap={0}>
       <HStack><Text>Left</Text><Spacer /><Text>Right</Text></HStack>
       <Frame><Text>Content</Text></Frame>
@@ -496,8 +508,10 @@ and flexible row children still require explicit flex weights.
 </Svg>
 ```
 
-Use `width="fit"` for compact document components. `Box`, `Frame`, `HStack`, and
-`VStack` retain their ordinary sizing defaults.
+Use `align_self="start"` for a compact child inside a fill-aligned container.
+Box/Frame children can override either axis with an object (omitted axes inherit),
+or both with a scalar/tuple. The child's own `align` still arranges its contents.
+`Box`, `Frame`, `HStack`, and `VStack` retain their ordinary sizing defaults.
 
 Use nested Boxes for spacing outside a decorated frame:
 
@@ -520,23 +534,42 @@ no separate `margin` prop or implicit wrapper in the layout pass. Empty boxes
 measure their padding plus border; an empty undecorated Box is 0×0. Oversized
 insets floor content dimensions at zero and retain their full excess as overflow.
 
-`Fit` is an explicit uniform transform of one naturally measured child:
+Fitting is an element prop, separate from allocation. Put it directly on a
+formula, text, frame, stack, canvas, or custom element:
 
 ```jsx
-<Fit width={px(280)} height={px(80)} mode="contain">
-  <Text font_size={px(16)}>One fitted line</Text>
-</Fit>
+<Text fit max_width={px(280)} font_size={px(16)}>One fitted line</Text>
 ```
 
-Fit occupies finite offered axes; unoffered axes follow the scaled child. It
-establishes its chosen target axes as references, then queries the child naturally.
-`contain` fits within the target, `cover` fills it with possible overflow, and
-`scale_down` contains without enlarging. Alignment defaults to center and accepts
-the same positions as Box, excluding fill and stretch. `clip` defaults to false; enable it
-for cropped cover fitting. Fit scales the child's allocated rectangle, including
-any nested padding, glyphs, strokes, and guides; it does not fit ink extents. Text
-keeps its natural line breaks instead of reflowing to the target width. Zero source axes
-contribute no scale ratio, and a zero target can produce an invisible scale of zero.
+`fit` measures the element naturally, then uniformly shrinks
+it only when needed. It hugs the result, so a larger host adds no blank strip.
+`fit="contain"` allows enlargement; `fit="cover"` fills and clips the target.
+Those modes occupy finite offered axes; an unoffered axis follows the scaled drawing.
+
+Authored width/height/aspect describe the natural drawing. Parent offers and own
+maxima constrain its final fitted size; minima reserve space in the final allocation.
+Fill sizing and exact parent allocations can deliberately reserve a larger frame.
+`fit_align` defaults to center and accepts the same positions as Box, excluding
+fill/stretch. It does not replace `align`, which still arranges the element's children.
+
+The shared layout pass applies fitting, so custom elements need no special code.
+Fitting is not inherited. Glyphs, strokes, padding, baselines, math metrics, and
+connection geometry scale together. Zero-sized targets are valid. Unchanged
+geometry returns without adding a transform fragment. Fitting uses allocated
+geometry, not ink bounds; declared outsets follow the transform. Omitted
+dimensions use ordinary layout, including text reflow.
+
+Whole formulas from the math package fit finite offers and own maxima automatically.
+Internal math allocations and inline formula measurement remain natural.
+`fit={false}` disables automatic fitting. Math spacing, rules, and stretch primitives
+retain their allocation behavior. A source type's `auto_fit` capability (also
+available in `define_element` options) survives protocol adoption by components;
+it is not an authored element prop. Resizing reuses the cached natural drawing.
+
+Migration: omit former `width="fit"` / `width="hug"` dimensions; move parent-fill
+opt-outs to `align_self` and content-based growth to `basis="auto"`. The `Fit`
+element is removed; put `fit` on the content itself. Former `scale_down` or
+`fit="shrink"` becomes bare `fit`; use `max_width`/`max_height` for fitting bounds.
 
 ## Stacks
 
@@ -621,9 +654,9 @@ retain measured bases. An own maximum can supply an available budget, while a
 minimum alone retains natural bases before adding surplus.
 
 `basis="auto"` skips the zero fallback and uses an explicit main-axis dimension
-or measured content. A row child's `width="fit"` also preserves a measured basis;
-`width="fill"` supplies no fixed basis. Grow still enlarges the final allocation,
-and an explicit length basis overrides fit. An explicit `basis={0}` stays zero
+or measured content. `width="fill"` supplies no fixed basis. Grow still enlarges
+the final allocation, and explicit length bases take precedence. Alignment does
+not choose a basis. An explicit `basis={0}` stays zero
 even without a budget, where content can overflow a zero allocation.
 
 `grow={1}` gives an unsized item an equal share of remaining space alongside
@@ -656,7 +689,7 @@ selecting the shared height. Stretch may override a child's preferred cross size
 and cross limits, following the exact-request contract. The selected cross size
 is never fed back into percentage references. These are bounded measurement
 phases, with no aspect-fitting search or font scaling. Fill follows the same
-phases but preserves explicit cross dimensions and `width="fit"`, and clamps
+phases but preserves explicit cross dimensions and child alignment overrides, and clamps
 automatic allocations to child limits. Only participating fill/stretch children
 are remeasured at their selected cross size. A stretching column keeps its selected
 width if a non-stretching child later grows wider during height allocation;
@@ -737,7 +770,7 @@ lengths. Anchors are dimensionless fractions of the allocated child rectangle, n
 its painted ink. `anchor="center"` subtracts half the child's width and height;
 `anchor={[1, 0]}` or `anchor={{x: "end", y: "start"}}` places its top-right corner
 at the position. Tuple entries can mix fractions and keywords, for example
-`anchor={['end', 0.5]}`. Per-axis Box/Fit/Anchor alignment and Rotate origins also
+`anchor={['end', 0.5]}`. Per-axis Box/Anchor alignment, fitting alignment, and Rotate origins also
 accept tuples. Stack alignment stays a single-axis value.
 Anchors accept neither fill nor stretch; width and height control sizing.
 
@@ -749,7 +782,7 @@ arbitrarily placed labels; child fragments retain their local guides.
 
 Group uses one query per child, then positions completed fragments. Pixel-sized
 fonts and strokes remain pixel-sized when the canvas changes; text reflows within
-its region. Use a positioned `Fit` when the intent is to scale a completed drawing.
+its region. Set `fit` on a positioned element to scale its completed drawing.
 Clipping affects visible ink and leaves allocations and unclipped overflow inspectable.
 
 See the [Group implementation](./src/elems/group.ts) and the
@@ -1091,7 +1124,7 @@ examples, and current limits.
 ```
 
 Any element with an `id` is a node. Node is the conventional one: a compact
-TextFrame with `width="fit"` and a centered placement anchor. Network uses Graph sizing and coordinates, inferring limits
+TextFrame with a centered placement anchor. Network uses Graph sizing and coordinates, inferring limits
 from child x/y positions and edge waypoints with 0.2 default data padding. Explicit node
 widths wrap labels at their ordinary font size. Put edges first to paint them
 behind nodes; source order remains paint order independently of measurement order.
@@ -1100,7 +1133,7 @@ Each identified element's fragment exposes `connection: { id, boundary }` in loc
 pixels. Boxes, rectangles, squares, circles, and ellipses report their rounded or
 elliptical outline; LayoutPass supplies the allocation rectangle for the rest. Network lays out ordinary children
 first, then follows their placements to locate these boundaries through Box,
-Fit, Rotate, and other containers. Ports and normals follow the composed transforms,
+Rotate, and other containers, including fitted elements. Ports and normals follow the composed transforms,
 including when the visible frame differs from its surrounding allocation.
 Identified containers stay transparent, so a group and its members are both
 addressable. Nested networks set `connection_scope` to keep their IDs local, and
@@ -1188,7 +1221,9 @@ bare element is wrapped in `Svg`; an existing `Svg` keeps its layout descriptor
 and props, with `options.defaults` spread beneath them and `options.overrides`
 above them, while `options.wrap` props reach only a generated viewport, such as
 preview bounds an explicit `Svg` should not inherit (undefined entries are
-ignored throughout). The viewport is laid out under
+ignored throughout). For example, `wrap: { max_width: px(640), max_height: px(480) }`
+reflows a bare element within those offers and scales down the whole figure if
+needed to satisfy the maxima. The viewport is laid out under
 `options.request` by `options.pass`, or by a new pass seeded with `options.fonts`
 or the core fonts, and serialized with the remaining `render_svg` options. Fonts
 given alongside a pass are installed on it through `set_resource`. The result is

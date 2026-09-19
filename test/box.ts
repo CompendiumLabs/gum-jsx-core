@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Box, Frame, Fit, Svg, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
+  Box, Frame, Svg, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
   TextFigure, Legend, Slide, Fonts, LayoutPass, evaluate,
   px, em, make_request, exact, available, make_size, make_insets,
   render_svg, inspect_fragment,
@@ -333,47 +333,6 @@ const tests: Record<string, () => void> = {
     const frame = pass.layout(new Frame({ children: new Square({ width: px(20), stroke: 'none' }) }))
     assert.deepEqual(frame.size, { width: 22, height: 22 })
     assert.deepEqual(frame.ink, { x: 0, y: 0, width: 22, height: 22 })
-  },
-
-  'Fit scales completed geometry and guides uniformly, with explicit cover clipping'() {
-    const pass = new LayoutPass()
-    const leaf = new Fixed({ content_width: px(200), content_height: px(100), fill: 'teal' })
-    const props = { width: px(100), height: px(100), children: leaf }
-    const contain = pass.layout(new Fit(props))
-    assert.deepEqual(contain.children[0].offset, { x: 0, y: 25 })
-    assert.deepEqual(contain.children[0].transform, [0.5, 0, 0, 0.5, 0, 0])
-    assert.equal(contain.guides.baseline, 65)
-    const cover = pass.layout(new Fit({ ...props, mode: 'cover', clip: true }))
-    assert.equal(cover.children[0].fragment, contain.children[0].fragment)
-    assert.deepEqual(cover.children[0].offset, { x: -50, y: 0 })
-    assert.deepEqual(cover.ink, { x: 0, y: 0, width: 100, height: 100 })
-    assert.equal(cover.overflow.left, 50); assert.equal(cover.overflow.right, 50)
-    const width = pass.layout(new Fit({ width: px(100), children: leaf }))
-    assert.deepEqual(width.size, { width: 100, height: 50 })
-    const down = pass.layout(new Fit({ width: px(400), height: px(200), mode: 'scale_down', children: leaf }))
-    assert.deepEqual(down.children[0].transform, [1, 0, 0, 1, 0, 0])
-    const zero = pass.layout(new Fit({ width: px(0), height: px(0), children: leaf }))
-    assert.deepEqual(zero.children[0].transform, [0, 0, 0, 0, 0, 0])
-    assert.equal(zero.ink, null)
-    assert.deepEqual(pass.layout(new Fit()).size, make_size())
-  },
-
-  'fitting text is distinct from ordinary Box reflow and keeps pixel strokes in the source'() {
-    const pass = new LayoutPass()
-    const text = new Text({ text: 'Several words make a long label', font_size: px(20) })
-    const box = pass.layout(new Box({ width: px(100), children: text }))
-    const fit = pass.layout(new Fit({ width: px(100), children: text }))
-    assert.ok(box.children[0].fragment.children.length > 1)
-    assert.equal(fit.children[0].fragment.children.length, 1)
-    assert.ok(fit.children[0].transform![0] < 1)
-    const square = pass.layout(new Square(), make_request({ width: exact(80), height: exact(40) }))
-    assert.ok(square.draw[0].kind === 'rect')
-    assert.deepEqual(square.draw[0].rect, { x: 20, y: 0, width: 40, height: 40 })
-    const scaled = pass.layout(new Fit({ width: px(40), children: new Square({
-      width: px(20), stroke_width: px(2),
-    }) }))
-    assert.equal(scaled.children[0].fragment.draw[0].stroke_width, 2)
-    assert.equal(scaled.children[0].transform![0], 2)
   },
 }
 

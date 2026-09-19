@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Overlay, Attach, Anchor, Rotate, TransformBox, Box, Fit, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
+  Overlay, Attach, Anchor, Rotate, TransformBox, Box, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
   TextFrame, Bullets, Slide, Graph, Points, Arc, Arrow, Spline, RoundedLine, HFill,
   Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d, evaluate,
 } from '../src/index'
@@ -100,10 +100,12 @@ const tests: Record<string, () => void> = {
     ]
     const pass = new LayoutPass()
     for (const [tuple, record] of pairs) {
-      for (const Wrapper of [Box, Fit, Anchor]) {
+      for (const Wrapper of [Box, Anchor]) {
         assert.deepEqual(pass.layout(new Wrapper({ align: tuple, children: child }), fixed),
           pass.layout(new Wrapper({ align: record, children: child }), fixed))
       }
+      assert.deepEqual(pass.layout(new Box({ fit: 'contain', fit_align: tuple, children: child }), fixed),
+        pass.layout(new Box({ fit: 'contain', fit_align: record, children: child }), fixed))
       assert.deepEqual(pass.layout(new Rotate({ origin: tuple, angle: 45, resize: false, children: child })),
         pass.layout(new Rotate({ origin: record, angle: 45, resize: false, children: child })))
     }

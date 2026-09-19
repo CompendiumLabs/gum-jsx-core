@@ -58,15 +58,15 @@ const tests: Record<string, () => void> = {
     }
   },
 
-  'auto and fit preserve content-based growth while fill supplies no fixed basis'() {
+  'auto preserves content-based growth while fill and alignment supply no fixed basis'() {
     const pass = new LayoutPass()
-    for (const props of [{ basis: 'auto' }, { width: 'fit' }] satisfies ElementProps[]) {
+    for (const props of [{ basis: 'auto' }, { basis: 'auto', align_self: 'start' }] satisfies ElementProps[]) {
       const result = pass.layout(new HStack({ width: px(300), children:
         [40, 80].map(size => leaf('width', size, { grow: 1, ...props })) }))
       assert.deepEqual(lengths(result), [130, 170])
     }
     const fitZero = pass.layout(new HStack({ width: px(300), children:
-      [40, 80].map(size => leaf('width', size, { width: 'fit', basis: 0, grow: 1 })) }))
+      [40, 80].map(size => leaf('width', size, { align_self: 'start', basis: 0, grow: 1 })) }))
     assert.deepEqual(lengths(fitZero), [150, 150])
     for (const basis of [undefined, 'auto'] as const) {
       const row = pass.layout(new HStack({ width: px(300), children: [40, 80].map(size =>
@@ -76,9 +76,9 @@ const tests: Record<string, () => void> = {
     const column = pass.layout(new VStack({ height: px(300), children:
       [40, 80].map(size => leaf('height', size, { grow: 1, basis: 'auto' })) }))
     assert.deepEqual(lengths(column, 'height'), [130, 170])
-    // Fit width controls horizontal measurement, not a column's vertical basis.
+    // Cross-axis alignment does not alter a column's vertical growth basis.
     const vertical = pass.layout(new VStack({ height: px(300), children:
-      [40, 80].map(size => leaf('height', size, { grow: 1, width: 'fit' })) }))
+      [40, 80].map(size => leaf('height', size, { grow: 1, align_self: 'start' })) }))
     assert.deepEqual(lengths(vertical, 'height'), [150, 150])
   },
 

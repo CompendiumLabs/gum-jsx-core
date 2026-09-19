@@ -10,7 +10,7 @@ import { make_point, make_size } from '../engine/geometry'
 import { available, exact, natural, make_request, finish_size, resolve_sizing } from '../engine/layout'
 import type { Axis, AxisRequest, Sizing } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_font_size, resolve_length } from '../engine/units'
+import { px, resolve_font_size, resolve_length } from '../engine/units'
 import type { Length, ReferenceBox } from '../engine/units'
 
 type StackAlign = AlignmentValue | 'baseline'
@@ -21,6 +21,8 @@ type StackProps = ElementProps & Readonly<{
   gap?: Length
   align?: StackAlign
   justify?: StackJustify
+  wrap?: boolean
+  line_gap?: Length
 }>
 type Item = {
   element: Element
@@ -55,9 +57,9 @@ function stack_item(element: Element, index: number, main: Axis,
   const sizing = resolve_sizing(props, { font_size, reference, path })
   const grow = nonnegative(props.grow ?? 0, `${path}.grow`)
   // Unsized growth divides a finite budget from zero. Natural measurement,
-  // an explicit auto basis, and fit width retain content-based starting sizes.
+  // and an explicit auto basis retain content-based starting sizes.
   const zero_basis = props.basis === undefined && grow > 0
-    && query.request[main].kind !== 'natural' && sizing[main].mode !== 'fit'
+    && query.request[main].kind !== 'natural'
   if (typeof props.basis === 'string' && props.basis !== 'auto') {
     throw new TypeError(`${path}.basis: expected a length or "auto"`)
   }
@@ -65,9 +67,15 @@ function stack_item(element: Element, index: number, main: Axis,
     ? sizing[main].preferred ?? (zero_basis ? 0 : undefined)
     : nonnegative(resolve_length(props.basis, { font_size, fraction: reference[main] },
       `${path}.basis`), `${path}.basis`)
+  let self = props.align_self
+  if (self === null) throw new TypeError(`${path}.align_self: expected an alignment`)
+  if (typeof self === 'object') {
+    const axis = main === 'width' ? 'y' : 'x'
+    const resolved = resolve_alignment(self, `${path}.align_self`)
+    self = 'length' in self || self[axis] !== undefined ? resolved[axis] : undefined
+  }
   return { element, index, sizing, basis, grow,
-    align: props.align_self === undefined ? align
-      : stack_alignment(props.align_self, main, `${path}.align_self`),
+    align: self === undefined ? align : stack_alignment(self, main, `${path}.align_self`),
     shrink: nonnegative(props.shrink ?? 0, `${path}.shrink`) }
 }
 
@@ -100,10 +108,14 @@ function stack_guides(children: readonly Placement[]): Guides {
 // significant: a column establishes its shared width before allocating heights;
 // a row allocates widths before finding the height of its reflowed children.
 // A measured cross axis is selected once, without percentage feedback or search.
-function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
+function stack_layout(props: StackProps, query: LayoutQuery, main: Axis,
+  reference = definite_reference(query.request, query.sizing)): Fragment {
+  if (props.wrap) {
+    if (main !== 'width') throw new TypeError('Only horizontal stacks support wrap')
+    if (query.request.width.kind !== 'natural') return wrap_stack(props, query)
+  }
   const cross = main === 'width' ? 'height' : 'width'
   const align = stack_alignment(props.align ?? 'start', main, `${query.path}.align`)
-  const reference = definite_reference(query.request, query.sizing)
   const gap = nonnegative(resolve_length(props.gap ?? 0, {
     font_size: query.style.font_size, fraction: reference[main],
   }, `${query.path}.gap`), `${query.path}.gap`)
@@ -210,6 +222,68 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis) {
   const guides = stack_guides(children)
   return make_fragment({ size, children,
     guides: baseline_items.length ? { ...guides, baseline: above } : guides })
+}
+
+// Choose line breaks from the ordinary flex bases, then let each row allocate
+// its own surplus or deficit. The offer establishes percentage references, not
+// a filled frame: ungrowing rows hug their contents. Give growing cards a basis
+// or min_width to control wrapping.
+function wrap_stack(props: StackProps, query: LayoutQuery): Fragment {
+  const offer = query.request.width
+  if (offer.kind === 'natural') throw new TypeError('Wrapping needs a width offer')
+  const width = offer.value
+  const reference = { ...definite_reference(query.request, query.sizing), width }
+  const basis = { font_size: query.style.font_size, fraction: width }
+  const gap = nonnegative(resolve_length(props.gap ?? 0, basis, `${query.path}.gap`), 'gap')
+  const line_gap = props.line_gap === undefined ? gap
+    : nonnegative(resolve_length(props.line_gap,
+      { font_size: query.style.font_size, fraction: reference.height }, `${query.path}.line_gap`), 'line_gap')
+  const align = stack_alignment(props.align ?? 'start', 'width', `${query.path}.align`)
+  type Entry = { element: Element; index: number }
+  const lines: Entry[][] = []
+  let line: Entry[] = []
+  function occupied(entries: Entry[]): number {
+    const gaps = (entries.length - 1) * gap
+    // As in a single row, fractions refer to the space left after its gaps.
+    const inner = { ...reference, width: Math.max(0, width - gaps) }
+    return entries.reduce((total, { element, index }) => {
+      const item = stack_item(element, index, 'width', query, inner, align)
+      const measured = item.basis ?? query.child(element, make_request(), inner, index).size.width
+      return total + Math.max(item.sizing.width.min, Math.min(item.sizing.width.max, measured))
+    }, gaps)
+  }
+  for (const [index, element] of element_children(props.children).entries()) {
+    const entry = { element, index }
+    if (line.length && occupied([...line, entry]) > width + 1e-9) {
+      lines.push(line)
+      line = []
+    }
+    line.push(entry)
+  }
+  if (line.length) lines.push(line)
+  const rows = lines.map((entries, index) => {
+    // Keep the line-breaking reference while allowing the row to report only
+    // its used width. Re-measuring at that width would feed back into fractions.
+    const row = new HStack({ name: 'HStack', layout: (element, row_query) =>
+      stack_layout(element.props as StackProps, row_query, 'width', { width }) }, {
+      gap: px(gap), align: props.align, justify: props.justify,
+      children: entries.map(entry => entry.element) })
+    return query.child(row, make_request({ width: offer }), reference, index)
+  })
+  const size = finish_size(make_size(Math.max(0, ...rows.map(row => row.size.width)),
+    rows.reduce((height, row) => height + row.size.height, Math.max(0, rows.length - 1) * line_gap)),
+    query.request, query.sizing)
+  let height = 0
+  const children = rows.map((row, index) => {
+    const packing = pack_stack(props.justify ?? 'start', row.children.length, size.width - row.size.width, gap)
+    const fragment = make_fragment({ name: row.name, guides: row.guides, size: make_size(size.width, row.size.height),
+      children: row.children.map((child, index) => place_fragment(child.fragment,
+        make_point(child.offset.x + packing.offset + index * (packing.gap - gap), child.offset.y), child.transform)) })
+    const placement = place_fragment(fragment, make_point(0, height))
+    height += row.size.height + (index < rows.length - 1 ? line_gap : 0)
+    return placement
+  })
+  return make_fragment({ size, children, guides: stack_guides(children) })
 }
 
 class HStack extends Element<StackProps> {

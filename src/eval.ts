@@ -6,7 +6,7 @@ import { Svg } from './elems/svg'
 import { PngImage } from './elems/image'
 import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
 import { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
-import { Box, Frame, Fit } from './elems/box'
+import { Box, Frame } from './elems/box'
 import { HStack, VStack, Spacer } from './elems/stack'
 import { Group } from './elems/group'
 import { Text, Span } from './elems/text'
@@ -48,7 +48,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): any {
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
-    Svg, PngImage, Box, Frame, Fit, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
+    Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
     Graph, Plot, BarPlot, Legend, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,

@@ -2,29 +2,33 @@ import type { Fragment } from './fragment'
 import type { FlexSpec } from '../lib/flex'
 import type { PositionSpec } from '../elems/group'
 import type { SizeSpec } from './layout'
-import type { StackAlign } from '../elems/stack'
+import type { FitSpec } from './fitting'
+import type { Alignment } from '../lib/composition'
 import type { LayoutQuery } from './pass'
 import type { StyleSpec } from './style'
 import type { DataBounds } from './coordinates'
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
-type ElementProps = SizeSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
+type ElementProps = SizeSpec & FitSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
   children?: Child
   // Any identified element is a connection target for the enclosing Network.
   id?: string
   // Outline this element's allocated and content boxes without inheriting to children.
   debug?: boolean
-  // Only the immediate stack parent interprets this placement override.
-  align_self?: StackAlign
+  // Override the immediate container's alignment; stacks use the cross axis.
+  align_self?: Alignment | 'baseline'
 }>
 type LayoutMethod<Props> = (props: Readonly<Props>, query: LayoutQuery) => Fragment
 type ElementType = Readonly<{
   name: string
   layout: (element: Element, query: LayoutQuery) => Fragment
+  // Intrinsic sources fit ordinary layout offers, but not internal math allocations.
+  auto_fit?: boolean
   // Graph containers inspect source geometry without measuring or cloning it.
   data_bounds?: (element: Element) => DataBounds | null
 }>
 type ElementOptions<Props, Input> = Readonly<{
+  auto_fit?: boolean
   normalize?: (props: Input) => Props
   data_bounds?: (props: Readonly<Props>) => DataBounds | null
 }>
@@ -63,6 +67,7 @@ function define_element<Props extends ElementProps = ElementProps, Input extends
     static layout = layout
     static normalize = options.normalize
     static data_bounds = options.data_bounds
+    static auto_fit = options.auto_fit
   }
 }
 
@@ -121,15 +126,17 @@ function element_definition(ctor: ElementClass): ElementDefinition {
   const inherited = parent === Element || parent.prototype instanceof Element
     ? element_definition(parent).defaults : {}
   const defaults = copy_data({ ...inherited, ...(Object.hasOwn(ctor, 'defaults') ? ctor.defaults : {}) })
-  const { layout, normalize, data_bounds } = ctor
+  const { layout, normalize, data_bounds, auto_fit } = ctor
   const name = Object.hasOwn(ctor, 'element_name') ? ctor.element_name! : ctor.name
   if (typeof name !== 'string' || !name) throw new TypeError('Element name must be a nonempty string')
+  if (auto_fit !== undefined && typeof auto_fit !== 'boolean') throw new TypeError(`${name}.auto_fit must be a boolean`)
   for (const [key, hook] of Object.entries({ layout, normalize, data_bounds })) {
     if (hook !== undefined && typeof hook !== 'function') throw new TypeError(`${name}.${key} must be a function`)
   }
   const type: ElementType | undefined = layout && Object.freeze({
     name,
     layout: (element: Element, query: LayoutQuery) => layout.call(ctor, element.props, query),
+    ...(auto_fit === undefined ? {} : { auto_fit }),
     ...(data_bounds ? { data_bounds: (element: Element) => data_bounds.call(ctor, element.props) } : {}),
   })
   const definition = Object.freeze({ defaults, type, normalize: normalize?.bind(ctor) })

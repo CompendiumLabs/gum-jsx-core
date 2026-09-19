@@ -112,7 +112,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
   const own_ink = spec.ink === undefined ? union_rects(...draw.map(drawing_ink)) : spec.ink
   const ink = union_rects(own_ink, ...children.map(child => {
     // A singular SVG transform paints nothing; its collapsed layout bounds
-    // still participate in overflow below (for example, Fit at scale zero).
+    // still participate in overflow below (for example, fitting at scale zero).
     if (child.transform) {
       const [a, b, c, d] = child.transform
       if (a * d - b * c === 0) return null

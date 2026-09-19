@@ -16,7 +16,7 @@ type Alignment = AlignmentValue | Readonly<{ x?: AlignmentValue; y?: AlignmentVa
   | readonly [x: AlignmentValue, y: AlignmentValue]
 type ResolvedAlignmentValue = number | 'stretch' | 'fill'
 type ResolvedAlignment = Readonly<{ x: ResolvedAlignmentValue; y: ResolvedAlignmentValue }>
-type FitMode = 'contain' | 'cover' | 'scale_down'
+type FitMode = true | 'contain' | 'cover'
 // Outer bounds allocate room for an element's own decorations. Frame bounds
 // allocate the frame alone and reserve the decorations as an outset.
 type Bounds = 'outer' | 'frame'
@@ -27,7 +27,8 @@ function frame_bounds(bounds: Bounds = 'outer'): boolean {
 }
 
 // Alignment values are dimensionless: 0/start, 0.5/center, and 1/end.
-function resolve_alignment(align: Alignment = 'start', path = 'alignment'): ResolvedAlignment {
+function resolve_alignment(align: Alignment = 'start', path = 'alignment',
+  fallback: ResolvedAlignment = { x: 0, y: 0 }): ResolvedAlignment {
   const tuple = typeof align === 'object' && 'length' in align
   const axes = tuple ? read_point(align, path)
     : typeof align === 'object' ? align : { x: align, y: align }
@@ -42,7 +43,7 @@ function resolve_alignment(align: Alignment = 'start', path = 'alignment'): Reso
     if (fraction < 0 || fraction > 1) throw new RangeError(`${path} must be between 0 and 1`)
     return fraction
   }
-  return Object.freeze({ x: resolve(axes.x), y: resolve(axes.y) })
+  return Object.freeze({ x: resolve(axes.x ?? fallback.x), y: resolve(axes.y ?? fallback.y) })
 }
 
 // Oversized content can align outside the frame; keep the resulting negative offset.
@@ -57,7 +58,7 @@ function align_offset(size: Size, child: Size, align: ResolvedAlignment) {
 // limits. Stretch deliberately overrides both explicit sizes and limits.
 function fills_axis(align: ResolvedAlignmentValue, sizing: AxisSizing): boolean {
   return align === 'stretch' || align === 'fill'
-    && sizing.mode !== 'fit' && (sizing.preferred === undefined || sizing.mode === 'fill')
+    && (sizing.preferred === undefined || sizing.mode === 'fill')
 }
 
 function aligned_request(offer: AxisRequest, size: number | undefined,
@@ -89,7 +90,11 @@ function layout_content(
   child: Element | undefined, query: LayoutQuery, insets: Insets = make_insets(),
   alignment: Alignment = 'start',
 ) {
-  const align = resolve_alignment(alignment)
+  const parent_align = resolve_alignment(alignment)
+  const self = child?.props.align_self
+  if (self === 'baseline') throw new TypeError('Baseline alignment is available on HStack')
+  const align = self === undefined ? parent_align
+    : resolve_alignment(self, `${query.path}.align_self`, parent_align)
   const inner = deflate_request(query.request, insets)
   const fixed = definite_reference(query.request, query.sizing)
   const reference = Object.freeze({
@@ -128,13 +133,13 @@ function layout_content(
 // Fit whole fragments uniformly. A zero source axis contributes no ratio; empty
 // sources keep scale 1. An offered zero on a nonzero axis can produce scale 0.
 function fit_scale(source: Size, target: ReferenceBox, mode: FitMode): number {
-  if (!['contain', 'cover', 'scale_down'].includes(mode)) throw new TypeError('Unknown fit mode')
+  if (mode !== true && mode !== 'contain' && mode !== 'cover') throw new TypeError('Unknown fit mode')
   const ratios = (['width', 'height'] as const).flatMap(axis => {
     const value = target[axis]
     return value === undefined || source[axis] === 0 ? [] : [value / source[axis]]
   })
   const scale = !ratios.length ? 1 : mode === 'cover' ? Math.max(...ratios) : Math.min(...ratios)
-  return finite(mode === 'scale_down' ? Math.min(1, scale) : scale, 'fit scale')
+  return finite(mode === true ? Math.min(1, scale) : scale, 'fit scale')
 }
 
 export { frame_bounds, resolve_alignment, align_offset, fills_axis, aligned_request, definite_reference, layout_content, fit_scale }

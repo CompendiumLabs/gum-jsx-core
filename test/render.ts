@@ -57,9 +57,10 @@ const tests: Record<string, () => void> = {
   'wrap props bound only the generated viewport'() {
     const bounds = { max_width: px(500), max_height: px(300) }
     const wide = new Rect({ width: px(2000), height: px(100) })
-    const clamped = render_element(wide, { wrap: bounds })
-    assert.deepEqual(clamped.size, { width: 500, height: 100 })
-    assert.equal(clamped.fragment.overflow.right, 1500.5)
+    const fitted = render_element(wide, { wrap: bounds })
+    assert.deepEqual(fitted.size, { width: 500, height: 25 })
+    assert.equal(fitted.fragment.overflow.right, 0.125)
+    assert.deepEqual(fitted.fragment.children[0].transform, [0.25, 0, 0, 0.25, 0, 0])
     assert.deepEqual(render_element(new Rect(), { wrap: bounds }).size, { width: 500, height: 300 })
     assert.deepEqual(render_element(wide, { wrap: { max_width: undefined } }).size, { width: 2000, height: 100 })
 
