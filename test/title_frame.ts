@@ -32,9 +32,10 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(title.fragment.size, { width: 48, height: 28 })
     assert.deepEqual(title.offset, { x: 76, y: 0 })
     assert.equal(body.offset.y, 14)
-    assert.equal(result.size.height, 70)
-    assert.equal(result.content!.y, 35)
-    assert.equal(result.guides.baseline, 59)
+    // The title reserves no room inside the body; content starts at the padding.
+    assert.equal(result.size.height, 54)
+    assert.equal(result.content!.y, 19)
+    assert.equal(result.guides.baseline, 43)
     // Transparent title boxes still remove the body border underneath them.
     const border = body.fragment.children.at(-1)!.fragment
     assert.equal(border.children.length, 3)
@@ -44,6 +45,37 @@ const tests: Record<string, () => void> = {
     }
     assert.equal(pass.layout(source), result)
     assert.equal(JSON.stringify(source), before)
+  },
+
+  'frame bounds leave the raised title outside the allocation'() {
+    const props = { width: px(200), padding: px(4), gap: px(6), title_padding: px(3), radius: px(8),
+      title: new Fixed({ content_width: px(40), content_height: px(20) }),
+      children: new Fixed({ content_width: px(80), content_height: px(30) }) }
+    const pass = new LayoutPass()
+    const outer = pass.layout(new TitleFrame({ ...props, id: 'a' }))
+    const framed = pass.layout(new TitleFrame({ ...props, id: 'a', bounds: 'frame' }))
+    const [body, title] = framed.children
+    assert.deepEqual(framed.size, { width: 200, height: 40 })
+    assert.deepEqual(body.fragment.size, framed.size)
+    assert.deepEqual(body.offset, { x: 0, y: 0 })
+    assert.deepEqual(title.offset, { x: 76, y: -14 })
+    assert.deepEqual(framed.outset, { left: 0, top: 14, right: 0, bottom: 0 })
+    assert.equal(framed.content!.y, 5)
+    assert.equal(framed.guides.baseline, 29)
+    assert.equal(outer.outset, undefined)
+    assert.equal(render_svg(body.fragment), render_svg(outer.children[0].fragment))
+    // The connection outline is the rounded body rather than the title-spanning hybrid.
+    assert.deepEqual(framed.connection!.boundary, { x: 0, y: 0, width: 200, height: 40, radius: { x: 8, y: 8 } })
+    assert.deepEqual((outer.connection!.boundary.radius as { tl: unknown }).tl, { x: 0, y: 0 })
+    // Sizes and aspects describe the frame itself.
+    const square = pass.layout(new TitleFrame({ ...props, aspect: 1, bounds: 'frame' }))
+    assert.deepEqual(square.size, { width: 200, height: 200 })
+    assert.deepEqual(square.children[0].fragment.size, { width: 200, height: 200 })
+    const allocated = pass.layout(new TitleFrame({ ...props, bounds: 'frame' }),
+      make_request({ width: exact(160), height: exact(100) }))
+    assert.deepEqual(allocated.children[0].fragment.size, { width: 160, height: 100 })
+    assert.equal(pass.layout(new TitleFrame({ bounds: 'frame', children: props.children })).outset, undefined)
+    assert.throws(() => pass.layout(new TitleFrame({ ...props, bounds: 'body' as 'frame' })), /bounds/)
   },
 
   'title positions and natural widths include the whole title box'() {

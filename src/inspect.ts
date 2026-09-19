@@ -2,10 +2,10 @@ import type { Fragment } from './engine/fragment'
 import type { Insets, Point } from './engine/geometry'
 
 // Keep numerical layout output exact; inspection must not round away a boundary.
-function overflow_text(insets: Insets): string {
-  const entries = Object.entries(insets).filter(([, value]) => value !== 0)
+function insets_text(name: string, insets?: Insets): string {
+  const entries = Object.entries(insets ?? {}).filter(([, value]) => value !== 0)
   const edges = entries.map(([side, value]) => `${side}:${value}`).join(',')
-  return entries.length ? ` overflow=${edges}` : ''
+  return entries.length ? ` ${name}=${edges}` : ''
 }
 
 // Inspect only result data: this command cannot evaluate or measure an element.
@@ -23,7 +23,7 @@ function inspect_fragment(fragment: Fragment): string {
     const box = content ? ` content=${content.x},${content.y},${content.width},${content.height}` : ''
     const connection = node.connection ? ` connection=${JSON.stringify(node.connection)}` : ''
     lines.push(`${'  '.repeat(depth)}${name} ${width}×${height} ${location}${matrix}`
-      + ` ink=${ink}${overflow_text(node.overflow)}${guides}${math}${box}${connection}${node.clip ? ' clipped' : ''}`)
+      + ` ink=${ink}${insets_text('overflow', node.overflow)}${insets_text('outset', node.outset)}${guides}${math}${box}${connection}${node.clip ? ' clipped' : ''}`)
     for (const child of node.children) {
       const transform = child.transform ? ` matrix(${child.transform.join(',')})` : ''
       visit(child.fragment, depth + 1, child.offset, transform)

@@ -27,6 +27,9 @@ interface Fragment<Draw = Drawing> {
   readonly math?: MathMetrics
   readonly ink: Rect | null
   readonly overflow: Insets
+  // Space reserved outside the allocation by frame-bounded elements, such as a
+  // plot's labels. It is declared rather than measured; a hugging viewport grows by it.
+  readonly outset?: Insets
   readonly draw: readonly Draw[]
   readonly children: readonly Placement<Draw>[]
   readonly content?: Rect
@@ -52,6 +55,7 @@ type FragmentSpec = Readonly<{
   math?: MathMetrics
   ink?: Rect | null
   overflow?: Insets
+  outset?: Insets
   draw?: readonly Drawing[]
   children?: readonly Placement[]
   content?: Rect
@@ -79,6 +83,11 @@ function content_bounds(fragment: Pick<Fragment, 'size' | 'overflow'>): Rect {
   const { width, height } = fragment.size
   const { left, top, right, bottom } = fragment.overflow
   return make_rect(-left, -top, width + left + right, height + top + bottom)
+}
+
+// The allocation grown by the decoration space reserved around it.
+function outset_bounds(fragment: Pick<Fragment, 'size' | 'outset'>): Rect {
+  return content_bounds({ size: fragment.size, overflow: fragment.outset ?? make_insets() })
 }
 
 // Translation and uniform fitting move guides along with the completed child.
@@ -115,6 +124,13 @@ function make_fragment(spec: FragmentSpec): Fragment {
     transform_rect(content_bounds(child.fragment), child.offset, child.transform)))
 
   const clip = spec.clip === undefined ? undefined : make_clip(spec.clip, spec.clip.radius)
+  // Only declared outsets propagate, and a clip hides whatever it cuts away.
+  const reserved = union_rects(outset_bounds({ size, outset: make_insets(spec.outset) }), ...children.map(child => {
+    if (!child.fragment.outset) return null
+    const rect = transform_rect(outset_bounds(child.fragment), child.offset, child.transform)
+    return clip === undefined ? rect : intersect_rects(rect, clip)
+  }))
+  const outset = bounds_overflow(size, reserved)
   const content = spec.content === undefined ? undefined
     : make_rect(spec.content.x, spec.content.y, spec.content.width, spec.content.height)
   let connection: Connection | undefined
@@ -131,6 +147,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
     ...(spec.math === undefined ? {} : { math: copy_math_metrics(spec.math) }),
     ink: clip === undefined ? ink : intersect_rects(ink, clip),
     overflow: bounds_overflow(size, bounds),
+    ...(Object.values(outset).some(Boolean) ? { outset } : {}),
     draw: Object.freeze(draw), children: Object.freeze(children),
     ...(content === undefined ? {} : { content }),
     ...(clip === undefined ? {} : { clip }),
@@ -150,5 +167,5 @@ function frame_connection(id: string | undefined, boundary: Clip): Pick<Fragment
 // Guides (including baseline) use pixels from the local origin. Ink describes
 // painted bounds after clipping; overflow records excess content before clipping.
 // An explicit transform acts in child coordinates, before the placement offset.
-export { make_fragment, place_fragment, content_bounds, transform_guides, frame_connection }
+export { make_fragment, place_fragment, content_bounds, outset_bounds, transform_guides, frame_connection }
 export type { Transform, Guides, Connection, Fragment, Placement, FragmentSpec }

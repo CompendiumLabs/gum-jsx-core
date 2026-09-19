@@ -220,6 +220,9 @@ The [fragment schema](./src/engine/fragment.ts) contains only the result for one
 - `guides`: optional named vertical pixel positions, including `baseline` from the top.
 - `ink`: painted bounds after clipping, or `null` for no paint.
 - `overflow`: nonnegative excess content on each side, recorded before clipping.
+- `outset`: optional space reserved outside the allocation by frame-bounded elements, such as
+  a `bounds="frame"` plot's labels. It is declared rather than measured from ink, propagates
+  through placements up to a clip, and a hugging `Svg` viewport grows to include it.
 - `draw`: resolved rectangle, ellipse, and path drawing records, including glyph outlines.
 - `children`: child fragments with local offsets and optional affine transforms.
 - `clip`: an optional local rectangle with optional rounded corners, clipping the fragment and its descendants.
@@ -991,7 +994,7 @@ Each `evaluate` call owns a fresh random stream, defaulting to seed 42; pass
 share a separate host stream; `new RNG(seed)` creates an independent one.
 `integer` excludes its upper bound. Layout and rendering never consume random
 samples, so resizing preserves the data. See the
-[migration notes](../gum-jsx-docs/docs/gallery/text/Migration.md#numeric-helpers) for
+[migration notes](../docs/MIGRATION.md#numeric-helpers) for
 differences from the original helpers.
 
 ## Graphs and plotting

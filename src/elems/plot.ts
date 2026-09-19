@@ -4,6 +4,8 @@ import { Bars } from './bars'
 import type { BarsProps } from './bars'
 import { box_layout } from './box'
 import type { BoxProps } from './box'
+import { frame_bounds } from '../lib/composition'
+import type { Bounds } from '../lib/composition'
 import { infer_coordinates } from '../engine/coordinates'
 import type { Coordinates } from '../engine/coordinates'
 import { text_element } from './document'
@@ -12,7 +14,7 @@ import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import type { Fragment, Placement } from '../engine/fragment'
-import { make_point, make_rect, make_size, resolve_insets } from '../engine/geometry'
+import { make_point, make_rect, make_size, make_insets, resolve_insets } from '../engine/geometry'
 import type { InsetSpec } from '../engine/geometry'
 import { graph_size, graph_children } from './graph'
 import type { GraphProps } from './graph'
@@ -46,6 +48,7 @@ type PlotProps = GraphProps & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
   title?: string | Element; xlabel?: string | Element; ylabel?: string | Element
   legend?: readonly LegendEntry[] | Element
   margin?: InsetSpec; label_gap?: Length; background?: string; plot_background?: string
+  bounds?: Bounds
   border_color?: string; border_width?: Length
   axis_style?: AxisProps; tick_style?: StyleSpec; label_style?: TextOptions
   title_style?: TextOptions; xlabel_style?: TextOptions; ylabel_style?: TextOptions
@@ -146,11 +149,17 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   const ylabel = measure(props.y_label, 22)
   const left = margin.left + extents.left + (ylabel ? ylabel.size.width + gap : 0)
   const right = margin.right + extents.right
-  const text_width = Math.max(0, size.width - left - right)
+  // Outer bounds carve the graph area out of the allocation. Frame bounds make
+  // the allocation the graph area, reserving the same insets around it instead.
+  const frame = frame_bounds(props.bounds)
+  const text_width = frame ? size.width : Math.max(0, size.width - left - right)
   const title = measure(props.title_element, 20, text_width), xlabel = measure(props.x_label, 21, text_width)
   const top = margin.top + extents.top + (title ? title.size.height + gap : 0)
   const bottom = margin.bottom + extents.bottom + (xlabel ? xlabel.size.height + gap : 0)
-  const area = make_rect(left, top, Math.max(0, size.width - left - right), Math.max(0, size.height - top - bottom))
+  const outer = frame ? make_rect(-left, -top, size.width + left + right, size.height + top + bottom)
+    : make_rect(0, 0, size.width, size.height)
+  const area = frame ? make_rect(0, 0, size.width, size.height)
+    : make_rect(left, top, Math.max(0, size.width - left - right), Math.max(0, size.height - top - bottom))
   const inner = make_size(area.width, area.height)
   const request = make_request({ width: exact(inner.width), height: exact(inner.height) })
   const offset = make_point(area.x, area.y), children: Placement[] = []
@@ -173,20 +182,22 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   props.axes.forEach((axis, i) => add(query.child(axis, request, inner, i, context)))
   // Outer text stays upright; only the completed y title is rotated.
   if (title) children.push(place_fragment(title,
-    make_point(left + (inner.width - title.size.width) / 2, margin.top)))
+    make_point(area.x + (inner.width - title.size.width) / 2, outer.y + margin.top)))
   if (xlabel) children.push(place_fragment(xlabel,
-    make_point(left + (inner.width - xlabel.size.width) / 2, size.height - margin.bottom - xlabel.size.height)))
+    make_point(area.x + (inner.width - xlabel.size.width) / 2,
+      outer.y + outer.height - margin.bottom - xlabel.size.height)))
   if (ylabel) children.push(place_fragment(ylabel,
-    make_point(margin.left, top + (inner.height - ylabel.size.height) / 2)))
+    make_point(outer.x + margin.left, area.y + (inner.height - ylabel.size.height) / 2)))
   if (props.legend_element) {
     const legend = query.child(props.legend_element,
       make_request({ width: available(inner.width), height: available(inner.height) }), inner, 40, { coordinates: null })
     children.push(place_fragment(legend,
       make_point(area.x + inner.width - legend.size.width - gap, area.y + gap)))
   }
-  const draw = props.background ? [draw_rect(make_rect(0, 0, size.width, size.height),
+  const draw = props.background ? [draw_rect(outer,
     { fill: theme_color(props.background, query.style.theme), stroke: 'none', stroke_width: 0, opacity: query.style.opacity })] : []
-  return make_fragment({ size, content: area, draw, children })
+  const outset = frame ? make_insets({ left, top, right, bottom }) : undefined
+  return make_fragment({ size, content: area, outset, draw, children })
 }
 
 class Plot extends Element<PlotData, PlotProps> {

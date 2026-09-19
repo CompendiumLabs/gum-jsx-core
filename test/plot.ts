@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Graph, Plot, BarPlot, HBars, Bars, CoordLine, Points, SymLine, HAxis, Text, Fonts,
+  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, CoordLine, Points, SymLine, HAxis, Text, Fonts,
   LayoutPass, define_element, make_fragment, shape_size, make_request, exact, px,
   infer_coordinates, map_point, unmap_point, linear_ticks, render_svg, evaluate,
 } from '../src/index'
@@ -248,6 +248,62 @@ const tests: Record<string, () => void> = {
     const root = new LayoutPass().layout(evaluate('<Svg width={px(680)} height={px(420)}><Plot/></Svg>'))
     assert.deepEqual(root.children[0].fragment.size, root.size)
     assert.deepEqual(new LayoutPass().layout(new Graph()).size, { width: 480, height: 320 })
+  },
+
+  'frame bounds allocate the graph area and reserve decorations as an outset'() {
+    const props = { title: 'Revenue', xlabel: 'Elapsed time', ylabel: 'Revenue', xlim: [0, 2], ylim: [0, 1000000],
+      yticks: [[0, '$0'], [1000000, '$1,000,000']] } as const
+    const pass = new LayoutPass()
+    const outer = pass.layout(new Plot(props), make_request({ width: exact(600), height: exact(360) }))
+    assert.equal(outer.outset, undefined)
+    // The same graph area gets the same decorations, moved outside the allocation.
+    const area = outer.content!
+    const framed = pass.layout(new Plot({ ...props, bounds: 'frame' }),
+      make_request({ width: exact(area.width), height: exact(area.height) }))
+    assert.deepEqual(framed.size, { width: area.width, height: area.height })
+    assert.deepEqual(framed.content, { x: 0, y: 0, width: area.width, height: area.height })
+    near(framed.outset!.left, area.x); near(framed.outset!.top, area.y)
+    near(framed.outset!.right, 600 - area.x - area.width); near(framed.outset!.bottom, 360 - area.y - area.height)
+    for (const side of ['left', 'top', 'right', 'bottom'] as const) {
+      assert.ok(framed.overflow[side] <= framed.outset![side] + 1e-8)
+    }
+    assert.deepEqual(find(framed, 'Graph').size, find(outer, 'Graph').size)
+    assert.throws(() => pass.layout(new Plot({ bounds: 'inner' as 'frame' })), /bounds/)
+
+    // Differently sized tick labels no longer move the graph areas of stacked plots.
+    const stack = pass.layout(evaluate(`<VStack gap={px(60)}>
+      <Plot bounds="frame" width={px(300)} height={px(200)} ylim={[0, 1]} />
+      <BarPlot bounds="frame" width={px(300)} height={px(200)} values={[1000000, 2000000]} />
+    </VStack>`))
+    assert.deepEqual(stack.size, { width: 300, height: 460 })
+    assert.deepEqual(stack.children.map(child => child.fragment.content),
+      [{ x: 0, y: 0, width: 300, height: 200 }, { x: 0, y: 0, width: 300, height: 200 }])
+    const [first, second] = stack.children.map(child => child.fragment.outset!)
+    assert.ok(second.left > first.left)
+    near(stack.outset!.left, second.left); near(stack.outset!.top, first.top)
+    near(stack.outset!.right, Math.max(first.right, second.right)); near(stack.outset!.bottom, second.bottom)
+  },
+
+  'hugging viewports grow by reserved outsets while established axes keep their size'() {
+    const plot = new Plot({ bounds: 'frame', width: px(300), height: px(200), title: 'Title' })
+    const pass = new LayoutPass(), { outset } = pass.layout(plot)
+    const root = pass.layout(new Svg({ children: plot }))
+    assert.deepEqual(root.size, { width: 300 + outset!.left + outset!.right, height: 200 + outset!.top + outset!.bottom })
+    assert.deepEqual(root.children[0].offset, { x: outset!.left, y: outset!.top })
+    assert.equal(root.outset, undefined)
+    const ink = root.children[0].fragment.ink!
+    assert.ok(ink.x + outset!.left >= 0 && ink.y + outset!.top >= 0)
+    // Padding absorbs part of the outset; the viewport adds only the remainder.
+    const padded = pass.layout(new Svg({ children: new Box({ padding: px(10), children: plot }) }))
+    assert.deepEqual(padded.size, { width: root.size.width, height: root.size.height })
+    assert.equal(pass.layout(new Box({ padding: px(1000), children: plot })).outset, undefined)
+    assert.equal(pass.layout(new Box({ clip: true, children: plot })).outset, undefined)
+    const wide = pass.layout(new Svg({ width: px(300), children: plot }))
+    assert.equal(wide.size.width, 300)
+    assert.deepEqual(wide.children[0].offset, { x: 0, y: outset!.top })
+    const exact_root = pass.layout(new Svg({ children: plot }), make_request({ width: exact(300), height: exact(200) }))
+    assert.deepEqual(exact_root.size, { width: 300, height: 200 })
+    assert.deepEqual(exact_root.children[0].offset, { x: 0, y: 0 })
   },
 
   'plot resizes without rerunning sample callbacks or reshaping prepared text'() {

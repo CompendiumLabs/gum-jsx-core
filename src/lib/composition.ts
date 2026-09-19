@@ -17,6 +17,14 @@ type Alignment = AlignmentValue | Readonly<{ x?: AlignmentValue; y?: AlignmentVa
 type ResolvedAlignmentValue = number | 'stretch' | 'fill'
 type ResolvedAlignment = Readonly<{ x: ResolvedAlignmentValue; y: ResolvedAlignmentValue }>
 type FitMode = 'contain' | 'cover' | 'scale_down'
+// Outer bounds allocate room for an element's own decorations. Frame bounds
+// allocate the frame alone and reserve the decorations as an outset.
+type Bounds = 'outer' | 'frame'
+
+function frame_bounds(bounds: Bounds = 'outer'): boolean {
+  if (bounds !== 'outer' && bounds !== 'frame') throw new TypeError('Unknown bounds mode')
+  return bounds === 'frame'
+}
 
 // Alignment values are dimensionless: 0/start, 0.5/center, and 1/end.
 function resolve_alignment(align: Alignment = 'start', path = 'alignment'): ResolvedAlignment {
@@ -129,5 +137,5 @@ function fit_scale(source: Size, target: ReferenceBox, mode: FitMode): number {
   return finite(mode === 'scale_down' ? Math.min(1, scale) : scale, 'fit scale')
 }
 
-export { resolve_alignment, align_offset, fills_axis, aligned_request, definite_reference, layout_content, fit_scale }
-export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode }
+export { frame_bounds, resolve_alignment, align_offset, fills_axis, aligned_request, definite_reference, layout_content, fit_scale }
+export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode, Bounds }
