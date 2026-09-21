@@ -120,7 +120,7 @@ const tests: Record<string, () => void> = {
 
   'fitted identified elements publish one transformed connection boundary'() {
     const result = new LayoutPass().layout(new Node({ fit: 'contain', id: 'node', border_radius: px(4),
-      width: px(200), height: px(100), text: 'Node' }), offer(100, 100))
+      width: px(200), height: px(100), children: 'Node' }), offer(100, 100))
     assert.deepEqual(result.connection!.boundary, { x: 0, y: 25, width: 100, height: 50,
       radius: { x: 2, y: 2 } })
     assert.equal(result.children[0].fragment.connection, undefined)

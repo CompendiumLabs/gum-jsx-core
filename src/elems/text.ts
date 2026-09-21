@@ -11,7 +11,8 @@ import { make_fragment, place_fragment } from '../engine/fragment'
 import type { Fragment } from '../engine/fragment'
 import { make_point, make_size, transform_rect } from '../engine/geometry'
 import { finish_size, make_request } from '../engine/layout'
-import { definite_reference } from '../lib/composition'
+import { definite_reference, resolve_alignment } from '../lib/composition'
+import type { AlignmentValue } from '../lib/composition'
 import type { LayoutQuery } from '../engine/pass'
 import { transform_path } from '../engine/path'
 import { resolve_style } from '../engine/style'
@@ -24,7 +25,7 @@ type TextProps = ElementProps & Readonly<{
   wrap?: boolean
   whitespace?: 'normal' | 'pre'
   tab_size?: number
-  text_align?: 'left' | 'center' | 'right'
+  justify?: Exclude<AlignmentValue, 'stretch' | 'fill'>
 }>
 // Options for generated labels/captions; the owning component supplies content.
 type TextOptions = Omit<TextProps, 'text' | 'children'>
@@ -274,8 +275,12 @@ function flow_lines(prepared: MeasuredText, budget: number): Line[] {
 // Lines are result fragments, never reconstructed elements. Their drawing paths
 // use fixed font pixels, with real ink independent of the allocated line boxes.
 function text_layout(props: TextProps, query: LayoutQuery) {
-  const { text_align = 'left', wrap = true } = props
-  if (!['left', 'center', 'right'].includes(text_align)) throw new TypeError('Unknown text_align')
+  const { justify = 'start', wrap = true } = props
+  if (typeof justify !== 'number' && typeof justify !== 'string') {
+    throw new TypeError('Text.justify must be start, center, end, or a fraction')
+  }
+  const alignment = resolve_alignment(justify, `${query.measure.path}.justify`).x
+  if (typeof alignment !== 'number') throw new TypeError('Text.justify must be start, center, end, or a fraction')
   const dependencies = viewport_length(query.style.line_height) || viewport_spans(props.children)
     ? [query.measure.viewport] : []
   const prepared = measure_text(query.prepare('text', () => prepare_text(props, query), dependencies), query)
@@ -314,7 +319,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
     const fragment = make_fragment({
       name: 'Line', size: make_size(Math.max(0, line.width), height), guides: { baseline: line.above }, draw, children: content,
     })
-    const x = (size.width - line.width) * (text_align === 'left' ? 0 : text_align === 'center' ? 0.5 : 1)
+    const x = (size.width - line.width) * alignment
     const placement = place_fragment(fragment, make_point(x, y))
     y += height
     return placement

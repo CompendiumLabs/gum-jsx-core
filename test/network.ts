@@ -18,7 +18,7 @@ function ends(fragment: Fragment) {
   return [commands[0] as Point, commands.at(-1) as Point]
 }
 function node(id: string, x: number, y: number, props = {}) {
-  return new Node({ id, x, y, width: px(80), height: px(40), border_radius: 0, text: id, ...props })
+  return new Node({ id, x, y, width: px(80), height: px(40), border_radius: 0, children: id, ...props })
 }
 function layout(children: readonly Element[], props = {}) {
   return new LayoutPass().layout(new Network({ ...limits, ...props, children }), fixed)
@@ -26,22 +26,55 @@ function layout(children: readonly Element[], props = {}) {
 
 const tests: Record<string, () => void> = {
   'nodes hug text and expose the drawn frame separately from their inner content'() {
-    const pass = new LayoutPass(), a = pass.layout(new Node({ id: 'a', text: 'A' }))
-    const b = pass.layout(new Node({ id: 'b', text: 'A longer label' }))
+    const pass = new LayoutPass(), a = pass.layout(new Node({ id: 'a', children: 'A' }))
+    const b = pass.layout(new Node({ id: 'b', children: 'A longer label' }))
     assert.ok(a.size.width < b.size.width)
     near(a.size.height, b.size.height)
     assert.deepEqual(a.connection!.boundary, { ...make_rect(0, 0, a.size.width, a.size.height),
       radius: a.children.at(-1)!.fragment.clip!.radius })
     assert.ok(a.content!.x > 0 && a.content!.width < a.connection!.boundary.width)
-    assert.equal(pass.layout(new Node({ text: 'Standalone' })).connection, undefined)
+    assert.equal(pass.layout(new Node({ children: 'Standalone' })).connection, undefined)
     assert.ok(Object.isFrozen(a.connection) && Object.isFrozen(a.connection!.boundary.radius))
+  },
+
+  'node alignment positions labels while text_justify controls generated lines'() {
+    const pass = new LayoutPass()
+    const lines = 'A wider first line\nShort'
+    const source = { width: px(200), height: px(80), padding: 0, border_width: 0, children: lines }
+    for (const [align, fraction] of [['start', 0], ['center', 0.5], ['end', 1]] as const) {
+      const frame = pass.layout(new Node({ ...source, align }))
+      const label = frame.children[0]
+      const [first, second] = label.fragment.children
+      near(label.offset.x, (frame.size.width - label.fragment.size.width) * fraction)
+      near(label.offset.y, (frame.size.height - label.fragment.size.height) * fraction)
+      near(first.offset.x, 0)
+      near(second.offset.x, 0)
+    }
+    for (const [text_justify, fraction] of [['start', 0], ['center', 0.5], ['end', 1], [0.25, 0.25]] as const) {
+      const label = pass.layout(new Node({ ...source, align: 'start', text_justify })).children[0]
+      const [first, second] = label.fragment.children
+      near(second.offset.x, (first.fragment.size.width - second.fragment.size.width) * fraction)
+    }
+    const jsx = pass.layout(evaluate('<Node width={px(200)} height={px(80)} padding={0} border-width={0} text-justify="center">A wider first line\nShort</Node>'))
+    const text = jsx.children[0].fragment
+    near(text.children[1].offset.x, (text.children[0].fragment.size.width - text.children[1].fragment.size.width) / 2)
+    const styled = new Node({ children: 'Label', text_font_size: px(24), text_color: 'red', text_wrap: false })
+    assert.ok(styled.props.children instanceof Text)
+    assert.deepEqual(styled.props.children.props.font_size, px(24))
+    assert.equal(styled.props.children.props.color, 'red')
+    assert.equal(styled.props.children.props.wrap, false)
+    assert.equal('text_font_size' in styled.props, false)
+    const explicit = pass.layout(new Node({ ...source, text_justify: 'start',
+      children: new Text({ text: lines, justify: 'end' }) }))
+    const [wide, short] = explicit.children[0].fragment.children
+    near(short.offset.x, wide.fragment.size.width - short.fragment.size.width)
   },
 
   'edges bind after text reflow and keep source paint order across cached layouts'() {
     const edge = new Edge({ start: 'a', end: 'b', ...plain })
-    const a = new Node({ id: 'a', x: 0.2, y: 0.5, text: 'A' })
+    const a = new Node({ id: 'a', x: 0.2, y: 0.5, children: 'A' })
     const b = new Node({ id: 'b', x: 0.8, y: 0.5, width: 0.2,
-      text: 'A label that wraps into several lines' })
+      children: 'A label that wraps into several lines' })
     const source = new Network({ ...limits, children: [edge, a, b] })
     const before = JSON.stringify(source), pass = new LayoutPass()
     const wide = pass.layout(source, fixed)
@@ -60,7 +93,7 @@ const tests: Record<string, () => void> = {
   },
 
   'connections follow fitted and padded node frames instead of wrapper allocations'() {
-    const a = new Node({ id: 'a', width: px(60), height: px(30), border_radius: 0, text: 'A' })
+    const a = new Node({ id: 'a', width: px(60), height: px(30), border_radius: 0, children: 'A' })
     const wrappers: readonly [Element, Point][] = [
       [new Box({ fit: 'contain', x: 0.3, y: 0.5, anchor: 'center', max_width: px(180), max_height: px(100), children: a }),
         { x: 135, y: 195 }],
@@ -293,6 +326,7 @@ const tests: Record<string, () => void> = {
 
   'invalid references, duplicate ids, ports, and singular transforms fail clearly'() {
     assert.throws(() => new Node({ id: '' }), /nonempty string/)
+    assert.throws(() => new Node({ text: 'Old label' } as unknown as import('../src/index').NodeProps), /Use children instead of text/)
     assert.throws(() => new Circle({ id: 7 as unknown as string }), /nonempty string/)
     assert.throws(() => new Edge({ start: new Circle(), end: 'b' }), /nonempty string/)
     assert.throws(() => new Edge({ start: new Node(), end: 'b' }), /nonempty string/)

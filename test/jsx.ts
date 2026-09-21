@@ -5,8 +5,8 @@ import { ErrorRuntime } from '../src/lib/errors'
 const tests: Record<string, () => void> = {
   'dashed JSX attributes produce the same properties and layout as underscore attributes'() {
     const pass = new LayoutPass()
-    const dashed = evaluate('<Text font-size={px(24)} font-weight={bold} line-height={em(1.5)} text-align="center">April-June</Text>')
-    const underscored = evaluate('<Text font_size={px(24)} font_weight={bold} line_height={em(1.5)} text_align="center">April-June</Text>')
+    const dashed = evaluate('<Text font-size={px(24)} font-weight={bold} line-height={em(1.5)} justify="center">April-June</Text>')
+    const underscored = evaluate('<Text font_size={px(24)} font_weight={bold} line_height={em(1.5)} justify="center">April-June</Text>')
     assert.deepEqual(dashed.props, underscored.props)
     assert.deepEqual(pass.layout(dashed), pass.layout(underscored))
 

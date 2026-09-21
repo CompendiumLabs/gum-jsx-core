@@ -78,9 +78,9 @@ const tests: Record<string, () => void> = {
       tick_size: px(8), tick_side: 'top' as const, label_offset: px(6),
       line_height: em(1.7), font_size: px(13) }
     const axis = new HAxis({ ...base, line_stroke: 'blue', tick_stroke_width: px(3),
-      label_color: 'red', label_wrap: false, label_text_align: 'right' })
+      label_color: 'red', label_wrap: false, label_justify: 'end' })
     assert.equal(svg(axis), svg(new HAxis({ ...base, line_style: { stroke: 'blue' },
-      tick_style: { stroke_width: px(3) }, label_style: { color: 'red', wrap: false, text_align: 'right' } })))
+      tick_style: { stroke_width: px(3) }, label_style: { color: 'red', wrap: false, justify: 'end' } })))
     assert.deepEqual(axis.props.line_height, em(1.7))
     assert.deepEqual(axis.props.tick_size, px(8))
     assert.equal(axis.props.tick_side, 'top')

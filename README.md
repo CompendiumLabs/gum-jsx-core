@@ -504,6 +504,9 @@ For document layouts, `TextBox` and `TextFrame` default to `align={{ x: "fill" }
 `width="fill"` at the document boundary to occupy the offered width.
 Their existing padding, border, and gap defaults remain. Heights are content-sized,
 and flexible row children still require explicit flex weights.
+`TextBox` and `TextFrame` forward `text_*` props to generated text children:
+`text_justify` sets line alignment, while `text_font_size`, `text_color`, and
+`text_wrap` set the corresponding `Text` props.
 
 ```jsx
 <Svg width={px(400)}>
@@ -710,7 +713,7 @@ of this group with `align_self`; baseline alignment is only available in horizon
 stacks. Stretching siblings receive a height that includes the baseline group.
 Stacks propagate the first guided child's guides and the last textual child's
 `last_baseline`, shifted into the stack's coordinates. `justify` only positions
-completed main-axis slots; `align`/`align_self` position their cross axes; `Text.text_align`
+completed main-axis slots; `align`/`align_self` position their cross axes; `Text.justify`
 positions text inside its own allocation. Center/end can use negative offsets
 for overflowing content. Distributed spacing only adds positive free space to gaps.
 
@@ -830,7 +833,7 @@ An inherited `line-height={px(20)}` remains 20px even in a larger span.
 | `wrap` | Defaults to true; wrap at supported Unicode line-break opportunities. |
 | `whitespace="normal"` | Collapse horizontal spaces/tabs and trim hard-line edges; **retain explicit newlines**. |
 | `whitespace="pre"` | Preserve spaces and expand tabs at `tab_size` column stops (default 4). Wrapping remains independently controlled by `wrap`. |
-| `text_align` | `left` (default), `center`, or `right`, inside the final allocated width. |
+| `justify` | `start` (default), `center`, `end`, or a fraction from 0 to 1, inside the final allocated width. |
 | `font_family` | `IBM Plex Sans`, `IBM Plex Mono`, or a registered family. |
 | `font_weight` | Numeric 1–1000; choose the nearest available weight, lower on ties. Bundled weights are 300, 400, 700. |
 | `font_style` | `normal` or `italic`; a registered italic face is preferred, otherwise synthesize a 12° oblique outline. |
@@ -1136,6 +1139,11 @@ TextFrame with a centered placement anchor. Network uses Graph sizing and coordi
 from child x/y positions and edge waypoints with 0.2 default data padding. Explicit node
 widths wrap labels at their ordinary font size. Put edges first to paint them
 behind nodes; source order remains paint order independently of measurement order.
+`align` positions the label inside Node. `text_*` props pass to the generated
+`Text` label without their prefix: `text_justify` sets line alignment and
+`text_font_size` sets its `font_size`, for example. An explicit
+`Text` child uses its own properties.
+Supply label text as children, for example `<Node text-justify="center">Label</Node>`.
 
 Each identified element's fragment exposes `connection: { id, boundary }` in local
 pixels. Boxes, rectangles, squares, circles, and ellipses report their rounded or
@@ -1180,6 +1188,7 @@ dashes or underscores; direct JavaScript uses underscores:
 | Plot, BarPlot | `tick_`, `label_`, `title_`, `xlabel_`, `ylabel_` | Tick styles and generated text options |
 | Plot, BarPlot | `grid_`, `xgrid_`, `ygrid_`, `legend_` | Mesh/Legend options, including `legend_label_font_size` |
 | Legend | `label_` | Generated label TextOptions |
+| Node, TextBox, TextFrame | `text_` | Generated label TextOptions, including `text_justify` |
 | TitleBox, Slide | `title_` | Generated title TextOptions |
 | TitleFrame | `title_` | Title text and box styling; `title_position` defaults to centered across the top border |
 | TextFigure | `caption_` | Generated caption TextOptions |

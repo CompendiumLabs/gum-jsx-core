@@ -7,7 +7,7 @@ import {
   Fonts, EMOJI_FAMILY, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
   resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point,
 } from '../src/index'
-import type { Drawing, FontProvider, Fragment } from '../src/index'
+import type { Drawing, FontProvider, Fragment, TextProps } from '../src/index'
 import { color_font } from './fixtures/color_font'
 
 const regular = readFileSync(new URL('../src/fonts/IBMPlexSans-Regular.ttf', import.meta.url))
@@ -149,10 +149,10 @@ const tests: Record<string, () => void> = {
     const nowrap = pass.layout(new Text({ text, wrap: false, width: px(10) }))
     assert.equal(lines(nowrap), 1); assert.equal(nowrap.size.width, 10)
     assert.ok(nowrap.overflow.right > 0)
-    for (const text_align of ['left', 'center', 'right'] as const) {
-      const fragment = pass.layout(new Text({ text: 'wide\ni', width: px(100), text_align }))
+    for (const [justify, fraction] of [['start', 0], ['center', 0.5], ['end', 1],
+      [0, 0], [0.25, 0.25], [1, 1]] as const) {
+      const fragment = pass.layout(new Text({ text: 'wide\ni', width: px(100), justify }))
       for (const child of fragment.children) {
-        const fraction = text_align === 'left' ? 0 : text_align === 'center' ? 0.5 : 1
         near(child.offset.x, (100 - child.fragment.size.width) * fraction)
       }
     }
@@ -160,6 +160,28 @@ const tests: Record<string, () => void> = {
     assert.equal(lines(pass.layout(limited)), 3)
     const forced = pass.layout(limited, make_request({ width: exact(200) }))
     assert.equal(lines(forced), 1); assert.equal(forced.size.width, 200)
+  },
+
+  'justify positions wrapped and overflowing lines and requires a single fraction or keyword'() {
+    const pass = new LayoutPass()
+    const props = { children: 'one two three four five', width: px(75) }
+    const start = pass.layout(new Text(props))
+    assert.deepEqual(start, pass.layout(new Text({ ...props, justify: 'start' })))
+    const wrapped = pass.layout(new Text({ ...props, justify: 0.25 }))
+    assert.ok(wrapped.children.length > 1)
+    assert.deepEqual(wrapped.size, start.size)
+    for (const [index, line] of wrapped.children.entries()) {
+      near(line.offset.x, (wrapped.size.width - line.fragment.size.width) / 4)
+      assert.deepEqual(line.fragment, start.children[index].fragment)
+    }
+    const overflow = pass.layout(new Text({ children: 'wide', width: px(5), wrap: false, justify: 'end' }))
+    assert.ok(overflow.children[0].offset.x < 0 && overflow.overflow.left > 0)
+    near(overflow.children[0].offset.x + overflow.children[0].fragment.size.width, 5)
+    for (const justify of ['left', 'right', 'fill', 'stretch', 'space-between',
+      -0.1, 1.1, NaN, Infinity, -Infinity, null, true, { x: 0.5 }, [0, 0.5]]) {
+      assert.throws(() => pass.layout(new Text({ children: 'Label',
+        justify: justify as TextProps['justify'] })), /justify/)
+    }
   },
 
   'font faces, italic synthesis, registration, and versioned resources are independent'() {

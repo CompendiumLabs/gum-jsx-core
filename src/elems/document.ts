@@ -15,7 +15,7 @@ import { available, exact, make_request, deflate_request, prepare_request, finis
 import { HStack, VStack, stack_layout } from './stack'
 import type { StackProps } from './stack'
 import { resolve_rect_radius } from './shapes'
-import { scope_props } from '../lib/props'
+import { prefix_split, scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Text, Span } from './text'
 import type { TextOptions } from './text'
@@ -24,7 +24,7 @@ import type { Length } from '../engine/units'
 import { draw_rect } from '../engine/drawing'
 
 type TextStackProps = StackProps & Readonly<{ direction?: 'horizontal' | 'vertical' }>
-type TextBoxProps = BoxProps & Readonly<{ text?: string }>
+type TextBoxProps = BoxProps & Prefixed<'text', TextOptions>
 type TextFigureProps = BoxProps & Prefixed<'caption', TextOptions> & Readonly<{
   caption?: Child; caption_style?: TextOptions; gap?: Length
 }>
@@ -98,8 +98,10 @@ class TextCol extends TextStack {
 }
 class TextBox extends Element<BoxProps, TextBoxProps> {
   static defaults: Partial<BoxProps> = { align: { x: 'fill' }, padding: em(0.6) }
-  static normalize({ text, ...props }: TextBoxProps): BoxProps {
-    return { ...props, children: text !== undefined ? new Text({ text }) : text_element(props.children) }
+  static normalize(input: TextBoxProps): BoxProps {
+    if ('text' in input) throw new TypeError('Use children instead of text')
+    const [style, props] = prefix_split(['text'], input)
+    return { ...props, children: text_element(props.children, style) }
   }
   static layout = box_layout
 }
