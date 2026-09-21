@@ -18,7 +18,7 @@ function ends(fragment: Fragment) {
   return [commands[0] as Point, commands.at(-1) as Point]
 }
 function node(id: string, x: number, y: number, props = {}) {
-  return new Node({ id, x, y, width: px(80), height: px(40), radius: 0, text: id, ...props })
+  return new Node({ id, x, y, width: px(80), height: px(40), border_radius: 0, text: id, ...props })
 }
 function layout(children: readonly Element[], props = {}) {
   return new LayoutPass().layout(new Network({ ...limits, ...props, children }), fixed)
@@ -60,7 +60,7 @@ const tests: Record<string, () => void> = {
   },
 
   'connections follow fitted and padded node frames instead of wrapper allocations'() {
-    const a = new Node({ id: 'a', width: px(60), height: px(30), radius: 0, text: 'A' })
+    const a = new Node({ id: 'a', width: px(60), height: px(30), border_radius: 0, text: 'A' })
     const wrappers: readonly [Element, Point][] = [
       [new Box({ fit: 'contain', x: 0.3, y: 0.5, anchor: 'center', max_width: px(180), max_height: px(100), children: a }),
         { x: 135, y: 195 }],
@@ -99,7 +99,7 @@ const tests: Record<string, () => void> = {
   },
 
   'rounded corner locations meet the visible ellipse and gaps follow its normal'() {
-    const a = node('a', 0.25, 0.5, { width: px(100), height: px(60), radius: [px(30), px(20)] })
+    const a = node('a', 0.25, 0.5, { width: px(100), height: px(60), border_radius: [px(30), px(20)] })
     const local_y = 20 - 20 * Math.sqrt(1 - 4 / 9)
     const nx = -20 / 900, ny = (local_y - 20) / 400, norm = Math.hypot(nx, ny)
     for (const gap of [0, 7]) {
@@ -122,7 +122,7 @@ const tests: Record<string, () => void> = {
   'any identified element is a node and framed shapes supply their visible outline'() {
     const circle = new Circle({ id: 'c', x: 0.25, y: 0.5, anchor: 'center', width: px(80), height: px(80) })
     const rect = new Rect({ id: 'r', x: 0.75, y: 0.5, anchor: 'center', width: px(100), height: px(60),
-      radius: [px(30), px(20)] })
+      border_radius: [px(30), px(20)] })
     const result = layout([new Edge({ start: circle, end: rect, start_side: 'top', start_loc: 0.25,
       end_side: 'top', end_loc: 0.1, ...plain }), circle, rect])
     const [start, end] = ends(result.children[0].fragment)
@@ -162,7 +162,7 @@ const tests: Record<string, () => void> = {
 
   'compound elements publish one connection however they compose their parts'() {
     const titled = new TitleFrame({ id: 'titled', title: 'Title', x: 0.3, y: 0.5, anchor: 'center',
-      width: px(160), radius: px(12), children: 'Body' })
+      width: px(160), border_radius: px(12), children: 'Body' })
     const result = layout([new Edge({ start: 'titled', end: 'b', start_side: 'top', ...plain }),
       new Edge({ start: 'titled', end: 'b', start_side: 'right', ...plain }), titled, node('b', 0.85, 0.5)])
     const placed = result.children[2], { width, height } = placed.fragment.size

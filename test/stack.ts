@@ -227,7 +227,7 @@ const tests: Record<string, () => void> = {
       new Rect({ width: px(30), height: px(20), stroke: 'none' })]
     const positions: [StackJustify, number[]][] = [
       ['start', [0, 30]], ['center', [20, 50]], ['end', [40, 70]],
-      ['space_between', [0, 70]], ['space_around', [10, 60]], ['space_evenly', [40 / 3, 170 / 3]],
+      ['space-between', [0, 70]], ['space-around', [10, 60]], ['space-evenly', [40 / 3, 170 / 3]],
       [0.25, [10, 40]],
     ]
     const request = make_request({ width: exact(100), height: exact(60) })

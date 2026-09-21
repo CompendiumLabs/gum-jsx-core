@@ -19,7 +19,7 @@ type PositionValue = PointValue<Length>
 type Radius = Length | PositionValue
 type RadiusSides = Readonly<Partial<Record<'t' | 'b' | 'l' | 'r' | 'tl' | 'tr' | 'bl' | 'br', Radius>>>
 type RectRadius = Radius | RadiusSides
-type RectProps = ElementProps & Readonly<{ radius?: RectRadius }>
+type RectProps = ElementProps & Readonly<{ border_radius?: RectRadius }>
 type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>
 type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>
 type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue }>
@@ -68,11 +68,11 @@ function resolve_rect_radius(radius: RectRadius, size: Size, measure: LengthCont
     const sides = radius as RadiusSides
     for (const key of Object.keys(sides)) {
       if (!['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br'].includes(key)) {
-        throw new TypeError(`${measure.path}.radius: unknown side or corner ${key}`)
+        throw new TypeError(`${measure.path}.border_radius: unknown side or corner ${key}`)
       }
     }
     const resolved = Object.fromEntries(Object.entries(sides).filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, resolve_radius(value!, size, measure, `radius.${key}`)]))
+      .map(([key, value]) => [key, resolve_radius(value!, size, measure, `border_radius.${key}`)]))
     const zero = make_point()
     return Object.freeze({
       tl: resolved.tl ?? resolved.t ?? resolved.l ?? zero,
@@ -81,7 +81,7 @@ function resolve_rect_radius(radius: RectRadius, size: Size, measure: LengthCont
       bl: resolved.bl ?? resolved.b ?? resolved.l ?? zero,
     })
   }
-  return resolve_radius(radius as Radius, size, measure)
+  return resolve_radius(radius as Radius, size, measure, 'border_radius')
 }
 
 // Edges meet the drawn ellipse: a clip whose corner radii span its whole box.
@@ -93,7 +93,7 @@ function ellipse_boundary(center: Point, radius: Point) {
 function rect_layout(props: RectProps, query: LayoutQuery, radius: Radius = 0) {
   const { size, paint } = shape_context(props, query)
   const rect = make_rect(0, 0, size.width, size.height)
-  const corners = resolve_rect_radius(props.radius ?? radius, size, query.measure)
+  const corners = resolve_rect_radius(props.border_radius ?? radius, size, query.measure)
   return make_fragment({ size, draw: [draw_rect(rect, paint, corners)],
     ...frame_connection(props.id, make_clip(rect, corners)) })
 }
@@ -114,7 +114,7 @@ class Square extends Element<RectProps> {
     const { size, paint } = shape_context(props, query, 1)
     const side = Math.min(size.width, size.height)
     const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side)
-    const radius = resolve_rect_radius(props.radius ?? 0, make_size(side, side), query.measure)
+    const radius = resolve_rect_radius(props.border_radius ?? 0, make_size(side, side), query.measure)
     return make_fragment({ size, draw: [draw_rect(rect, paint, radius)],
       ...frame_connection(props.id, make_clip(rect, radius)) })
   }

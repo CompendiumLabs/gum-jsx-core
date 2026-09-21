@@ -14,11 +14,11 @@ import { resolve_paint, resolve_style } from '../engine/style'
 import type { StyleSpec } from '../engine/style'
 
 type PerBar<T> = T | readonly T[] | ((value: number, index: number) => T)
-type BarStyle = StyleSpec & Readonly<{ radius?: RectRadius }>
+type BarStyle = StyleSpec & Readonly<{ border_radius?: RectRadius }>
 type BarsProps = MarkProps & Readonly<{
   values?: readonly number[]; positions?: readonly number[]
   bases?: PerBar<number>; bar_width?: PerBar<number>
-  direction?: 'vertical' | 'horizontal'; radius?: RectRadius
+  direction?: 'vertical' | 'horizontal'; border_radius?: RectRadius
   styles?: readonly BarStyle[] | ((value: number, index: number) => BarStyle)
 }>
 type BarProps = Omit<BarsProps, 'values' | 'positions' | 'bases' | 'bar_width' | 'styles'> & Readonly<{
@@ -26,7 +26,7 @@ type BarProps = Omit<BarsProps, 'values' | 'positions' | 'bases' | 'bar_width' |
 }>
 type BarDatum = Readonly<{ value: number; position: number; base: number; width: number; style: BarStyle }>
 type BarsData = MarkProps & Readonly<{
-  bars: readonly BarDatum[]; direction?: 'vertical' | 'horizontal'; radius?: RectRadius
+  bars: readonly BarDatum[]; direction?: 'vertical' | 'horizontal'; border_radius?: RectRadius
 }>
 
 function bars_data({ values = [], positions, bases = 0, bar_width = 0.8, styles, ...props }: BarsProps): BarsData {
@@ -59,15 +59,15 @@ function bar_corners(bar: BarDatum, direction = 'vertical') {
 
 function bars_layout(props: BarsData, query: LayoutQuery) {
   const { size, point } = mark_context(props, query)
-  const shared_radius = resolve_rect_radius(props.radius ?? 0, size, query.measure)
+  const shared_radius = resolve_rect_radius(props.border_radius ?? 0, size, query.measure)
   const draw = props.bars.map(bar => {
     const [a, b] = bar_corners(bar, props.direction).map(point)
     const rect = make_rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y))
     const style = resolve_style(bar.style, query.style, query.measure)
     const paint = resolve_paint(style, size, query.measure)
     // Radius is geometry, so it must be consumed separately from inherited paint.
-    const radius = bar.style.radius === undefined ? shared_radius
-      : resolve_rect_radius(bar.style.radius, size, make_measure(query.measure, { font_size: style.font_size }))
+    const radius = bar.style.border_radius === undefined ? shared_radius
+      : resolve_rect_radius(bar.style.border_radius, size, make_measure(query.measure, { font_size: style.font_size }))
     return draw_rect(rect, paint, radius)
   })
   return make_fragment({ size, draw })

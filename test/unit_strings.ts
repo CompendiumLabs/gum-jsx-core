@@ -77,9 +77,9 @@ const tests: Record<string, () => void> = {
   'quoted JSX lengths render identically across root fonts, flex layout, rounded corners, and paint'() {
     const strings = evaluate(`
       <Svg width="800px" height="600px" font-size="4vh">
-        <Box width="50%" padding={["1em", "2vh"]} border-width="0.25em" radius={{ t: "0.5em", b: "1vw" }}>
+        <Box width="50%" padding={["1em", "2vh"]} border-width="0.25em" border-radius={{ t: "0.5em", b: "1vw" }}>
           <HStack width="100%" gap="1vw">
-            <Rect basis="35%" height="10vh" radius="1em" stroke-width="0.5vh" stroke-dasharray={["1vw", "0.5em"]} />
+            <Rect basis="35%" height="10vh" border-radius="1em" stroke-width="0.5vh" stroke-dasharray={["1vw", "0.5em"]} />
             <Text font-size="150%" line-height="120%">
               Hello <Span font-size="0.5em">world</Span>
             </Text>
@@ -89,9 +89,9 @@ const tests: Record<string, () => void> = {
     `)
     const helpers = evaluate(`
       <Svg width={px(800)} height={px(600)} font-size={vh(4)}>
-        <Box width={0.5} padding={[em(1), vh(2)]} border-width={em(0.25)} radius={{ t: em(0.5), b: vw(1) }}>
+        <Box width={0.5} padding={[em(1), vh(2)]} border-width={em(0.25)} border-radius={{ t: em(0.5), b: vw(1) }}>
           <HStack width={1} gap={vw(1)}>
-            <Rect basis={0.35} height={vh(10)} radius={em(1)} stroke-width={vh(0.5)} stroke-dasharray={[vw(1), em(0.5)]} />
+            <Rect basis={0.35} height={vh(10)} border-radius={em(1)} stroke-width={vh(0.5)} stroke-dasharray={[vw(1), em(0.5)]} />
             <Text font-size={1.5} line-height={1.2}>
               Hello <Span font-size={em(0.5)}>world</Span>
             </Text>

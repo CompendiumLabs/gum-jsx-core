@@ -31,7 +31,7 @@ type TextFigureProps = BoxProps & Prefixed<'caption', TextOptions> & Readonly<{
 type TitleBoxProps = BoxProps & Prefixed<'title', TextOptions>
   & Readonly<{ title?: Child; title_style?: TextOptions; gap?: Length }>
 type TitleFrameTitleStyle = TextOptions & Pick<BoxProps,
-  'padding' | 'border_width' | 'border_color' | 'background' | 'radius' | 'align'>
+  'padding' | 'border_width' | 'border_color' | 'background' | 'border_radius' | 'align'>
 type TitleFrameProps = BoxProps & Prefixed<'title', TitleFrameTitleStyle> & Readonly<{
   title?: Child; title_style?: TitleFrameTitleStyle; gap?: Length
   title_position?: 'start' | 'center' | 'end' | number
@@ -141,11 +141,11 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
       = scope_props(input, ['title'], ['title_position'])
     const { padding = [em(0.6), em(0.3)], border_width = props.border_width,
       border_color = props.border_color, background = props.background,
-      radius = em(0.3), align = 'center', font_size, ...text } = title_style
+      border_radius = em(0.3), align = 'center', font_size, ...text } = title_style
     return { ...props, title_position,
       children: new VStack({ gap, align: 'stretch', children: text_children(children) }),
       title_box: title == null ? undefined : new Frame({
-        padding, border_width, border_color, background, radius, align, font_size,
+        padding, border_width, border_color, background, border_radius, align, font_size,
         children: text_element(title, text),
       }),
     }
@@ -201,7 +201,7 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     // and the side ports agree. Only the body's lower corners reach that outline.
     // Frame bounds exclude the overhang, so the outline is the rounded body itself.
     const round = make_clip(make_rect(0, 0, body.size.width, body.size.height),
-      resolve_rect_radius(props.radius ?? 0, body.size, query.measure)).radius!
+      resolve_rect_radius(props.border_radius ?? 0, body.size, query.measure)).radius!
     const corner = (key: 'bl' | 'br') => 'tl' in round ? round[key] : round
     const boundary = make_clip(make_rect(0, 0, size.width, size.height),
       framed ? round : { tl: make_point(), tr: make_point(), bl: corner('bl'), br: corner('br') })

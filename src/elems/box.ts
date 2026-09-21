@@ -24,7 +24,7 @@ type BoxProps = ElementProps & Readonly<{
   border_width?: Length
   border_color?: string
   background?: string
-  radius?: RectRadius
+  border_radius?: RectRadius
   align?: Alignment
   clip?: boolean
 }>
@@ -74,7 +74,7 @@ function box_layout(props: BoxProps, query: LayoutQuery, border_cutout?: (size: 
   const layout = layout_content(child, query, add_insets(padding, border), props.align)
   const { size, content, guides, overflow, placement } = layout
   const rect = make_rect(0, 0, size.width, size.height)
-  const radius = resolve_rect_radius(props.radius ?? 0, size, query.measure)
+  const radius = resolve_rect_radius(props.border_radius ?? 0, size, query.measure)
   const corners = make_clip(rect, radius).radius!
   const draw = background === 'none' ? [] : [draw_rect(rect,
     { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity }, corners)]

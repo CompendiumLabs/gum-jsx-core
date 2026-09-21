@@ -65,7 +65,7 @@ type OuterLabelProps = ElementProps & Readonly<{
 type OuterLabelData = ElementProps & Readonly<{ side?: Side; offset?: Length; label_element: Element }>
 
 class Legend extends Element<BoxProps, LegendProps> {
-  static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: 'theme:border', radius: px(4) }
+  static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: 'theme:border', border_radius: px(4) }
   static data_bounds() {
     return null
   }
@@ -212,9 +212,9 @@ class BarPlot extends Element<PlotData, BarPlotProps> {
   static data_bounds() {
     return null
   }
-  static normalize({ values, positions, bases, bar_width, styles, direction, radius, children, ...props }: BarPlotProps): PlotData {
+  static normalize({ values, positions, bases, bar_width, styles, direction, border_radius, children, ...props }: BarPlotProps): PlotData {
     return plot_data({
-      ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, radius,
+      ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, border_radius,
         fill: props.fill ?? 'theme:area' }),
         ...element_children(children)],
     })

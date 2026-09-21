@@ -36,7 +36,7 @@ const tests: Record<string, () => void> = {
     equivalent(new Ellipse({ center: from, radius }),
       new Ellipse({ center: { x: from[0], y: from[1] }, radius: { x: radius[0], y: radius[1] } }))
     for (const Shape of [Rect, RoundedRect, Square]) {
-      equivalent(new Shape({ radius }), new Shape({ radius: { x: radius[0], y: radius[1] } }))
+      equivalent(new Shape({ border_radius: radius }), new Shape({ border_radius: { x: radius[0], y: radius[1] } }))
     }
     const path = new LayoutPass().layout(new Line({ font_size: px(10), from, to }), fixed).draw[0] as PathDraw
     assert.deepEqual(path.commands, [{ kind: 'M', x: 12, y: 20 }, { kind: 'L', x: 150, y: 50 }])

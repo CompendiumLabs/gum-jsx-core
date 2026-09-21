@@ -52,7 +52,7 @@ function position_bounds({ x, y }: ElementProps): DataBounds {
 class Node extends Element<BoxProps, NodeProps> {
   static defaults: Partial<BoxProps> = {
     x: 0, y: 0, anchor: 'center', align: 'center',
-    padding: em(0.6), border_width: px(1), radius: em(0.3),
+    padding: em(0.6), border_width: px(1), border_radius: em(0.3),
   }
   static normalize = TextBox.normalize
   static data_bounds = position_bounds

@@ -74,11 +74,14 @@ export { resolve_alignment, align_offset, definite_reference, layout_content, fi
 export type { AlignmentValue, Alignment, ResolvedAlignment, FitMode } from './lib/composition'
 export { render_svg } from './svg'
 export type { SvgOptions } from './svg'
+export { DEFAULT_OUTPUT_PRECISION, output_number_formatter } from './engine/output_number'
+export type { OutputPrecision } from './engine/output_number'
 export { make_viewport, layout_element, render_element } from './render'
 export type {
   ViewportOptions, LayoutElementOptions, RenderElementOptions, LayoutElementResult, RenderElementResult,
 } from './render'
 export { inspect_fragment } from './inspect'
+export type { InspectOptions } from './inspect'
 export { evaluate } from './eval'
 export type { EvaluateOptions } from './eval'
 export { Graph } from './elems/graph'

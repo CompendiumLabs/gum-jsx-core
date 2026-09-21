@@ -17,7 +17,7 @@ import type { Length, ReferenceBox } from '../engine/units'
 type StackAlign = AlignmentValue | 'baseline'
 type ResolvedStackAlign = number | 'stretch' | 'fill' | 'baseline'
 type StackJustify = Exclude<AlignmentValue, 'stretch' | 'fill'>
-  | 'space_between' | 'space_around' | 'space_evenly'
+  | 'space-between' | 'space-around' | 'space-evenly'
 type StackProps = ElementProps & Readonly<{
   gap?: Length
   align?: StackAlign
@@ -79,11 +79,11 @@ function stack_item(element: Element, index: number, main: Axis,
 // Pack leftover space after flex allocation. Distributed spacing never makes
 // gaps negative; center/end can place overflowing content before the origin.
 function pack_stack(justify: StackJustify, count: number, free: number, gap: number) {
-  if (justify === 'space_between' || justify === 'space_around' || justify === 'space_evenly') {
+  if (justify === 'space-between' || justify === 'space-around' || justify === 'space-evenly') {
     if (free <= 0 || count === 0) return { offset: 0, gap }
-    if (justify === 'space_between') return { offset: 0, gap: gap + (count > 1 ? free / (count - 1) : 0) }
-    const space = free / (justify === 'space_around' ? count : count + 1)
-    return { offset: justify === 'space_around' ? space / 2 : space, gap: gap + space }
+    if (justify === 'space-between') return { offset: 0, gap: gap + (count > 1 ? free / (count - 1) : 0) }
+    const space = free / (justify === 'space-around' ? count : count + 1)
+    return { offset: justify === 'space-around' ? space / 2 : space, gap: gap + space }
   }
   const align = resolve_alignment(justify).x
   if (typeof align !== 'number') throw new TypeError('Use grow to distribute stack space')

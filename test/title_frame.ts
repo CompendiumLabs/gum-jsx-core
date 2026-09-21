@@ -48,7 +48,7 @@ const tests: Record<string, () => void> = {
   },
 
   'frame bounds leave the raised title outside the allocation'() {
-    const props = { width: px(200), padding: px(4), gap: px(6), title_padding: px(3), radius: px(8),
+    const props = { width: px(200), padding: px(4), gap: px(6), title_padding: px(3), border_radius: px(8),
       title: new Fixed({ content_width: px(40), content_height: px(20) }),
       children: new Fixed({ content_width: px(80), content_height: px(30) }) }
     const pass = new LayoutPass()
@@ -96,10 +96,13 @@ const tests: Record<string, () => void> = {
     const props = { width: px(200), height: px(100), clip: true, font_size: px(10),
       title: new Fixed({ content_width: em(2), content_height: em(1) }),
       children: new Fixed({ content_width: em(2), content_height: em(1) }) }
-    const flat = new TitleFrame({ ...props, title_font_size: em(2), title_padding: em(0.5), title_background: 'navy' })
-    const nested = new TitleFrame({ ...props, title_style: { font_size: em(2), padding: em(0.5), background: 'navy' } })
+    const flat = new TitleFrame({ ...props, title_font_size: em(2), title_padding: em(0.5),
+      title_background: 'navy', title_border_radius: px(7) })
+    const nested = new TitleFrame({ ...props,
+      title_style: { font_size: em(2), padding: em(0.5), background: 'navy', border_radius: px(7) } })
     const result = pass.layout(flat)
     assert.equal(render_svg(result), render_svg(pass.layout(nested)))
+    assert.match(render_svg(result), /rx="7" ry="7"/)
     assert.deepEqual(result.children[1].fragment.size, { width: 62, height: 42 })
     assert.equal(result.clip, undefined)
     assert.ok(result.children[0].fragment.children[0].fragment.clip)

@@ -2,8 +2,10 @@ import type { Drawing } from './engine/drawing'
 import type { Fragment } from './engine/fragment'
 import type { Point, Rect, RectRadii } from './engine/geometry'
 import { path_data } from './engine/path'
+import { output_number_formatter } from './engine/output_number'
+import type { OutputPrecision } from './engine/output_number'
 
-type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string }>
+type SvgOptions = Readonly<{ title?: string; background?: string; id_prefix?: string; precision?: OutputPrecision }>
 const IDENTITY = [1, 0, 0, 1, 0, 0] as const
 
 // Escape text and quoted attributes; drawing records never contain raw SVG markup.
@@ -13,75 +15,76 @@ function escape_xml(value: string): string {
 }
 
 // Layout values are already final pixels. Serialization performs no unit conversion.
-function rect_attributes(rect: Rect): string {
+function rect_attributes(rect: Rect, number: (value: number) => string): string {
   const { x, y, width, height } = rect
-  return `x="${x}" y="${y}" width="${width}" height="${height}"`
+  return `x="${number(x)}" y="${number(y)}" width="${number(width)}" height="${number(height)}"`
 }
 
 // SVG rects have one radius pair; separate corners need an outline of exact arcs.
 // Use the same outline for decoration and clipping so their edges coincide.
-function render_rect(rect: Rect, radius?: RectRadii, paint = ''): string {
+function render_rect(rect: Rect, number: (value: number) => string, radius?: RectRadii, paint = ''): string {
   if (!radius || 'x' in radius || rect.width === 0 || rect.height === 0) {
-    const rounded = radius && 'x' in radius ? ` rx="${radius.x}" ry="${radius.y}"` : ''
-    return `<rect ${rect_attributes(rect)}${rounded}${paint ? ` ${paint}` : ''}/>`
+    const rounded = radius && 'x' in radius ? ` rx="${number(radius.x)}" ry="${number(radius.y)}"` : ''
+    return `<rect ${rect_attributes(rect, number)}${rounded}${paint ? ` ${paint}` : ''}/>`
   }
   const { x, y, width, height } = rect, right = x + width, bottom = y + height
   // A zero radius on either axis makes that corner square, as on SVG rects.
   const square = (r: Point) => r.x === 0 || r.y === 0 ? { x: 0, y: 0 } : r
   const tl = square(radius.tl), tr = square(radius.tr), br = square(radius.br), bl = square(radius.bl)
   const arc = (r: Point, x: number, y: number) => r.x && r.y
-    ? `A${r.x} ${r.y} 0 0 1 ${x} ${y}` : `L${x} ${y}`
-  const d = `M${x + tl.x} ${y}L${right - tr.x} ${y}`
-    + arc(tr, right, y + tr.y) + `L${right} ${bottom - br.y}`
-    + arc(br, right - br.x, bottom) + `L${x + bl.x} ${bottom}`
-    + arc(bl, x, bottom - bl.y) + `L${x} ${y + tl.y}` + arc(tl, x + tl.x, y) + 'Z'
+    ? `A${number(r.x)} ${number(r.y)} 0 0 1 ${number(x)} ${number(y)}` : `L${number(x)} ${number(y)}`
+  const d = `M${number(x + tl.x)} ${number(y)}L${number(right - tr.x)} ${number(y)}`
+    + arc(tr, right, y + tr.y) + `L${number(right)} ${number(bottom - br.y)}`
+    + arc(br, right - br.x, bottom) + `L${number(x + bl.x)} ${number(bottom)}`
+    + arc(bl, x, bottom - bl.y) + `L${number(x)} ${number(y + tl.y)}` + arc(tl, x + tl.x, y) + 'Z'
   return `<path d="${d}"${paint ? ` ${paint}` : ''}/>`
 }
 
 // Each drawing kind has an explicit vocabulary, with no arbitrary attribute injection.
-function render_drawing(draw: Drawing): string {
+function render_drawing(draw: Drawing, number: (value: number) => string): string {
   if (draw.kind === 'image') {
-    return `<image ${rect_attributes(draw.rect)} xlink:href="${escape_xml(draw.data)}"`
-      + ` preserveAspectRatio="none"${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : ''}/>`
+    return `<image ${rect_attributes(draw.rect, number)} xlink:href="${escape_xml(draw.data)}"`
+      + ` preserveAspectRatio="none"${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : ''}/>`
   }
   if (draw.kind === 'text') {
     // Quote the family as one CSS string; an unquoted name must be identifiers.
     const family = `'${draw.font_family.replace(/[\\']/g, '\\$&')}'`
-    return `<text x="${draw.origin.x + draw.advance / 2}" y="${draw.origin.y}" text-anchor="middle"`
-      + ` font-family="${escape_xml(family)}" font-size="${draw.font_size}" fill="${escape_xml(draw.fill)}"`
-      + `${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : ''}>${escape_xml(draw.text)}</text>`
+    return `<text x="${number(draw.origin.x + draw.advance / 2)}" y="${number(draw.origin.y)}" text-anchor="middle"`
+      + ` font-family="${escape_xml(family)}" font-size="${number(draw.font_size)}" fill="${escape_xml(draw.fill)}"`
+      + `${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : ''}>${escape_xml(draw.text)}</text>`
   }
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
     stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw
   const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`
-    + ` stroke-width="${stroke_width}" stroke-linecap="${stroke_linecap}"`
-    + ` stroke-linejoin="${stroke_linejoin}" stroke-miterlimit="${stroke_miterlimit}"`
-    + (draw.stroke_dasharray?.some(value => value > 0) ? ` stroke-dasharray="${draw.stroke_dasharray.join(' ')}"` : '')
-    + (draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${draw.opacity}"` : '')
+    + ` stroke-width="${number(stroke_width)}" stroke-linecap="${stroke_linecap}"`
+    + ` stroke-linejoin="${stroke_linejoin}" stroke-miterlimit="${number(stroke_miterlimit)}"`
+    + (draw.stroke_dasharray?.some(value => value > 0) ? ` stroke-dasharray="${draw.stroke_dasharray.map(number).join(' ')}"` : '')
+    + (draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : '')
   switch (draw.kind) {
-    case 'rect': return render_rect(draw.rect, draw.radius, paint)
+    case 'rect': return render_rect(draw.rect, number, draw.radius, paint)
     case 'ellipse': {
       const { center, radius } = draw
-      return `<ellipse cx="${center.x}" cy="${center.y}" rx="${radius.x}" ry="${radius.y}" ${paint}/>`
+      return `<ellipse cx="${number(center.x)}" cy="${number(center.y)}" rx="${number(radius.x)}" ry="${number(radius.y)}" ${paint}/>`
     }
-    case 'path': return `<path d="${path_data(draw.commands)}" ${paint}/>`
+    case 'path': return `<path d="${path_data(draw.commands, number)}" ${paint}/>`
   }
 }
 
 // Keep diagnostic strokes legible through fitting, including zero-sized allocations.
-function render_debug_box(rect: Rect, kind: 'allocated' | 'content'): string {
+function render_debug_box(rect: Rect, kind: 'allocated' | 'content', number: (value: number) => string): string {
   const paint = `data-gum-debug-box="${kind}" stroke="${kind === 'allocated' ? '#e11d48' : '#2563eb'}"`
     + ' vector-effect="non-scaling-stroke"' + (kind === 'content' ? ' stroke-dasharray="4 3"' : '')
   if (rect.width === 0 || rect.height === 0) {
-    return `<path d="M${rect.x} ${rect.y}l${rect.width} ${rect.height}" ${paint} stroke-linecap="round"/>`
+    return `<path d="M${number(rect.x)} ${number(rect.y)}l${number(rect.width)} ${number(rect.height)}" ${paint} stroke-linecap="round"/>`
   }
-  return render_rect(rect, undefined, paint)
+  return render_rect(rect, number, undefined, paint)
 }
 
 // Render an immutable result, allocating definition IDs only within this document.
 function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   const { width, height } = fragment.size
   const { title, background, id_prefix = 'gum' } = options
+  const number = output_number_formatter(options.precision)
   if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(id_prefix)) {
     throw new TypeError('SVG id_prefix must be an identifier')
   }
@@ -92,8 +95,8 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   // Shared fragments reuse their local clip definition across placements.
   function render_fragment(node: Fragment, transform = ''): string {
     if (node.debug) {
-      const boxes = render_debug_box({ x: 0, y: 0, ...node.size }, 'allocated')
-        + (node.content ? render_debug_box(node.content, 'content') : '')
+      const boxes = render_debug_box({ x: 0, y: 0, ...node.size }, 'allocated', number)
+        + (node.content ? render_debug_box(node.content, 'content', number) : '')
       debug.push(transform ? `<g transform="${transform}">${boxes}</g>` : boxes)
     }
     let clip = ''
@@ -102,18 +105,18 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       if (!id) {
         id = `${id_prefix}-clip-${clips.size}`
         clips.set(node, id)
-        const rect = render_rect(node.clip, node.clip.radius)
+        const rect = render_rect(node.clip, number, node.clip.radius)
         definitions.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">${rect}</clipPath>`)
       }
       clip = ` clip-path="url(#${id})"`
     }
-    const draw = node.draw.map(render_drawing)
+    const draw = node.draw.map(item => render_drawing(item, number))
     const children = node.children.map(child => {
       const { x, y } = child.offset
       const transforms: string[] = []
-      if (x !== 0 || y !== 0) transforms.push(`translate(${x} ${y})`)
+      if (x !== 0 || y !== 0) transforms.push(`translate(${number(x)} ${number(y)})`)
       if (child.transform?.some((value, index) => value !== IDENTITY[index])) {
-        transforms.push(`matrix(${child.transform.join(' ')})`)
+        transforms.push(`matrix(${child.transform.map(number).join(' ')})`)
       }
       const placement_transform = transforms.join(' ')
       const body = render_fragment(child.fragment, [transform, placement_transform].filter(Boolean).join(' '))
@@ -128,12 +131,12 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
 
   const body = render_fragment(fragment)
   const image_namespace = body.includes('<image ') ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ''
-  const parts = [`<svg xmlns="http://www.w3.org/2000/svg"${image_namespace} width="${width}" height="${height}"`,
-    ` viewBox="0 0 ${width} ${height}" overflow="hidden">`]
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg"${image_namespace} width="${number(width)}" height="${number(height)}"`,
+    ` viewBox="0 0 ${number(width)} ${number(height)}" overflow="hidden">`]
   if (title !== undefined) parts.push(`<title>${escape_xml(title)}</title>`)
   if (definitions.length) parts.push(`<defs>${definitions.join('')}</defs>`)
   if (background !== undefined) {
-    parts.push(`<rect width="${width}" height="${height}" fill="${escape_xml(background)}"/>`)
+    parts.push(`<rect width="${number(width)}" height="${number(height)}" fill="${escape_xml(background)}"/>`)
   }
   // Diagnostics sit above all paint and outside content clips; the viewport still clips.
   const overlay = debug.length ? '<g data-gum-debug="" fill="none" stroke-width="1"'

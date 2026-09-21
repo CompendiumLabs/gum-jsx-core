@@ -105,7 +105,7 @@ const tests: Record<string, () => void> = {
     assert.ok(mixed.kind === 'ellipse')
     assert.deepEqual(mixed.center, { x: 12, y: 20 })
     assert.deepEqual(mixed.radius, { x: 25, y: 10 })
-    const round = pass.layout(new RoundedRect({ radius: px(50) }), request).draw[0]
+    const round = pass.layout(new RoundedRect({ border_radius: px(50) }), request).draw[0]
     assert.ok(round.kind === 'rect')
     assert.deepEqual(round.radius, { x: 50, y: 20 })
     assert.throws(() => pass.layout(new Circle({ radius: px(-1) })), /radius/)

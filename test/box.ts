@@ -318,7 +318,7 @@ const tests: Record<string, () => void> = {
   'rounded clipping preserves overflow and borders stay inside the allocated frame'() {
     const pass = new LayoutPass()
     const props = { width: px(30), height: px(16), padding: px(2), border_width: px(2),
-      radius: px(8), children: new Fixed({ fill: 'coral' }) }
+      border_radius: px(8), children: new Fixed({ fill: 'coral' }) }
     const visible = pass.layout(new Box(props))
     const clipped = pass.layout(new Box({ ...props, clip: true }))
     assert.ok(visible.ink!.width > 30)

@@ -82,13 +82,13 @@ function path_bounds(commands: readonly PathCommand[]): Rect | null {
 }
 
 // Preserve pixel precision: rounding here can change glyphs or small geometry.
-function path_data(commands: readonly PathCommand[]): string {
+function path_data(commands: readonly PathCommand[], number: (value: number) => string = String): string {
   return commands.map(command => {
     switch (command.kind) {
-      case 'M': case 'L': return `${command.kind}${command.x} ${command.y}`
-      case 'Q': return `Q${command.x1} ${command.y1} ${command.x} ${command.y}`
-      case 'C': return `C${command.x1} ${command.y1} ${command.x2} ${command.y2}`
-        + ` ${command.x} ${command.y}`
+      case 'M': case 'L': return `${command.kind}${number(command.x)} ${number(command.y)}`
+      case 'Q': return `Q${number(command.x1)} ${number(command.y1)} ${number(command.x)} ${number(command.y)}`
+      case 'C': return `C${number(command.x1)} ${number(command.y1)} ${number(command.x2)} ${number(command.y2)}`
+        + ` ${number(command.x)} ${number(command.y)}`
       case 'Z': return 'Z'
     }
   }).join('')

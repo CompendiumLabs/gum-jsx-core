@@ -257,7 +257,7 @@ the element constructor.
 JSX creates descriptions without doing layout:
 
 ```jsx
-<Svg width={px(240)} height={px(120)} font_size={px(20)}>
+<Svg width={px(240)} height={px(120)} font-size={px(20)}>
   <Rect width={0.75} height={em(3)} fill="#49a895" stroke="none" />
 </Svg>
 ```
@@ -266,7 +266,7 @@ Named constants are available both in evaluated JSX and as imports from
 `gum-jsx-core`: `sans`, `mono`, `light` (300), `regular` (400), `bold` (700),
 `none`, `white`, `black`, `blue`, `red`, `green`, `yellow`, `purple`, `gray`,
 `lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
-For example, `<Text font_family={sans} font_weight={bold} color={blue}>Hello</Text>`.
+For example, `<Text font-family={sans} font-weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
 [style reference](../gum-jsx-docs/docs/gallery/text/Style.md) for their exact values.
 
@@ -416,7 +416,7 @@ This is a complete 100×100 document, with no manual placement or root dimension
 
 ```jsx
 <Svg>
-  <Box padding={em(1)} border_width={px(2)}>
+  <Box padding={em(1)} border-width={px(2)}>
     <Square width={px(64)} fill="#63b49d" stroke="none" />
   </Box>
 </Svg>
@@ -442,7 +442,7 @@ Svg uses the same operation with no insets. Neither reconstructs source elements
 | `border_width` | Uniform length occupying space inside all four edges; default zero. |
 | `border_color` | Border paint; defaults to the resolved text `color`. |
 | `background` | Local fill behind the content; default `"none"`. |
-| `radius` | Rounded outer corners; scalar, `{x,y}` / `[x,y]` pair, or side/corner object, default zero. Clamped to the box. |
+| `border_radius` | Rounded outer corners; scalar, `{x,y}` / `[x,y]` pair, or side/corner object, default zero. Clamped to the box. |
 | `align` | `"start"`, `"center"`, `"end"`, `"fill"`, `"stretch"`, or a number from 0 to 1; also accepts `{x,y}` or `[x,y]`. Default start on both axes. |
 | `clip` | Clip the child inside the border, including the padding area; default false. |
 
@@ -459,13 +459,13 @@ the child or treating an advisory offer as a fill instruction.
 
 For TitleFrame, generic `aspect` includes the raised title, just as width and
 height do. Use `frame_aspect` for the bordered body instead: `width={px(480)}
-frame_aspect={1}` gives a square border and adds the title overhang automatically.
+frame-aspect={1}` gives a square border and adds the title overhang automatically.
 Explicit outer allocations, including those derived from `aspect`, take precedence
 over the body's preferred ratio.
 
 Radius objects use `t`, `b`, `l`, `r`, `tl`, `tr`, `bl`, and `br` (bottom-right).
-For example, `radius={{ t: px(8) }}` rounds only the top corners;
-`radius={{ t: [px(12), px(6)], tr: 0 }}` leaves only the top-left corner rounded.
+For example, `border-radius={{ t: px(8) }}` rounds only the top corners;
+`border-radius={{ t: [px(12), px(6)], tr: 0 }}` leaves only the top-left corner rounded.
 Entries accept the same scalar lengths and elliptical pairs as uniform radii.
 Unspecified corners are square. Explicit corners override sides, and `t`/`b`
 override `l`/`r` at shared corners, independently of object order. Each axis is
@@ -516,7 +516,7 @@ and flexible row children still require explicit flex weights.
 </Svg>
 ```
 
-Use `align_self="start"` for a compact child inside a fill-aligned container.
+Use `align-self="start"` for a compact child inside a fill-aligned container.
 Box/Frame children can override either axis with an object (omitted axes inherit),
 or both with a scalar/tuple. The child's own `align` still arranges its contents.
 `Box`, `Frame`, `HStack`, and `VStack` retain their ordinary sizing defaults.
@@ -525,7 +525,7 @@ Use nested Boxes for spacing outside a decorated frame:
 
 ```jsx
 <Box padding={px(8)}>
-  <Box width={px(80)} padding={px(4)} border_width={px(1)}>
+  <Box width={px(80)} padding={px(4)} border-width={px(1)}>
     <Text>Hello</Text>
   </Box>
 </Box>
@@ -546,7 +546,7 @@ Fitting is an element prop, separate from allocation. Put it directly on a
 formula, text, frame, stack, canvas, or custom element:
 
 ```jsx
-<Text fit max_width={px(280)} font_size={px(16)}>One fitted line</Text>
+<Text fit max-width={px(280)} font-size={px(16)}>One fitted line</Text>
 ```
 
 `fit` measures the element naturally, then uniformly shrinks
@@ -623,7 +623,7 @@ needs one query per element, including Svg:
 | `width`, `height`, `min_width`, etc. | Shared sizing for the stack's full allocation. |
 | `gap` | Length between adjacent children, default zero. No leading or trailing gap. |
 | `align` | Cross-axis `"start"` (default), `"center"`, `"end"`, `"fill"`, `"stretch"`, or a number from 0 to 1. HStack also accepts `"baseline"`. |
-| `justify` | Main-axis `"start"` (default), `"center"`, `"end"`, a number from 0 to 1, `"space_between"`, `"space_around"`, or `"space_evenly"`. |
+| `justify` | Main-axis `"start"` (default), `"center"`, `"end"`, a number from 0 to 1, `"space-between"`, `"space-around"`, or `"space-evenly"`. |
 
 Flex and `align_self` properties belong to the **direct child** of a stack. Put
 them on an enclosing Box when the Box is the item being allocated; they do not
@@ -803,9 +803,9 @@ the optional common-height figure policy remain later work.
 ## Text and fonts
 
 ```jsx
-<Svg width={px(360)} height={px(200)} font_size={px(18)} color="#203746">
-  <Text width={px(320)} line_height={em(1.4)}>
-    A paragraph with <Span font_weight={bold}>bold words</Span> and <Span font_style="italic">italic words.</Span>
+<Svg width={px(360)} height={px(200)} font-size={px(18)} color="#203746">
+  <Text width={px(320)} line-height={em(1.4)}>
+    A paragraph with <Span font-weight={bold}>bold words</Span> and <Span font-style="italic">italic words.</Span>
   </Text>
 </Svg>
 ```
@@ -823,7 +823,7 @@ text boxes, bullet items, captions, and titles.
 Text defaults to IBM Plex Sans, weight 400, 16px, 1.2em line height, and black.
 `color` paints glyphs; `fill`/`stroke` paint shapes. Relative font sizes refer to the
 inherited size; relative line height refers to each run's newly resolved size.
-An inherited `line_height={px(20)}` remains 20px even in a larger span.
+An inherited `line-height={px(20)}` remains 20px even in a larger span.
 
 | Text property | Behavior |
 |---|---|
@@ -964,7 +964,7 @@ ordinary shape sizing policy.
 
 | Element | Geometry props and defaults |
 |---|---|
-| `Rect` | `radius` defaults to zero; a scalar uses the shorter side, `{x,y}` / `[x,y]` resolves per axis, and a side/corner object selects corners as on Box. |
+| `Rect` | `border_radius` defaults to zero; a scalar uses the shorter side, `{x,y}` / `[x,y]` resolves per axis, and a side/corner object selects corners as on Box. |
 | `Square` | Same props as Rect; centered square geometry with side equal to the shorter allocation axis. |
 | `RoundedRect` | Same props, with a default radius of 0.125 of the shorter side. Radii clamp to half the corresponding dimension. |
 | `Circle` | `center: {x: 0.5, y: 0.5}`, scalar `radius: 0.5` of the shorter side. |
@@ -983,7 +983,7 @@ TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengt
 [point values reference](../gum-jsx-docs/docs/gallery/text/PointValues.md) and its runnable example.
 
 ```jsx
-<Path width={px(120)} height={px(60)} stroke_width={px(2)}
+<Path width={px(120)} height={px(60)} stroke-width={px(2)}
   commands={[
     move_to(0, 0.5),
     curve_to(0.25, em(-1), 0.75, 1, 1, 0.5),
@@ -997,7 +997,7 @@ The first API uses structured absolute commands, without SVG string parsing,
 relative commands, or arcs. Each coordinate accepts fractions, `px()`, or `em()`;
 negative and out-of-frame coordinates are valid and contribute overflow.
 
-Shape defaults are `fill="none"`, `stroke="black"`, and `stroke_width={px(1)}`.
+Shape defaults are `fill="none"`, `stroke="black"`, and `stroke-width={px(1)}`.
 Strokes straddle geometry, including rectangle edges; they do not consume layout
 space. `stroke_linecap` accepts butt/round/square; `stroke_linejoin` accepts
 miter/round/bevel; `stroke_miterlimit` defaults to 4. Curve ink uses a conservative
@@ -1045,7 +1045,7 @@ differences from the original helpers.
   <Plot title="A sampled curve" xlabel="x" ylabel="sin(x)"
     xlim={[0, tau]} ylim={[-1.2, 1.2]} background="white">
     <SymLine fy={sin} xlim={[0, tau]}
-      stroke={blue} stroke_width={px(2)} />
+      stroke={blue} stroke-width={px(2)} />
   </Plot>
 </Svg>
 ```
@@ -1214,7 +1214,10 @@ a component or normalizer, before those children are constructed.
 
 ## Rendering and inspection
 
-`render_svg(fragment, { title?, background?, id_prefix? })` consumes only fragments.
+`render_svg(fragment, { title?, background?, id_prefix?, precision? })` consumes only fragments.
+Numeric output uses 10 significant digits by default. Set `precision` to an integer
+from 1 to 17, or to `'full'` for JavaScript's unrounded number strings. Formatting
+changes only serialized output, not layout or fragment geometry.
 It emits escaped SVG, resolved drawing geometry, explicit placement transforms,
 and rectangular clip definitions. Identity placements and attribute-free fragment
 groups are omitted; transforms, clipping, and accessible labels retain their groups.
