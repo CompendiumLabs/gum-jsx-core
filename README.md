@@ -1304,7 +1304,7 @@ props on two newly constructed elements do not give them a shared cache entry.
 
 When adding a public element, export it and its types in `src/index.ts`, add its JSX
 binding in `src/eval.ts`, and wire relevant checks into `test/run.ts`. Add concise
-paired Markdown/JSX examples to `gum-jsx-docs` and run its content check;
+paired Markdown/JSX examples to `gum-jsx-docs` and run its test command;
 inspect CLI-generated images and numerical trees. The custom placement examples
 are intentional protocol examples, while new composition examples should use the
 standard elements. Update this README, the docs README, and roadmap status.
