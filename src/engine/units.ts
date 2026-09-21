@@ -2,7 +2,8 @@ import { finite, nonnegative } from '../lib/checks'
 import { DEFAULTS } from './defaults'
 
 type UnitLength = Readonly<{ value: number; unit: 'em' | 'px' | 'vw' | 'vh' }>
-type Length = number | UnitLength
+type LengthString = `${number}${UnitLength['unit'] | '%'}` | '0'
+type Length = number | UnitLength | LengthString
 type NormalizedLength = Readonly<{
   value: number
   unit: 'fraction' | UnitLength['unit']
@@ -53,6 +54,14 @@ function vh(value: number) {
 
 // Copy the input so normalization never freezes a caller's own object.
 function normalize_length(length: Length | NormalizedLength, path = 'length'): NormalizedLength {
+  if (typeof length === 'string') {
+    const source = length.trim()
+    if (source === '0') return Object.freeze({ value: 0, unit: 'px' })
+    const match = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)(px|em|vw|vh|%)$/.exec(source)
+    if (!match) throw new TypeError(`${path}: expected a length with px, em, vw, vh, or %; received ${JSON.stringify(length)}`)
+    const value = finite(Number(match[1]), path), unit = match[2] as UnitLength['unit'] | '%'
+    length = { value: unit === '%' ? value / 100 : value, unit: unit === '%' ? 'fraction' : unit }
+  }
   const { value, unit } = typeof length === 'number'
     ? { value: length, unit: 'fraction' as const }
     : length
@@ -137,5 +146,5 @@ export {
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 }
 export type {
-  UnitLength, Length, NormalizedLength, ReferenceBox, LengthContext,
+  UnitLength, LengthString, Length, NormalizedLength, ReferenceBox, LengthContext,
 }

@@ -16,7 +16,7 @@ export {
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 } from './engine/units'
 export type {
-  UnitLength, Length, NormalizedLength, ReferenceBox, LengthContext,
+  UnitLength, LengthString, Length, NormalizedLength, ReferenceBox, LengthContext,
 } from './engine/units'
 export {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,

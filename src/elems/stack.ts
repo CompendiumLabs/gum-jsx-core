@@ -61,9 +61,6 @@ function stack_item(element: Element, index: number, main: Axis,
   // and an explicit auto basis retain content-based starting sizes.
   const zero_basis = props.basis === undefined && grow > 0
     && query.request[main].kind !== 'natural'
-  if (typeof props.basis === 'string' && props.basis !== 'auto') {
-    throw new TypeError(`${path}.basis: expected a length or "auto"`)
-  }
   const basis = props.basis === undefined || props.basis === 'auto'
     ? sizing[main].preferred ?? (zero_basis ? 0 : undefined)
     : nonnegative(resolve_length(props.basis, measure, reference[main], 'basis'), `${path}.basis`)

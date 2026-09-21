@@ -7,9 +7,10 @@ import { make_rect, make_point, make_size, make_insets, inflate_size } from '../
 import { prepare_request, finish_size } from '../engine/layout'
 import { draw_rect } from '../engine/drawing'
 import { theme_color } from '../engine/theme'
-import type { UnitLength } from '../engine/units'
+import { normalize_length } from '../engine/units'
+import type { UnitLength, LengthString } from '../engine/units'
 
-type SvgProps = ElementProps & Readonly<{ width?: UnitLength; height?: UnitLength; background?: string }>
+type SvgProps = ElementProps & Readonly<{ width?: UnitLength | LengthString; height?: UnitLength | LengthString; background?: string }>
 
 class Svg extends Element<SvgProps> {
   static viewport = true
@@ -17,8 +18,9 @@ class Svg extends Element<SvgProps> {
     // Omitted axes hug content. Specified viewport lengths remain explicit pixels;
     // a tight resize changes layout rather than magnifying a completed drawing.
     for (const axis of ['width', 'height'] as const) {
-      if (props[axis] !== undefined && props[axis].unit !== 'px') {
-        throw new TypeError(`Svg.${axis} requires px()`)
+      const length = props[axis]
+      if (length !== undefined && normalize_length(length, `${query.measure.path}.${axis}`).unit !== 'px') {
+        throw new TypeError(`Svg.${axis} requires pixels: px() or a "px" string`)
       }
     }
     const child = content_child(props.children)

@@ -209,8 +209,8 @@ if (false) {
   tick.label_color
   // @ts-expect-error a reserved owner key is not a scoped property
   tick.size
-  // @ts-expect-error scoped paint retains its value type
-  new Arrow({ head_stroke_width: '2px' })
+  // @ts-expect-error scoped paint retains its supported length units
+  new Arrow({ head_stroke_width: '2rem' })
   // @ts-expect-error unknown child property
   new Plot({ xaxis_label_colro: 'red' })
   // @ts-expect-error text options retain boolean types

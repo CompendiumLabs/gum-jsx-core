@@ -45,7 +45,9 @@ type MeasuredText = Readonly<{ text: string; tokens: readonly (Token<Part> & { w
 type Line = { parts: Part[]; width: number; above: number; below: number }
 
 function viewport_length(length?: Length | NormalizedLength): boolean {
-  return typeof length === 'object' && (length.unit === 'vw' || length.unit === 'vh')
+  const unit = typeof length === 'string' ? length.trim().slice(-2)
+    : typeof length === 'object' ? length.unit : undefined
+  return unit === 'vw' || unit === 'vh'
 }
 
 // Keep ordinary glyph preparation reusable when only the canvas changes. Inline

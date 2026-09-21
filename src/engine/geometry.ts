@@ -104,11 +104,11 @@ function make_clip(rect: Rect, radius?: RectRadiiValue): Clip {
 
 // Share shorthand expansion between layout lengths and numeric data padding.
 function read_insets<T extends Length>(spec: InsetSpec<T>, path = 'padding'): Readonly<Partial<Record<keyof Insets, T>>> {
-  if (typeof spec !== 'number' && (spec === null || typeof spec !== 'object')) {
+  if (typeof spec !== 'number' && typeof spec !== 'string' && (spec === null || typeof spec !== 'object')) {
     throw new TypeError(`${path}: expected a length, side object, [h, v], or [t, b, l, r]`)
   }
   let sides: InsetSides<T>
-  if (typeof spec === 'number' || 'unit' in spec) {
+  if (typeof spec === 'number' || typeof spec === 'string' || 'unit' in spec) {
     sides = { left: spec as T, top: spec as T, right: spec as T, bottom: spec as T }
   } else if (Array.isArray(spec)) {
     if ((spec.length !== 2 && spec.length !== 4) || [...spec].some(value => value == null)) {

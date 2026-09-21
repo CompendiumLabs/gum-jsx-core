@@ -73,12 +73,10 @@ function resolve_sizing(spec: SizeSpec = {}, context: Partial<LengthContext> = {
       const length = spec[key]
       if (length === undefined) return undefined
       const location = `${path}.${key}`
-      if (typeof length === 'string') {
-        if (((length as string) === 'fit' || (length as string) === 'hug') && (key === 'width' || key === 'height')) {
-          throw new TypeError(`${location}: omit the dimension for content sizing; use align_self to opt out of parent fill, or fit for scaling`)
-        }
-        throw new TypeError(`${location}: expected a length${key === 'width' || key === 'height' ? ' or "fill"' : ''}`)
+      if (((length as string) === 'fit' || (length as string) === 'hug') && (key === 'width' || key === 'height')) {
+        throw new TypeError(`${location}: omit the dimension for content sizing; use align_self to opt out of parent fill, or fit for scaling`)
       }
+      if (length === 'fill') throw new TypeError(`${location}: expected a length`)
       return nonnegative(resolve_length(length, context, reference[axis], key), location)
     }
 

@@ -68,21 +68,25 @@ layout content overflows.
 
 ## Lengths and references
 
-Length properties accept fractions as raw numbers and explicit `em()` / `px()`
-values. Helpers and normalized values are immutable; normalization copies input
+Length properties accept fractions as raw numbers, explicit `em()` / `px()` /
+`vw()` / `vh()` values, and unit strings such as `"1.5em"`, `"24px"`, `"25vw"`,
+`"4vh"`, and `"50%"`. Percent strings normalize to fractions; bare numbers retain
+their existing meaning. The unitless string `"0"` is also accepted. Helpers and
+normalized values are immutable; normalization copies input
 objects. Negative lengths are valid for coordinates. Sizing and inset operations
 require nonnegative resolved values.
 
 ```ts
-import { em, px, resolve_length, measure_length } from 'gum-jsx-core'
+import { em, px, make_measure, resolve_length, measure_length } from 'gum-jsx-core'
 
-const basis = { font_size: 16, fraction: 200 }
-resolve_length(0.5, basis)       // 100 pixels
-resolve_length(em(2), basis)     // 32 pixels
+const measure = make_measure({ font_size: 16 })
+resolve_length(0.5, measure, 200) // 100 pixels
+resolve_length('50%', measure, 200) // 100 pixels
+resolve_length(em(2), measure)  // 32 pixels
 resolve_length(px(10))          // 10 pixels
 
 measure_length(0.5)             // { value: 0.5, unit: 'fraction' }
-resolve_length(0.5, { fraction: 0 }) // 0 pixels: a known zero reference
+resolve_length(0.5, measure, 0)  // 0 pixels: a known zero reference
 resolve_length(0)               // 0 pixels: no reference needed
 ```
 
@@ -92,8 +96,10 @@ resolve_length(0)               // 0 pixels: no reference needed
 a percentage reference from an offer. A caller can resolve a retained value again
 once its reference becomes definite. General percentage cycles are deferred.
 
-`resolve_sizing` and `resolve_insets` accept a separate `LengthContext` containing
-`font_size`, `reference: { width?, height? }`, and a diagnostic `path`. Width and
+Length helpers share the immutable `LengthContext` at `query.measure`, containing
+`font_size`, `reference: { width?, height? }`, `viewport`, and a diagnostic `path`.
+`make_measure(context, patch)` derives local changes while preserving the other
+fields. `resolve_sizing` and `resolve_insets` select percentage axes: width and
 horizontal insets use reference width; height and vertical insets use reference
 height. The reference is the parent's established content box before flex slots
 are allocated. Deflating an offer does not change that reference.
@@ -103,12 +109,13 @@ clamped to own limits, and falls back to ordinary measurement without an offer.
 Omitted dimensions use ordinary measurement; text still wraps at its available
 width. Use `align_self` to opt out of parent fill alignment. Fill is a sizing
 policy, not a length.
-`resolve_sizing` accepts an optional `request` in its context to resolve fill from
+`resolve_sizing` accepts an optional `request` as its third argument to resolve fill from
 the actual parent offer. The layout pass supplies it automatically. Resolving fill
 once keeps an own maximum from turning natural measurement into a full-width request.
 
-Resolve `font_size` first using `resolve_font_size(value, inherited)`. Both its
-relative forms refer to the inherited size. Subsequent em lengths and line height
+Resolve `font_size` first using `resolve_font_size(value, inherited_measure)`.
+Its em and percentage forms refer to the inherited font size; viewport units use
+the reference canvas. Subsequent em lengths and line height
 use the resolved local font size. Defaults live in [defaults.ts](./src/engine/defaults.ts):
 16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
@@ -193,8 +200,9 @@ both intrinsic and explicit preferred ratios.
 
 ## Insets and fragments
 
-`resolve_insets` accepts a uniform length or these shorthand forms. Each value is
-a length: `px()`, `em()`, or a raw fraction resolved against its corresponding axis.
+`resolve_insets` accepts a uniform length or these shorthand forms. Each value
+accepts the helper and string forms above; fractions and percent strings resolve
+against the corresponding axis.
 
 | Form | Meaning |
 |---|---|
@@ -274,7 +282,8 @@ existing Acorn parser; no old element or layout engine is used. Extra scope valu
 belong to this evaluation. This runs ordinary trusted JavaScript, with its normal
 access to the host runtime.
 
-`Svg` accepts one content element and optional `px()` width and height. Each
+`Svg` accepts one content element and optional pixel width and height, written as
+`px(800)` or `"800px"`. Each
 omitted axis hugs the child's measured allocation, including any surrounding Boxes.
 A fixed width with an omitted height supports reflowing documents; omitting both supports
 fully natural composition. An exact request can resize either axis. Established
@@ -353,11 +362,10 @@ The layout function receives readonly props and a frozen query:
 | `request` | Prepared pixel requests, including explicit preferred dimensions. |
 | `sizing` | Resolved preferred sizes, min/max, and aspect. |
 | `style` | Inherited font and paint; font size is resolved, relative line height and stroke width retain their units. |
-| `reference` | The established **parent** content box used for this element's lengths. |
-| `path` | The instance path for diagnostics; it must not affect geometry. |
+| `measure` | Shared font size, established parent reference, root viewport, and diagnostic path for length resolution. |
 | `child(element, request, reference?, index?)` | Query a child with inherited style and its own path. |
 | `resource(name)` | Read a pass-owned resource during measurement. |
-| `prepare(name, compute)` | Cache source/style/resource work independently of requests and percentage references. |
+| `prepare(name, compute, dependencies?)` | Cache source/style/resource work independently of requests and parent references; dependencies default to the root viewport. |
 
 Pass a child's percentage reference explicitly once the container establishes its
 own content box. Omission leaves the reference indefinite. A finite available offer

@@ -195,7 +195,7 @@ const tests: Record<string, () => void> = {
       assert.throws(() => resolve_insets(spec as InsetSpec, context),
         /root\/Card.padding.*exactly two \[h, v\] or four \[t, b, l, r\]/)
     }
-    for (const spec of [true, false, null, '8px']) {
+    for (const spec of [true, false, null, '8rem']) {
       assert.throws(() => resolve_insets(spec as unknown as InsetSpec, context), /root\/Card.padding.*expected a length/)
     }
   },
@@ -347,8 +347,8 @@ console.log(`${Object.keys(tests).length} contract checks passed.`)
 if (false) {
   // @ts-expect-error Padding tuples require exactly two or four lengths.
   const three: InsetSpec = [0, 0, 0]
-  // @ts-expect-error A side value must be a length, not a string.
-  const side: InsetSpec = { t: '8px' }
+  // @ts-expect-error A side value must use a supported unit.
+  const side: InsetSpec = { t: '8rem' }
   // @ts-expect-error An axis value must be a length, not a boolean.
   const axis: InsetSpec = { h: true }
 }

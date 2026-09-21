@@ -84,7 +84,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const font_family = spec.font_family ?? inherited.font_family
   const font_weight = finite(spec.font_weight ?? inherited.font_weight, 'font_weight')
   const font_style = spec.font_style ?? inherited.font_style
-  const line_height = normalize_length(spec.line_height ?? inherited.line_height)
+  const line_height = normalize_length(spec.line_height ?? inherited.line_height, `${path}.line_height`)
   const color = paint('color')
   const fill = paint('fill')
   const stroke = paint('stroke')
@@ -98,12 +98,13 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
     throw new TypeError(`${path}: font_style must be normal or italic`)
   }
   nonnegative(line_height.value, `${path}.line_height`)
-  const stroke_width = normalize_length(spec.stroke_width ?? inherited.stroke_width)
+  const stroke_width = normalize_length(spec.stroke_width ?? inherited.stroke_width, `${path}.stroke_width`)
   const opacity = finite(spec.opacity ?? inherited.opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
-  const stroke_dasharray = Object.freeze((spec.stroke_dasharray ?? inherited.stroke_dasharray).map(value => {
-    const length = normalize_length(value)
-    nonnegative(length.value, 'stroke_dasharray')
+  const stroke_dasharray = Object.freeze((spec.stroke_dasharray ?? inherited.stroke_dasharray).map((value, index) => {
+    const location = `${path}.stroke_dasharray[${index}]`
+    const length = normalize_length(value, location)
+    nonnegative(length.value, location)
     return length
   }))
   return Object.freeze({
