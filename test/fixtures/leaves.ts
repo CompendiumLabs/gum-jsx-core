@@ -25,13 +25,8 @@ function paint_leaf(content: Size, query: LayoutQuery) {
 // A fixed leaf refuses to reflow, but still obeys its allocated size.
 class Fixed extends Element<LeafProps> {
   static layout(props: LeafProps, query: LayoutQuery) {
-    const { font_size } = query.style
-    const width = resolve_length(props.content_width ?? px(96), {
-      font_size, fraction: query.reference.width,
-    }, `${query.path}.content_width`)
-    const height = resolve_length(props.content_height ?? px(20), {
-      font_size, fraction: query.reference.height,
-    }, `${query.path}.content_height`)
+    const width = resolve_length(props.content_width ?? px(96), query.measure, query.measure.reference.width, 'content_width')
+    const height = resolve_length(props.content_height ?? px(20), query.measure, query.measure.reference.height, 'content_height')
     return paint_leaf(make_size(width, height), query)
   }
 }
@@ -52,7 +47,7 @@ class Wrapping extends Element<LeafProps> {
   static layout(props: LeafProps, query: LayoutQuery) {
     const count = props.count ?? 6
     if (!Number.isInteger(count) || count < 1) throw new Error('count must be a positive integer')
-    const unit = resolve_length(em(1), { font_size: query.style.font_size })
+    const unit = resolve_length(em(1), query.measure)
     const { width } = query.request
     const columns = width.kind === 'natural' || unit === 0 ? count
       : clamp(floor(width.value / unit), [1, count])

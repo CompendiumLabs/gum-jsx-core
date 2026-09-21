@@ -4,6 +4,7 @@ import type { FontProvider } from './engine/fonts'
 import type { LayoutRequest } from './engine/layout'
 import type { Fragment } from './engine/fragment'
 import type { Size } from './engine/geometry'
+import type { ReferenceBox } from './engine/units'
 import { Svg } from './elems/svg'
 import type { SvgProps } from './elems/svg'
 import { render_svg } from './svg'
@@ -19,6 +20,8 @@ type ViewportOptions = Readonly<{ defaults?: SvgProps; overrides?: SvgProps; wra
 // Fonts given alongside a pass are installed on it, refreshing the cache if they changed.
 type LayoutElementOptions = ViewportOptions & Readonly<{
   request?: LayoutRequest
+  // Reference dimensions for axes not established by the source.
+  viewport?: ReferenceBox
   pass?: LayoutPass
   fonts?: FontProvider
 }>
@@ -53,7 +56,8 @@ function resolve_pass({ pass, fonts }: LayoutElementOptions): LayoutPass {
 // A bare element gets a viewport that hugs it. An existing viewport keeps its
 // layout descriptor and props, so custom Svg subclasses survive the host policy.
 function make_viewport(element: Element, { defaults = {}, overrides = {}, wrap = {} }: ViewportOptions = {}): Svg {
-  const viewport = element instanceof Svg ? element : new Svg({ ...defined(wrap), children: element })
+  const viewport = element instanceof Svg ? element
+    : new Svg({ ...defined({ viewport: element.props.viewport }), ...defined(wrap), children: element })
   return new Svg(viewport.type, { ...defined(defaults), ...viewport.props, ...defined(overrides) })
 }
 
@@ -63,7 +67,7 @@ function layout_element(value: unknown, options?: LayoutElementOptions): LayoutE
 function layout_element(value: unknown, options: LayoutElementOptions = {}): LayoutElementResult {
   if (!(value instanceof Element)) return { kind: 'value', value }
   const pass = resolve_pass(options)
-  const fragment = pass.layout(make_viewport(value, options), options.request)
+  const fragment = pass.layout(make_viewport(value, options), options.request, { viewport: options.viewport })
   return { kind: 'fragment', fragment, pass }
 }
 
@@ -71,8 +75,8 @@ function layout_element(value: unknown, options: LayoutElementOptions = {}): Lay
 function render_element(element: Element, options?: RenderElementOptions): SvgResult
 function render_element(value: unknown, options?: RenderElementOptions): RenderElementResult
 function render_element(value: unknown, options: RenderElementOptions = {}): RenderElementResult {
-  const { request, defaults, overrides, wrap, pass, fonts, ...svg_options } = options
-  const result = layout_element(value, { request, defaults, overrides, wrap, pass, fonts })
+  const { request, viewport, defaults, overrides, wrap, pass, fonts, ...svg_options } = options
+  const result = layout_element(value, { request, viewport, defaults, overrides, wrap, pass, fonts })
   if (result.kind === 'value') return result
   const { fragment } = result
   return { kind: 'svg', svg: render_svg(fragment, svg_options), size: fragment.size, fragment, pass: result.pass }

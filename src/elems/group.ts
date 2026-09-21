@@ -6,7 +6,8 @@ import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point, make_rect } from '../engine/geometry'
 import { available, make_request, shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_font_size, resolve_length } from '../engine/units'
+import { child_measure } from '../engine/pass'
+import { resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
 type AnchorValue = Exclude<AlignmentValue, 'stretch' | 'fill'>
@@ -33,14 +34,14 @@ class Group extends Element<GroupProps> {
     const request = make_request({ width: available(size.width), height: available(size.height) })
     const children = element_children(props.children).map((element, index) => {
       const { x = 0, y = 0, anchor = 'start' } = element.props
-      const path = `${query.path}/${element.type.name}[${index}]`
-      const font_size = resolve_font_size(element.props.font_size, query.style.font_size, `${path}.font_size`)
+      const measure = child_measure(element, query, index, size)
+      const { path } = measure
 
       // Position lengths use the child's local font and the whole group rectangle.
       // Moving the origin or anchor never changes the child's available-space offer.
       const point = make_point(
-        resolve_length(x, { font_size, fraction: size.width }, `${path}.x`),
-        resolve_length(y, { font_size, fraction: size.height }, `${path}.y`),
+        resolve_length(x, measure, size.width, 'x'),
+        resolve_length(y, measure, size.height, 'y'),
       )
       const align = resolve_alignment(anchor, `${path}.anchor`)
       if (typeof align.x !== 'number' || typeof align.y !== 'number') {

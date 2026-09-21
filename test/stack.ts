@@ -38,7 +38,7 @@ const tests: Record<string, () => void> = {
     let calls = 0
     const Probe = define_element('Probe', (_, q) => {
       calls++
-      assert.deepEqual(q.reference, { width: 180, height: 40 })
+      assert.deepEqual(q.measure.reference, { width: 180, height: 40 })
       assert.equal(q.sizing.width.preferred, 90)
       assert.deepEqual(q.request.width, exact(90))
       return make_fragment({ size: finish_size(make_size(16, 16), q.request, q.sizing) })
@@ -268,7 +268,7 @@ const tests: Record<string, () => void> = {
     assert.throws(() => pass.layout(new HStack({ gap: 0.1 }), request), /HStack.gap/)
     const references: unknown[] = []
     const Probe = define_element('Probe', (_, q) => {
-      references.push(q.reference)
+      references.push(q.measure.reference)
       return make_fragment({ size: finish_size(make_size(50, 10), q.request, q.sizing) })
     })
     pass.layout(new VStack({ align: 'stretch', children: [new Probe(), new Box({ width: px(200) })] }))

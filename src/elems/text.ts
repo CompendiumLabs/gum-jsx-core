@@ -16,7 +16,8 @@ import type { LayoutQuery } from '../engine/pass'
 import { transform_path } from '../engine/path'
 import { resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
-import { resolve_line_height } from '../engine/units'
+import { make_measure, resolve_line_height } from '../engine/units'
+import type { Length, NormalizedLength, LengthContext } from '../engine/units'
 
 type TextProps = ElementProps & Readonly<{
   text?: string
@@ -43,6 +44,18 @@ type PreparedText = Readonly<{
 type MeasuredText = Readonly<{ text: string; tokens: readonly (Token<Part> & { width: number })[]; above: number; below: number }>
 type Line = { parts: Part[]; width: number; above: number; below: number }
 
+function viewport_length(length?: Length | NormalizedLength): boolean {
+  return typeof length === 'object' && (length.unit === 'vw' || length.unit === 'vh')
+}
+
+// Keep ordinary glyph preparation reusable when only the canvas changes. Inline
+// elements are measured later; only Span typography affects prepared prose.
+function viewport_spans(child: Child): boolean {
+  if (Array.isArray(child)) return child.some(viewport_spans)
+  return child instanceof Span && (viewport_length(child.props.font_size)
+    || viewport_length(child.props.line_height) || viewport_spans(child.props.children))
+}
+
 // Merge equivalent adjacent styles so a redundant Span does not disrupt kerning.
 function append_run(runs: Run[], text: string, style: Style): void {
   if (!text) return
@@ -53,15 +66,17 @@ function append_run(runs: Run[], text: string, style: Style): void {
 }
 
 // Inline spans are source runs, not independently measured layout children.
-function collect_runs(child: Child, style: Style, path: string, runs: Run[]): void {
+function collect_runs(child: Child, style: Style, measure: LengthContext, runs: Run[]): void {
+  const { path } = measure
   if (child == null || typeof child === 'boolean') return
   if (Array.isArray(child)) {
-    child.forEach((item, index) => collect_runs(item, style, `${path}[${index}]`, runs))
+    child.forEach((item, index) => collect_runs(item, style, make_measure(measure, { path: `${path}[${index}]` }), runs))
   } else if (typeof child === 'string' || typeof child === 'number') {
     append_run(runs, String(child), style)
   } else if (child instanceof Span) {
-    const nested = `${path}/Span`
-    collect_runs(child.props.children, resolve_style(child.props, style, nested), nested, runs)
+    const nested = make_measure(measure, { path: `${path}/Span` })
+    const child_style = resolve_style(child.props, style, nested)
+    collect_runs(child.props.children, child_style, make_measure(nested, { font_size: child_style.font_size }), runs)
   } else if (child instanceof Element) {
     // Unicode's object replacement character participates in line breaking but
     // is never shaped. Punctuation and nonbreaking spaces keep their semantics.
@@ -106,11 +121,11 @@ function normalize_runs(runs: Run[], pre: boolean, tab_size: number): Run[] {
 
 // Leading changes the line box, not the glyphs. A tight line height can put ink
 // above/below that box; mixed runs share a baseline and contribute both extents.
-function font_metrics(style: Style, fonts: FontProvider): Metrics {
+function font_metrics(style: Style, fonts: FontProvider, measure: LengthContext): Metrics {
   const font = fonts.resolve(style.font_family, style.font_weight, style.font_style)
   const ascent = font.ascent * style.font_size
   const descent = font.descent * style.font_size
-  const height = resolve_line_height(style.line_height, style.font_size)
+  const height = resolve_line_height(style.line_height, make_measure(measure, { font_size: style.font_size }))
   const above = (height + ascent - descent) / 2
   return { font, above, below: height - above }
 }
@@ -144,14 +159,14 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
     throw new TypeError('Text accepts text or children, not both')
   }
   const raw: Run[] = []
-  collect_runs(props.text ?? props.children, query.style, query.path, raw)
+  collect_runs(props.text ?? props.children, query.style, query.measure, raw)
   const runs = normalize_runs(raw, whitespace === 'pre', tab_size)
   const text = runs.map(run => run.text).join('')
   if (!text) return { runs, tokens: [], above: 0, below: 0 }
   const fonts = query.resource<FontProvider>('fonts')
   const metrics = new Map<Style, Metrics>()
   const get_metrics = (style: Style) => {
-    if (!metrics.has(style)) metrics.set(style, font_metrics(style, fonts))
+    if (!metrics.has(style)) metrics.set(style, font_metrics(style, fonts, query.measure))
     return metrics.get(style)!
   }
   const strut = get_metrics(query.style)
@@ -259,7 +274,9 @@ function flow_lines(prepared: MeasuredText, budget: number): Line[] {
 function text_layout(props: TextProps, query: LayoutQuery) {
   const { text_align = 'left', wrap = true } = props
   if (!['left', 'center', 'right'].includes(text_align)) throw new TypeError('Unknown text_align')
-  const prepared = measure_text(query.prepare('text', () => prepare_text(props, query)), query)
+  const dependencies = viewport_length(query.style.line_height) || viewport_spans(props.children)
+    ? [query.measure.viewport] : []
+  const prepared = measure_text(query.prepare('text', () => prepare_text(props, query), dependencies), query)
   const offer = query.request.width
   const budget = wrap && offer.kind !== 'natural' ? offer.value : Infinity
   const lines = flow_lines(prepared, budget)

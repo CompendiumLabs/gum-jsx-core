@@ -8,7 +8,7 @@ import type { Insets, Size } from '../engine/geometry'
 import { available, exact, make_request, deflate_request, finish_size, resolve_sizing } from '../engine/layout'
 import type { AxisRequest, AxisSizing, LayoutRequest, Sizing } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_font_size } from '../engine/units'
+import { child_measure } from '../engine/pass'
 import type { ReferenceBox } from '../engine/units'
 
 type AlignmentValue = number | 'start' | 'center' | 'end' | 'stretch' | 'fill'
@@ -94,7 +94,7 @@ function layout_content(
   const self = child?.props.align_self
   if (self === 'baseline') throw new TypeError('Baseline alignment is available on HStack')
   const align = self === undefined ? parent_align
-    : resolve_alignment(self, `${query.path}.align_self`, parent_align)
+    : resolve_alignment(self, `${query.measure.path}.align_self`, parent_align)
   const inner = deflate_request(query.request, insets)
   const fixed = definite_reference(query.request, query.sizing)
   const reference = Object.freeze({
@@ -107,9 +107,7 @@ function layout_content(
   })
   let sizing: Sizing | undefined
   if (child && (align.x === 'fill' || align.y === 'fill')) {
-    const path = `${query.path}/${child.type.name}[0]`
-    const font_size = resolve_font_size(child.props.font_size, query.style.font_size, `${path}.font_size`)
-    sizing = resolve_sizing(child.props, { font_size, reference, path })
+    sizing = resolve_sizing(child.props, child_measure(child, query, 0, reference))
   }
   const request = make_request({
     width: aligned_request(inner.width, reference.width, align.x, sizing?.width),

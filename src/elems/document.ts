@@ -19,7 +19,7 @@ import { scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Text, Span } from './text'
 import type { TextOptions } from './text'
-import { em, px } from '../engine/units'
+import { make_measure, em, px } from '../engine/units'
 import type { Length } from '../engine/units'
 import { draw_rect } from '../engine/drawing'
 
@@ -152,8 +152,8 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
   }
   static layout(props: TitleFrameData, query: LayoutQuery) {
     const frame_aspect = props.frame_aspect === undefined ? undefined
-      : nonnegative(props.frame_aspect, `${query.path}.frame_aspect`)
-    if (frame_aspect === 0) throw new RangeError(`${query.path}.frame_aspect must be positive`)
+      : nonnegative(props.frame_aspect, `${query.measure.path}.frame_aspect`)
+    if (frame_aspect === 0) throw new RangeError(`${query.measure.path}.frame_aspect must be positive`)
     const { id, bounds, ...frame } = props
     const framed = frame_bounds(bounds)
     if (!props.title_box) {
@@ -201,7 +201,7 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     // and the side ports agree. Only the body's lower corners reach that outline.
     // Frame bounds exclude the overhang, so the outline is the rounded body itself.
     const round = make_clip(make_rect(0, 0, body.size.width, body.size.height),
-      resolve_rect_radius(props.radius ?? 0, body.size, query)).radius!
+      resolve_rect_radius(props.radius ?? 0, body.size, query.measure)).radius!
     const corner = (key: 'bl' | 'br') => 'tl' in round ? round[key] : round
     const boundary = make_clip(make_rect(0, 0, size.width, size.height),
       framed ? round : { tl: make_point(), tr: make_point(), bl: corner('bl'), br: corner('br') })
@@ -253,7 +253,7 @@ class Slide extends Element<SlideData, SlideProps> {
   static layout(props: SlideData, query: LayoutQuery) {
     const size = graph_size(query, 16 / 9)
     const padding = resolve_insets(props.padding ?? em(1.5),
-      { font_size: query.style.font_size, reference: size, path: query.path })
+      make_measure(query.measure, { reference: size }))
     const inner = deflate_size(size, padding)
     const fragment = query.child(props.body, make_request({ width: exact(inner.width), height: exact(inner.height) }), inner)
     const area = make_rect(0, 0, size.width, size.height)

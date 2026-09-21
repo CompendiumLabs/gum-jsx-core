@@ -12,7 +12,7 @@ import { map_path } from '../engine/path'
 import type { PathCommand, PathSegment } from '../engine/path'
 import { resolve_paint } from '../engine/style'
 import { px, resolve_length } from '../engine/units'
-import type { Length } from '../engine/units'
+import type { Length, LengthContext } from '../engine/units'
 
 type Position = Readonly<{ x: Length; y: Length }>
 type PositionValue = PointValue<Length>
@@ -33,16 +33,15 @@ function shape_context(props: ElementProps, query: LayoutQuery, aspect?: number)
   if (element_children(props.children).length) throw new TypeError('Shapes have no content children')
   const sizing = { ...query.sizing, aspect: query.sizing.aspect ?? aspect }
   const size = shape_size(query.request, sizing)
-  const paint = resolve_paint(query.style, size, query.path)
+  const paint = resolve_paint(query.style, size, query.measure)
   return { size, paint }
 }
 
-function resolve_position(value: PositionValue, size: Size, query: LayoutQuery, path: string) {
-  const point = read_point(value, `${query.path}.${path}`)
-  const { font_size } = query.style
+function resolve_position(value: PositionValue, size: Size, measure: LengthContext, path: string) {
+  const point = read_point(value, `${measure.path}.${path}`)
   return make_point(
-    resolve_length(point.x, { font_size, fraction: size.width }, `${query.path}.${path}.x`),
-    resolve_length(point.y, { font_size, fraction: size.height }, `${query.path}.${path}.y`),
+    resolve_length(point.x, measure, size.width, `${path}.x`),
+    resolve_length(point.y, measure, size.height, `${path}.y`),
   )
 }
 
@@ -52,29 +51,28 @@ function is_position(value: Radius): value is PositionValue {
 }
 
 // A scalar radius stays circular; a pair resolves against the corresponding axes.
-function resolve_radius(radius: Radius, size: Size, query: LayoutQuery, path = 'radius') {
+function resolve_radius(radius: Radius, size: Size, measure: LengthContext, path = 'radius') {
   if (is_position(radius)) {
-    const point = resolve_position(radius, size, query, path)
+    const point = resolve_position(radius, size, measure, path)
     nonnegative(point.x, `${path}.x`); nonnegative(point.y, `${path}.y`)
     return point
   }
-  const basis = { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }
-  const value = nonnegative(resolve_length(radius, basis, `${query.path}.${path}`), path)
+  const value = nonnegative(resolve_length(radius, measure, Math.min(size.width, size.height), path), path)
   return make_point(value, value)
 }
 
 // Explicit corners win over sides; top/bottom win where side defaults overlap.
-function resolve_rect_radius(radius: RectRadius, size: Size, query: LayoutQuery): RectRadii {
+function resolve_rect_radius(radius: RectRadius, size: Size, measure: LengthContext): RectRadii {
   if (radius !== null && typeof radius === 'object' && !Array.isArray(radius)
     && !('unit' in radius) && !('x' in radius) && !('y' in radius)) {
     const sides = radius as RadiusSides
     for (const key of Object.keys(sides)) {
       if (!['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br'].includes(key)) {
-        throw new TypeError(`${query.path}.radius: unknown side or corner ${key}`)
+        throw new TypeError(`${measure.path}.radius: unknown side or corner ${key}`)
       }
     }
     const resolved = Object.fromEntries(Object.entries(sides).filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, resolve_radius(value!, size, query, `radius.${key}`)]))
+      .map(([key, value]) => [key, resolve_radius(value!, size, measure, `radius.${key}`)]))
     const zero = make_point()
     return Object.freeze({
       tl: resolved.tl ?? resolved.t ?? resolved.l ?? zero,
@@ -83,7 +81,7 @@ function resolve_rect_radius(radius: RectRadius, size: Size, query: LayoutQuery)
       bl: resolved.bl ?? resolved.b ?? resolved.l ?? zero,
     })
   }
-  return resolve_radius(radius as Radius, size, query)
+  return resolve_radius(radius as Radius, size, measure)
 }
 
 // Edges meet the drawn ellipse: a clip whose corner radii span its whole box.
@@ -95,7 +93,7 @@ function ellipse_boundary(center: Point, radius: Point) {
 function rect_layout(props: RectProps, query: LayoutQuery, radius: Radius = 0) {
   const { size, paint } = shape_context(props, query)
   const rect = make_rect(0, 0, size.width, size.height)
-  const corners = resolve_rect_radius(props.radius ?? radius, size, query)
+  const corners = resolve_rect_radius(props.radius ?? radius, size, query.measure)
   return make_fragment({ size, draw: [draw_rect(rect, paint, corners)],
     ...frame_connection(props.id, make_clip(rect, corners)) })
 }
@@ -116,7 +114,7 @@ class Square extends Element<RectProps> {
     const { size, paint } = shape_context(props, query, 1)
     const side = Math.min(size.width, size.height)
     const rect = make_rect((size.width - side) / 2, (size.height - side) / 2, side, side)
-    const radius = resolve_rect_radius(props.radius ?? 0, make_size(side, side), query)
+    const radius = resolve_rect_radius(props.radius ?? 0, make_size(side, side), query.measure)
     return make_fragment({ size, draw: [draw_rect(rect, paint, radius)],
       ...frame_connection(props.id, make_clip(rect, radius)) })
   }
@@ -125,8 +123,8 @@ class Square extends Element<RectProps> {
 class Circle extends Element<CircleProps> {
   static layout(props: CircleProps, query: LayoutQuery) {
     const { size, paint } = shape_context(props, query, 1)
-    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center')
-    const radius = resolve_radius(props.radius ?? 0.5, size, query)
+    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query.measure, 'center')
+    const radius = resolve_radius(props.radius ?? 0.5, size, query.measure)
     return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)],
       ...frame_connection(props.id, ellipse_boundary(center, radius)) })
   }
@@ -135,8 +133,8 @@ class Circle extends Element<CircleProps> {
 class Ellipse extends Element<EllipseProps> {
   static layout(props: EllipseProps, query: LayoutQuery) {
     const { size, paint } = shape_context(props, query)
-    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query, 'center')
-    const radius = resolve_radius(props.radius ?? { x: 0.5, y: 0.5 }, size, query)
+    const center = resolve_position(props.center ?? { x: 0.5, y: 0.5 }, size, query.measure, 'center')
+    const radius = resolve_radius(props.radius ?? { x: 0.5, y: 0.5 }, size, query.measure)
     return make_fragment({ size, draw: [draw_ellipse(center, radius, paint)],
       ...frame_connection(props.id, ellipse_boundary(center, radius)) })
   }
@@ -145,8 +143,8 @@ class Ellipse extends Element<EllipseProps> {
 class Line extends Element<LineProps> {
   static layout(props: LineProps, query: LayoutQuery) {
     const { size, paint } = shape_context(props, query)
-    const from = resolve_position(props.from ?? { x: 0, y: 0 }, size, query, 'from')
-    const to = resolve_position(props.to ?? { x: 1, y: 1 }, size, query, 'to')
+    const from = resolve_position(props.from ?? { x: 0, y: 0 }, size, query.measure, 'from')
+    const to = resolve_position(props.to ?? { x: 1, y: 1 }, size, query.measure, 'to')
     const commands: PathCommand[] = [{ kind: 'M', ...from }, { kind: 'L', ...to }]
     return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] })
   }
@@ -157,7 +155,7 @@ function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false) {
   const { size, paint } = shape_context(props, query)
   const commands: PathCommand[] = (props.points ?? []).map((point, index) => ({
     kind: index === 0 ? 'M' : 'L',
-    ...resolve_position(point, size, query, `points[${index}]`),
+    ...resolve_position(point, size, query.measure, `points[${index}]`),
   }))
   if (closed && commands.length > 1) commands.push({ kind: 'Z' })
   return make_fragment({ size, draw: [draw_path(commands, paint)] })
@@ -177,7 +175,7 @@ class Path extends Element<PathProps> {
   static layout(props: PathProps, query: LayoutQuery) {
     const { size, paint } = shape_context(props, query)
     const commands = map_path(props.commands ?? [], (x, y) =>
-      resolve_position({ x, y }, size, query, 'commands'))
+      resolve_position({ x, y }, size, query.measure, 'commands'))
     return make_fragment({ size, draw: [draw_path(commands, paint)] })
   }
 }

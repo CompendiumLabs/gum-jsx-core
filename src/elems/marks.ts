@@ -21,8 +21,8 @@ import type { Position, PositionValue, Radius } from './shapes'
 import { Rotate, TransformBox } from './placement'
 import { resolve_paint, resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
-import { px, resolve_length } from '../engine/units'
-import type { Length } from '../engine/units'
+import { make_measure, px, resolve_length } from '../engine/units'
+import type { Length, LengthContext } from '../engine/units'
 
 type MarkProps = ElementProps & Readonly<{ space?: GeometrySpace }>
 type CoordLineProps = MarkProps & Readonly<{ points?: readonly (PositionValue | null)[]; closed?: boolean }>
@@ -91,14 +91,14 @@ function mark_context(props: MarkProps, query: LayoutQuery) {
   const size = shape_size(query.request, query.sizing)
   const coord = props.space === 'local' ? undefined : query.coordinates
   const point = (value: PositionValue) => {
-    const p = read_point(value, query.path)
+    const p = read_point(value, query.measure.path)
     return make_point(
-      coordinate_length(p.x, 'x', size, query.style.font_size, coord, `${query.path}.x`),
-      coordinate_length(p.y, 'y', size, query.style.font_size, coord, `${query.path}.y`))
+      coordinate_length(p.x, 'x', size, query.measure, coord),
+      coordinate_length(p.y, 'y', size, query.measure, coord))
   }
   const length = (value: Length) => nonnegative(resolve_length(value,
-    { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, query.path), 'length')
-  return { size, point, length, coord, paint: resolve_paint(query.style, size, query.path) }
+    query.measure, Math.min(size.width, size.height), 'length'), 'length')
+  return { size, point, length, coord, paint: resolve_paint(query.style, size, query.measure) }
 }
 
 function mark_bounds(props: MarkProps, points: readonly (PositionValue | null)[]) {
@@ -201,8 +201,7 @@ class Arc extends Element<ArcProps> {
           * ((axis === 'x' ? coord.flip_x : coord.flip_y) ? -1 : 1)
       }
       return paired
-        ? nonnegative(resolve_length(value, { font_size: query.style.font_size,
-          fraction: axis === 'x' ? size.width : size.height }, 'radius'), 'radius') : length(value)
+        ? nonnegative(resolve_length(value, query.measure, axis === 'x' ? size.width : size.height, 'radius'), 'radius') : length(value)
     }
     const commands = arc_path(origin, make_point(delta(pair.x, 'x'), delta(pair.y, 'y')), props.start, props.end)
     return make_fragment({ size, draw: [draw_path(commands, paint)] })
@@ -306,16 +305,16 @@ function arrow_head_options(props: ArrowHeadScope): ArrowHeadOptions {
 
 // Both the element and generated arrowheads use this resolver and drawing path.
 // An attached head inherits its shaft's stroke; an open head always has no fill.
-function resolve_arrow_head(props: ArrowHeadOptions, size: Size, inherited: Style, path: string, shaft?: Paint) {
+function resolve_arrow_head(props: ArrowHeadOptions, size: Size, inherited: Style, context: LengthContext, shaft?: Paint) {
   const style = shaft ? resolve_style({ fill: shaft.stroke,
-    stroke: props.open ? shaft.stroke : 'none', ...props }, inherited, path) : inherited
-  const length = nonnegative(resolve_length(props.head_size ?? px(9), {
-    font_size: style.font_size, fraction: Math.min(size.width, size.height),
-  }, `${path}.head_size`), 'head_size')
+    stroke: props.open ? shaft.stroke : 'none', ...props }, inherited, context) : inherited
+  const measure = make_measure(context, { font_size: style.font_size })
+  const length = nonnegative(resolve_length(props.head_size ?? px(9), measure,
+    Math.min(size.width, size.height), 'head_size'), 'head_size')
   const width = props.head_width ?? (shaft ? 1.3 : 0.65), curve = props.curve ?? 0, open = props.open ?? false
   const side = props.barb ?? 'both'
   if (!['both', 'left', 'right'].includes(side)) throw new TypeError('barb must be both, left, or right')
-  const barb = arrow_barb(length, width, curve), paint = resolve_paint(style, size, path)
+  const barb = arrow_barb(length, width, curve), paint = resolve_paint(style, size, measure)
   return { length, width, curve, open, barb, side,
     draw: (tip: Point, angle: number) => draw_path(arrow_head(tip, angle, barb, open, side),
       open ? { ...paint, fill: 'none' } : paint) }
@@ -408,7 +407,7 @@ class Arrow extends Element<ArrowProps> {
   }
   static layout(props: ArrowProps, query: LayoutQuery) {
     const { size, point, paint, length } = mark_context(props, query)
-    const head = resolve_arrow_head(arrow_head_options(props), size, query.style, query.path, paint)
+    const head = resolve_arrow_head(arrow_head_options(props), size, query.style, query.measure, paint)
     return make_fragment({ size, draw: arrow_draw(arrow_points(props).map(point), paint, head,
       props, length(props.radius ?? 0)) })
   }
@@ -421,7 +420,7 @@ class ArrowHead extends Element<ArrowHeadProps> {
   }
   static layout(props: ArrowHeadProps, query: LayoutQuery) {
     const { size, point } = mark_context(props, query)
-    const head = resolve_arrow_head(props, size, query.style, query.path)
+    const head = resolve_arrow_head(props, size, query.style, query.measure)
     return make_fragment({ size, draw: [head.draw(point(props.tip ?? { x: 1, y: 0.5 }),
       finite(props.angle ?? 0, 'angle') * Math.PI / 180)] })
   }
@@ -462,7 +461,7 @@ class Points extends Element<PointsData, PointsProps> {
       const pair = paired
         ? read_point(marker.size, 'point_size') : { x: marker.size, y: marker.size }
       const dimension = (value: Length, fraction: number) => nonnegative(resolve_length(value,
-        { font_size: query.style.font_size, fraction }, 'point_size'), 'point_size')
+        query.measure, fraction, 'point_size'), 'point_size')
       const width = dimension(pair.x, paired ? size.width : Math.min(size.width, size.height))
       const height = dimension(pair.y, paired ? size.height : Math.min(size.width, size.height))
       const fragment = query.child(sized_marker(marker.shape, width, height),

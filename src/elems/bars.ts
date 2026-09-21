@@ -1,4 +1,5 @@
 import type { ElementProps } from '../engine/element'
+import { make_measure } from '../engine/units'
 import { finite, nonnegative } from '../lib/checks'
 import { Element } from '../engine/element'
 import { draw_rect } from '../engine/drawing'
@@ -58,15 +59,15 @@ function bar_corners(bar: BarDatum, direction = 'vertical') {
 
 function bars_layout(props: BarsData, query: LayoutQuery) {
   const { size, point } = mark_context(props, query)
-  const shared_radius = resolve_rect_radius(props.radius ?? 0, size, query)
+  const shared_radius = resolve_rect_radius(props.radius ?? 0, size, query.measure)
   const draw = props.bars.map(bar => {
     const [a, b] = bar_corners(bar, props.direction).map(point)
     const rect = make_rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y))
-    const style = resolve_style(bar.style, query.style)
-    const paint = resolve_paint(style, size, query.path)
+    const style = resolve_style(bar.style, query.style, query.measure)
+    const paint = resolve_paint(style, size, query.measure)
     // Radius is geometry, so it must be consumed separately from inherited paint.
     const radius = bar.style.radius === undefined ? shared_radius
-      : resolve_rect_radius(bar.style.radius, size, { ...query, style })
+      : resolve_rect_radius(bar.style.radius, size, make_measure(query.measure, { font_size: style.font_size }))
     return draw_rect(rect, paint, radius)
   })
   return make_fragment({ size, draw })

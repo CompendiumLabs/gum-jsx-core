@@ -30,7 +30,7 @@ import { HStack, VStack } from './stack'
 import type { StyleSpec } from '../engine/style'
 import { theme_color } from '../engine/theme'
 import type { TextOptions } from './text'
-import { em, px, resolve_length } from '../engine/units'
+import { make_measure, em, px, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
 type LegendEntry = Readonly<{
@@ -131,10 +131,10 @@ function plot_data(input: PlotProps): PlotData {
 
 function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   const size = graph_size(query), { coordinates } = props
-  const basis = { font_size: query.style.font_size, reference: size, path: query.path }
+  const basis = make_measure(query.measure, { reference: size })
   const margin = resolve_insets(props.margin ?? px(12), basis, 'margin')
   const gap = resolve_length(props.label_gap ?? px(8),
-    { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'label_gap')
+    query.measure, Math.min(size.width, size.height), 'label_gap')
   if (gap < 0) throw new RangeError('label_gap must be nonnegative')
   const context = { coordinates }
   const probe = make_request({ width: exact(size.width), height: exact(size.height) })
@@ -174,7 +174,7 @@ function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
     clip: (props.clip ?? true) ? plot_rect : undefined })
   add(data)
   const border = resolve_length(props.border_width ?? px(0),
-    { font_size: query.style.font_size, fraction: Math.min(inner.width, inner.height) }, 'border_width')
+    query.measure, Math.min(inner.width, inner.height), 'border_width')
   if (border < 0) throw new RangeError('border_width must be nonnegative')
   if (border) add(make_fragment({ name: 'PlotBorder', size: inner,
     draw: [draw_rect(plot_rect, { fill: 'none', stroke: theme_color(props.border_color ?? 'theme:border', query.style.theme), stroke_width: border,
@@ -235,7 +235,7 @@ class OuterLabel extends Element<OuterLabelData, OuterLabelProps> {
     if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown label side')
     const label = query.child(props.label_element, make_request(), size, 0, { coordinates: null })
     const offset = resolve_length(props.offset ?? em(1),
-      { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'offset')
+      query.measure, Math.min(size.width, size.height), 'offset')
     const x = side === 'left' ? -offset - label.size.width : side === 'right' ? size.width + offset
       : (size.width - label.size.width) / 2
     const y = side === 'top' ? -offset - label.size.height : side === 'bottom' ? size.height + offset

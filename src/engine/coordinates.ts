@@ -4,7 +4,7 @@ import type { Child } from './element'
 import { make_point, read_point, read_insets } from './geometry'
 import type { Point, PointValue, Size, InsetSpec } from './geometry'
 import { resolve_length } from './units'
-import type { Length } from './units'
+import type { Length, LengthContext } from './units'
 
 type Limit = readonly [number, number]
 type DataBounds = Readonly<{ xlim?: Limit; ylim?: Limit }>
@@ -120,15 +120,15 @@ function unmap_point(value: PointValue, coord: Coordinates, size: Size): Point {
     coord.ylim[0] + (coord.flip_y ? 1 - y : y) * (coord.ylim[1] - coord.ylim[0]))
 }
 
-// Only numeric geometry participates in data mapping. px/em remain local lengths.
-function coordinate_length(value: Length, axis: 'x' | 'y', size: Size, font_size: number,
-  coord?: Coordinates, path = 'coordinate'): number {
+// Only numeric geometry participates in data mapping. Tagged units remain lengths.
+function coordinate_length(value: Length, axis: 'x' | 'y', size: Size, measure: LengthContext,
+  coord?: Coordinates, property: string = axis): number {
   const extent = axis === 'x' ? size.width : size.height
   if (coord && typeof value === 'number') {
     return map_axis(value, axis === 'x' ? coord.xlim : coord.ylim, extent,
       axis === 'x' ? coord.flip_x : coord.flip_y)
   }
-  return resolve_length(value, { font_size, fraction: extent }, path)
+  return resolve_length(value, measure, extent, property)
 }
 
 export { copy_limit, copy_coordinates, point_bounds, merge_bounds, data_bounds,

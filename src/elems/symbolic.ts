@@ -103,7 +103,7 @@ class Field extends Element<FieldData, FieldProps> {
         children.push(place_fragment(fragment, a, [c, s, -s, c, s * height / 2, -c * height / 2]))
       } else {
         head ??= resolve_arrow_head({ ...arrow_head_options(props), head_size: props.head_size ?? px(5) },
-          size, query.style, query.path, paint)
+          size, query.style, query.measure, paint)
         draw.push(...arrow_draw([a, b], paint, head, {}))
       }
     }

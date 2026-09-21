@@ -9,15 +9,15 @@ import type { Fragment, LayoutRequest, Size } from '../../src/index'
 // These probes use measured stand-ins. Real elements and drawing arrive in stage 2.
 function units() {
   const font_size = resolve_font_size()
-  const basis = { font_size, fraction: 640 }
+  const measure = { font_size }
   return {
     lengths: [px(10), em(2), 0.5].map(length => ({
-      length, pixels: resolve_length(length, basis),
+      length, pixels: resolve_length(length, measure, 640),
     })),
-    inherited_font: resolve_font_size(em(2), font_size),
+    inherited_font: resolve_font_size(em(2), measure),
     line_height: resolve_line_height(),
     indefinite: measure_length(0.5),
-    known_zero: resolve_length(0.5, { fraction: 0 }),
+    known_zero: resolve_length(0.5, {}, 0),
     absolute_zero: resolve_length(0),
   }
 }

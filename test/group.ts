@@ -96,7 +96,7 @@ const tests: Record<string, () => void> = {
     const Probe = define_element('Probe', (_, q) => {
       calls++
       assert.deepEqual(q.request, make_request({ width: available(200), height: available(100) }))
-      assert.deepEqual(q.reference, { width: 200, height: 100 })
+      assert.deepEqual(q.measure.reference, { width: 200, height: 100 })
       return make_fragment({ size: finish_size(make_size(24, 12), q.request, q.sizing) })
     })
     const pass = new LayoutPass()

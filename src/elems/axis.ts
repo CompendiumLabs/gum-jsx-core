@@ -110,22 +110,22 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
     : map_axis(props.at, horizontal ? coord.ylim : coord.xlim,
       horizontal ? size.height : size.width, horizontal ? coord.flip_y : coord.flip_x)
   const point = (a: number, b: number) => horizontal ? make_point(a, b) : make_point(b, a)
-  const basis = { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }
-  const tick_size = nonnegative(resolve_length(props.tick_size ?? px(5), basis, 'tick_size'), 'tick_size')
-  const gap = nonnegative(resolve_length(props.label_offset ?? px(4), basis, 'label_offset'), 'label_offset')
+  const fraction = Math.min(size.width, size.height)
+  const tick_size = nonnegative(resolve_length(props.tick_size ?? px(5), query.measure, fraction, 'tick_size'), 'tick_size')
+  const gap = nonnegative(resolve_length(props.label_offset ?? px(4), query.measure, fraction, 'label_offset'), 'label_offset')
   const sign = positive ? 1 : -1, tick_sign = tick_positive ? 1 : -1
-  const line_style = resolve_style(props.line_style, query.style)
-  const paint = resolve_paint(line_style, size, query.path)
+  const line_style = resolve_style(props.line_style, query.style, query.measure)
+  const paint = resolve_paint(line_style, size, query.measure)
   const draw = mode === 'axis' && (props.line ?? true) ? arrow_draw(
     [point(along(lim[0]), cross), point(along(lim[1]), cross)], paint,
     resolve_arrow_head({ head_size: props.arrow_size ?? px(7), head_width: props.arrow_width,
-      ...props.arrow_style }, size, line_style, query.path, paint),
+      ...props.arrow_style }, size, line_style, query.measure, paint),
     { end_head: props.arrow ?? false }) : []
   if (mode !== 'labels' && tick_size) {
     const ticks = items.flatMap(item => line_path([
       point(along(item.value), cross), point(along(item.value), cross + tick_sign * tick_size),
     ]))
-    const tick_paint = resolve_paint(resolve_style(props.tick_style, query.style), size, query.path)
+    const tick_paint = resolve_paint(resolve_style(props.tick_style, query.style, query.measure), size, query.measure)
     draw.push(draw_path(ticks, { ...tick_paint, fill: 'none' }))
   }
   const children = mode !== 'scale' && (props.labels ?? true) ? items.map((item, index) => {
@@ -136,7 +136,7 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
     const fallback = horizontal
       ? { x: 0.5, y: positive ? 0 : 1 }
       : { x: positive ? 0 : 1, y: 0.5 }
-    const anchor = resolve_alignment(item.label.props.anchor ?? fallback, `${query.path}.label_anchor`)
+    const anchor = resolve_alignment(item.label.props.anchor ?? fallback, `${query.measure.path}.label_anchor`)
     if (typeof anchor.x !== 'number' || typeof anchor.y !== 'number') {
       throw new TypeError('Axis label anchor selects a point')
     }
@@ -226,7 +226,7 @@ function mesh_layout(props: MeshData, query: LayoutQuery) {
       : [make_point(0, pos), make_point(size.width, pos)])
   })
   return make_fragment({ size, draw: [draw_path(commands,
-    { ...resolve_paint(query.style, size, query.path), fill: 'none' })] })
+    { ...resolve_paint(query.style, size, query.measure), fill: 'none' })] })
 }
 
 class Mesh extends Element<MeshData, MeshProps> {

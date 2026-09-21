@@ -1,15 +1,16 @@
 import { nonnegative } from '../lib/checks'
+import { DEFAULTS } from './defaults'
 import { Element } from './element'
 import { Fonts } from './fonts'
 import { make_fragment } from './fragment'
 import type { Fragment } from './fragment'
 import { make_rect } from './geometry'
 import { finish_size, make_request, prepare_request, resolve_sizing } from './layout'
-import type { LayoutRequest, Sizing } from './layout'
+import type { Axis, AxisSizing, LayoutRequest, Sizing } from './layout'
 import { resolve_style } from './style'
 import type { Style } from './style'
-import { UnresolvedLengthError } from './units'
-import type { ReferenceBox } from './units'
+import { make_measure, measure_length, px, resolve_font_size, UnresolvedLengthError } from './units'
+import type { LengthContext, ReferenceBox } from './units'
 import { copy_coordinates } from './coordinates'
 import type { Coordinates } from './coordinates'
 import { copy_math_context } from './math'
@@ -19,14 +20,15 @@ import { fitting_mode, fitting_requests, fit_fragment } from './fitting'
 type LayoutContext = Readonly<{
   style?: Style; reference?: ReferenceBox; path?: string; coordinates?: Coordinates | null
   math?: MathContext | null
+  // Host canvas at the root; resolved reference canvas for descendants.
+  viewport?: ReferenceBox
 }>
 type Resource = Readonly<{ value: unknown; version: string | number }>
 type LayoutQuery = Readonly<{
   request: LayoutRequest
   sizing: Sizing
   style: Style
-  reference: ReferenceBox
-  path: string
+  measure: LengthContext
   coordinates?: Coordinates
   math?: MathContext
   child: (
@@ -34,25 +36,84 @@ type LayoutQuery = Readonly<{
     context?: Pick<LayoutContext, 'coordinates' | 'style' | 'math'>,
   ) => Fragment
   resource: <T>(name: string) => T
-  prepare: <T>(name: string, compute: () => T) => T
+  prepare: <T>(name: string, compute: () => T, dependencies?: readonly unknown[]) => T
 }>
 
+// Parent-owned metadata uses the child's local font and diagnostic path too.
+function child_measure(element: Element, query: LayoutQuery, index = 0, reference: ReferenceBox = {}): LengthContext {
+  const measure = make_measure(query.measure, { reference, path: `${query.measure.path}/${element.type.name}[${index}]` })
+  return make_measure(measure, { font_size: resolve_font_size(element.props.font_size, measure) })
+}
+
 // References describe established boxes, not offers. Missing axes stay missing.
-function copy_reference(reference: ReferenceBox = {}): ReferenceBox {
+function copy_reference(reference: ReferenceBox = {}, path = 'reference'): ReferenceBox {
   const result: { width?: number; height?: number } = {}
   for (const axis of ['width', 'height'] as const) {
     const value = reference[axis]
-    if (value !== undefined) result[axis] = nonnegative(value, `reference.${axis}`)
+    if (value !== undefined) result[axis] = nonnegative(value, `${path}.${axis}`)
   }
   return Object.freeze(result)
 }
 
+// Establish the canvas before the root font: authored references, definite root
+// dimensions, then the host canvas. Budgets and measured content never supply it.
+function root_viewport(element: Element, request: LayoutRequest, context: LayoutContext, path: string): ReferenceBox {
+  const host = copy_reference(context.viewport, 'viewport')
+  const authored = copy_reference(element.props.viewport, `${path}.viewport`)
+  if (!element.type.viewport) return copy_reference({ ...host, ...authored }, `${path}.viewport`)
+  const fixed: { width?: number; height?: number } = {}
+  const axes = ['width', 'height'] as const
+  for (const axis of axes) if (request[axis].kind === 'exact') fixed[axis] = request[axis].value
+  const inherited = context.style?.font_size ?? DEFAULTS.font_size
+  const props = element.props
+  if (props.aspect !== undefined) resolve_sizing({ aspect: props.aspect })
+
+  // Only fill unknown axes from already resolved inputs. Two axes can unlock
+  // the root font and each other; circular dependencies remain unresolved.
+  for (let step = 0; step < 3; step++) {
+    const viewport = { ...fixed, ...authored }
+    const measure = make_measure({ font_size: inherited, reference: context.reference, viewport, path })
+    const font = measure_length(props.font_size ?? px(inherited),
+      measure, inherited, 'font_size')
+    const rules: Partial<Record<Axis, AxisSizing>> = {}
+    let changed = false
+    for (const axis of axes) {
+      if (fixed[axis] !== undefined) continue
+      try {
+        const sizing = resolve_sizing({ [axis]: props[axis],
+          [`min_${axis}`]: props[`min_${axis}`], [`max_${axis}`]: props[`max_${axis}`] },
+        make_measure(measure, { font_size: typeof font === 'number' ? font : undefined }), request)
+        const rule = rules[axis] = sizing[axis]
+        const prepared = prepare_request(request, sizing)[axis]
+        const value = prepared.kind === 'exact' ? prepared.value : rule.min === rule.max ? rule.min : undefined
+        if (value !== undefined) { fixed[axis] = value; changed = true }
+      } catch (error) {
+        if (!(error instanceof UnresolvedLengthError)) throw error
+      }
+    }
+    if (props.aspect !== undefined) {
+      for (const axis of axes) {
+        const other = axis === 'width' ? fixed.height : fixed.width
+        const rule = rules[axis]
+        if (fixed[axis] !== undefined || other === undefined || !rule) continue
+        const value = axis === 'width' ? other * props.aspect : other / props.aspect
+        fixed[axis] = Math.max(rule.min, Math.min(rule.max, value))
+        changed = true
+      }
+    }
+    if (!changed) break
+  }
+  // Use the host canvas only after independently established root dimensions,
+  // so it cannot seed a sizing cycle and then be replaced by its result.
+  return copy_reference({ ...host, ...fixed, ...authored }, `${path}.viewport`)
+}
+
 // Cache exactly the inputs visible to geometry. Diagnostic paths are not geometry.
 function query_key(
-  request: LayoutRequest, style: Style, reference: ReferenceBox, epoch: number,
+  request: LayoutRequest, style: Style, measure: LengthContext, epoch: number,
   coordinates?: Coordinates, math?: MathContext,
 ): string {
-  return JSON.stringify([request, style, reference.width, reference.height, epoch, coordinates, math])
+  return JSON.stringify([request, style, measure.reference.width, measure.reference.height, epoch, coordinates, math, measure.viewport])
 }
 
 class LayoutError extends Error {
@@ -108,6 +169,10 @@ class LayoutPass {
 
   // Natural queries and final allocations run the same element implementation.
   layout(element: Element, request = make_request(), context: LayoutContext = {}): Fragment {
+    return this.#layout(element, request, context, true)
+  }
+
+  #layout(element: Element, request: LayoutRequest, context: LayoutContext, root = false): Fragment {
     if (!(element instanceof Element)) throw new TypeError('Layout requires a next Element')
     const path = context.path ?? element.type.name
     this.#queries++
@@ -115,10 +180,13 @@ class LayoutPass {
     try {
       request = make_request(request)
       const reference = copy_reference(context.reference)
-      const style = resolve_style(element.props, context.style, path)
+      const viewport = root ? root_viewport(element, request, context, path) : context.viewport!
+      const inherited = make_measure({ reference, viewport, path })
+      const style = resolve_style(element.props, context.style, inherited)
+      const measure = make_measure(inherited, { font_size: style.font_size })
       const coordinates = context.coordinates ? copy_coordinates(context.coordinates) : undefined
       const math = context.math ? copy_math_context(context.math) : undefined
-      const key = query_key(request, style, reference, this.#epoch, coordinates, math)
+      const key = query_key(request, style, measure, this.#epoch, coordinates, math)
       const cache = this.#cache.get(element) ?? new Map<string, Fragment>()
       this.#cache.set(element, cache)
       const cached = cache.get(key)
@@ -133,8 +201,7 @@ class LayoutPass {
       if (active.has(key)) throw new Error('Recursive layout request')
       active.add(key)
       try {
-        const basis = { font_size: style.font_size, reference, path }
-        const own_sizing = resolve_sizing(element.props, { ...basis, request })
+        const own_sizing = resolve_sizing(element.props, measure, request)
         // Only a complete formula entering ordinary layout fits automatically.
         // Internal TeX queries carry a math context; inline text measures its
         // operands naturally. Explicit fit (including false) always takes precedence.
@@ -145,17 +212,18 @@ class LayoutPass {
         const sizing = fitting ? fitting.intrinsic : own_sizing
         const prepared = fitting ? fitting.natural : prepare_request(request, sizing)
         const query: LayoutQuery = Object.freeze({
-          request: prepared, sizing, style, reference, path, coordinates, math,
-          child: (child, offer, basis = {}, index = 0, context = {}) => this.layout(child, offer, {
-            style, coordinates, math, ...context, reference: basis, path: `${path}/${child.type.name}[${index}]`,
+          request: prepared, sizing, style, measure, coordinates, math,
+          child: (child, offer, basis = {}, index = 0, context = {}) => this.#layout(child, offer, {
+            style, coordinates, math, ...context, viewport, reference: basis, path: `${path}/${child.type.name}[${index}]`,
           }),
           resource: <T>(name: string) => this.resource<T>(name),
-          // Prepared content depends on source, style, and resources, never offers
-          // or percentage references. Failed preparations are not retained.
-          prepare: <T>(name: string, compute: () => T): T => {
+          // Inline styles may use viewport units even when the owning style does
+          // not. Local offers and percentage references still do not affect preparation.
+          // Callers may supply narrower dependencies, such as [] for canvas-independent prose.
+          prepare: <T>(name: string, compute: () => T, dependencies: readonly unknown[] = [viewport]): T => {
             const cache = this.#prepared.get(element) ?? new Map<string, unknown>()
             this.#prepared.set(element, cache)
-            const key = JSON.stringify([name, style, this.#epoch, math])
+            const key = JSON.stringify([name, style, this.#epoch, math, dependencies])
             if (!cache.has(key)) cache.set(key, compute())
             return cache.get(key) as T
           },
@@ -164,7 +232,7 @@ class LayoutPass {
         // Resizing a fitted element can reuse its natural drawing. This key
         // includes every input visible to the source layout, but not the target.
         const intrinsic_key = fitting
-          ? `intrinsic:${query_key(prepared, style, reference, this.#epoch, coordinates, math)}` : undefined
+          ? `intrinsic:${query_key(prepared, style, measure, this.#epoch, coordinates, math)}` : undefined
         let result = intrinsic_key ? cache.get(intrinsic_key) : undefined
         if (result) this.#hits++
         else {
@@ -203,5 +271,5 @@ class LayoutPass {
   }
 }
 
-export { LayoutPass, LayoutError }
+export { LayoutPass, LayoutError, child_measure }
 export type { LayoutContext, LayoutQuery, Resource }

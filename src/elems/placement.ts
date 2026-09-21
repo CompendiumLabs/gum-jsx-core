@@ -8,7 +8,8 @@ import { make_size, make_point, make_rect, transform_rect } from '../engine/geom
 import type { Transform, Size } from '../engine/geometry'
 import { available, make_request, finish_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_font_size, resolve_length } from '../engine/units'
+import { child_measure } from '../engine/pass'
+import { resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 
 type Side = 'top' | 'right' | 'bottom' | 'left'
@@ -30,12 +31,12 @@ class Overlay extends Element<OverlayProps> {
     const request = make_request({ width: available(size.width), height: available(size.height) })
     decorations.forEach((element, index) => {
       const fragment = query.child(element, request, size, index + 1)
-      const font_size = resolve_font_size(element.props.font_size, query.style.font_size)
+      const measure = child_measure(element, query, index + 1, size)
       const align = resolve_alignment(element.props.anchor ?? 'start')
       if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
       // Anchor locates the child's own reference point, just as in Group.
-      const x = resolve_length(element.props.x ?? 0, { font_size, fraction: size.width }, 'x')
-      const y = resolve_length(element.props.y ?? 0, { font_size, fraction: size.height }, 'y')
+      const x = resolve_length(element.props.x ?? 0, measure, size.width, 'x')
+      const y = resolve_length(element.props.y ?? 0, measure, size.height, 'y')
       children.push(place_fragment(fragment,
         make_point(x - fragment.size.width * align.x, y - fragment.size.height * align.y)))
     })
@@ -49,7 +50,7 @@ class Overlay extends Element<OverlayProps> {
 function transformed_layout(props: ElementProps & { resize?: boolean }, query: LayoutQuery,
   matrix: (size: Size) => Transform) {
   const child = content_child(props.children)
-  const fragment = child ? query.child(child, make_request(), query.reference) : make_fragment({ size: make_size() })
+  const fragment = child ? query.child(child, make_request(), query.measure.reference) : make_fragment({ size: make_size() })
   const transform = matrix(fragment.size)
   const bounds = transform_rect(make_rect(0, 0, fragment.size.width, fragment.size.height), make_point(), transform)!
   const resize = props.resize ?? true
@@ -98,7 +99,7 @@ class Attach extends Element<AttachProps> {
     if (!['top', 'right', 'bottom', 'left'].includes(side)) throw new TypeError('Unknown attachment side')
     finite(at, 'at'); finite(child_anchor, 'child_anchor')
     const offset = resolve_length(props.offset ?? 0,
-      { font_size: query.style.font_size, fraction: Math.min(size.width, size.height) }, 'offset')
+      query.measure, Math.min(size.width, size.height), 'offset')
     if (props.attachment) {
       const item = query.child(props.attachment, make_request(), size, 1)
       const horizontal = side === 'top' || side === 'bottom'
@@ -116,7 +117,7 @@ class Attach extends Element<AttachProps> {
 class Anchor extends Element<AnchorProps> {
   static layout(props: AnchorProps, query: LayoutQuery) {
     const child = content_child(props.children)
-    const fragment = child ? query.child(child, make_request(), query.reference) : undefined
+    const fragment = child ? query.child(child, make_request(), query.measure.reference) : undefined
     const size = finish_size(make_size(), query.request, query.sizing)
     const alignment = resolve_alignment(props.align ?? 'center')
     const offset = align_offset(size, fragment?.size ?? make_size(), alignment)

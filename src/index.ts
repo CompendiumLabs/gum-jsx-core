@@ -12,11 +12,11 @@ export * from './lib/vectors'
 export * from './lib/random'
 export { interp, palette } from './lib/colors'
 export {
-  em, px, normalize_length, measure_length, resolve_length,
+  em, px, vw, vh, make_measure, normalize_length, measure_length, resolve_length,
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 } from './engine/units'
 export type {
-  UnitLength, Length, NormalizedLength, LengthBasis, ReferenceBox, LengthContext,
+  UnitLength, Length, NormalizedLength, ReferenceBox, LengthContext,
 } from './engine/units'
 export {
   make_size, make_point, make_rect, make_clip, make_insets, add_insets, resolve_insets,
@@ -46,7 +46,7 @@ export { Element, define_element, define_component, element_children, content_ch
 export type { Child, ElementProps, ElementType, LayoutMethod, ElementOptions } from './engine/element'
 export { prefix_split, prefix_join } from './lib/props'
 export type { Prefixed } from './lib/props'
-export { LayoutPass, LayoutError } from './engine/pass'
+export { LayoutPass, LayoutError, child_measure } from './engine/pass'
 export type { LayoutQuery, LayoutContext, Resource } from './engine/pass'
 export type { FitSpec } from './engine/fitting'
 export { copy_math_context, copy_math_metrics } from './engine/math'

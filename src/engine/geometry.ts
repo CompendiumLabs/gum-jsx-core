@@ -128,16 +128,15 @@ function read_insets<T extends Length>(spec: InsetSpec<T>, path = 'padding'): Re
 // Horizontal fractions use containing width; vertical fractions use height.
 function resolve_insets(
   spec: InsetSpec = 0,
-  context: LengthContext = {},
+  context: Partial<LengthContext> = {},
   property = 'padding',
 ): Insets {
-  const { font_size, reference = {}, path = 'root' } = context
+  const { reference = {}, path = 'root' } = context
   const sides = read_insets(spec, `${path}.${property}`)
 
   function resolve_side(side: keyof Insets, length: Length | undefined, fraction?: number): number {
     const location = `${path}.${property}.${side}`
-    const basis = { font_size, fraction }
-    return nonnegative(resolve_length(length ?? 0, basis, location), location)
+    return nonnegative(resolve_length(length ?? 0, context, fraction, `${property}.${side}`), location)
   }
 
   return make_insets({

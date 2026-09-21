@@ -98,8 +98,8 @@ function edge_fragment(props: EdgeData, query: LayoutQuery, nodes: ReadonlyMap<s
   const coord = props.space === 'local' ? undefined : query.coordinates
   const points = (props.points ?? []).map(value => {
     const p = read_point(value)
-    return make_point(coordinate_length(p.x, 'x', size, font_size, coord),
-      coordinate_length(p.y, 'y', size, font_size, coord))
+    return make_point(coordinate_length(p.x, 'x', size, query.measure, coord),
+      coordinate_length(p.y, 'y', size, query.measure, coord))
   })
   const self = props.start === props.end
   const start_side = props.start_side ?? (self ? 'right'
@@ -109,7 +109,7 @@ function edge_fragment(props: EdgeData, query: LayoutQuery, nodes: ReadonlyMap<s
   const start = connection_port(start_node, start_side, props.start_loc)
   const end = connection_port(end_node, end_side, props.end_loc)
   const length = (value: Length, name: string) => nonnegative(resolve_length(value,
-    { font_size, fraction: Math.min(size.width, size.height) }, name), name)
+    query.measure, Math.min(size.width, size.height), name), name)
   const gap = length(props.gap ?? 0, 'gap'), radius = length(props.radius ?? 0, 'radius')
   const step = (p: Point, n: Point, by: number) => make_point(p.x + n.x * by, p.y + n.y * by)
   const a = step(start.point, start.normal, gap), b = step(end.point, end.normal, gap)
@@ -125,8 +125,8 @@ function edge_fragment(props: EdgeData, query: LayoutQuery, nodes: ReadonlyMap<s
         first.y + last.y - connection_center(start_node).y)] : points
     route = curve ? [a, ...middle, b] : [a, first, ...middle, last, b]
   }
-  const paint = resolve_paint(query.style, size, query.path)
-  const head = resolve_arrow_head(arrow_head_options(props), size, query.style, query.path, paint)
+  const paint = resolve_paint(query.style, size, query.measure)
+  const head = resolve_arrow_head(arrow_head_options(props), size, query.style, query.measure, paint)
   const directions = curve && (props.tension ?? 1) > 0 ? { start: start.normal,
     end: make_point(-end.normal.x, -end.normal.y) } : undefined
   return make_fragment({ size, draw: arrow_draw(route, paint, head, { ...props, curve }, radius, directions) })

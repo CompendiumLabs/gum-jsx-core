@@ -11,7 +11,7 @@ import { HStack, VStack, Spacer } from './elems/stack'
 import { Group } from './elems/group'
 import { Text, Span } from './elems/text'
 import { move_to, line_to, quad_to, curve_to, close_path } from './engine/path'
-import { em, px } from './engine/units'
+import { em, px, vw, vh } from './engine/units'
 import { available, exact, natural, make_request, finish_size, shape_size } from './engine/layout'
 import { make_size, make_point, make_rect } from './engine/geometry'
 import { make_fragment, place_fragment } from './engine/fragment'
@@ -59,7 +59,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): any {
     SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
-    em, px, Element, define_element, define_component, element_children, prefix_split, prefix_join,
+    em, px, vw, vh, Element, define_element, define_component, element_children, prefix_split, prefix_join,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,

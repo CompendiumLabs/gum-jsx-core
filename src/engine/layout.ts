@@ -65,11 +65,10 @@ function deflate_request(request: LayoutRequest, insets: Insets): LayoutRequest 
 
 // Fractions use the established parent box. Fill instead selects the actual
 // offered width, once, before own limits introduce any measurement budgets.
-function resolve_sizing(spec: SizeSpec = {}, context: LengthContext & { request?: LayoutRequest } = {}): Sizing {
-  const { font_size, reference = {}, path = 'root' } = context
+function resolve_sizing(spec: SizeSpec = {}, context: Partial<LengthContext> = {}, request?: LayoutRequest): Sizing {
+  const { reference = {}, path = 'root' } = context
 
   function resolve_axis(axis: Axis): AxisSizing {
-    const basis = { font_size, fraction: reference[axis] }
     function resolve(key: SizeKey): number | undefined {
       const length = spec[key]
       if (length === undefined) return undefined
@@ -80,12 +79,12 @@ function resolve_sizing(spec: SizeSpec = {}, context: LengthContext & { request?
         }
         throw new TypeError(`${location}: expected a length${key === 'width' || key === 'height' ? ' or "fill"' : ''}`)
       }
-      return nonnegative(resolve_length(length, basis, location), location)
+      return nonnegative(resolve_length(length, context, reference[axis], key), location)
     }
 
     const value = spec[axis]
     const mode = value === 'fill' ? value : undefined
-    const offer = context.request?.[axis]
+    const offer = request?.[axis]
     const preferred = mode === undefined ? resolve(axis)
       : mode === 'fill' && offer?.kind === 'available' ? nonnegative(offer.value, `${path}.${axis}`) : undefined
     const min = resolve(`min_${axis}`) ?? 0

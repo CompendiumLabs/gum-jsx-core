@@ -149,7 +149,7 @@ const tests: Record<string, () => void> = {
 
     const references: unknown[] = []
     const Probe = define_element('Probe', (_, query) => {
-      references.push(query.reference)
+      references.push(query.measure.reference)
       return make_fragment({ size: finish_size(make_size(50, 10), query.request, query.sizing) })
     })
     pass.layout(new VStack({ children: [new Probe({ align_self: 'stretch' }), new Box({ width: px(200) })] }))

@@ -30,9 +30,9 @@ const tests: Record<string, () => void> = {
       assert.equal(JSON.stringify(box), source)
     }
     const request = make_request({ width: available(80) })
-    const context = { request, reference: { width: 500 } }
-    assert.equal(resolve_sizing({ width: 'fill' }, context).width.preferred, 80)
-    assert.equal(resolve_sizing({ width: 1 }, context).width.preferred, 500)
+    const context = { reference: { width: 500 } }
+    assert.equal(resolve_sizing({ width: 'fill' }, context, request).width.preferred, 80)
+    assert.equal(resolve_sizing({ width: 1 }, context, request).width.preferred, 500)
     // An own maximum supplies a wrapping budget, not a width to occupy.
     const sizing = resolve_sizing({ width: 'fill', max_width: px(120) })
     const prepared = prepare_request(make_request(), sizing)
@@ -119,7 +119,7 @@ const tests: Record<string, () => void> = {
 
     const references: unknown[] = []
     const Probe = define_element('Probe', (_, query) => {
-      references.push(query.reference)
+      references.push(query.measure.reference)
       return make_fragment({ size: finish_size(make_size(40, 10), query.request, query.sizing) })
     })
     pass.layout(new VStack({ align: 'fill', children: [new Probe(), new Fixed({ width: px(200) })] }))

@@ -1,16 +1,59 @@
 import assert from 'node:assert/strict'
 import {
-  em, px, normalize_length, measure_length, resolve_length, UnresolvedLengthError,
+  em, px, vw, vh, make_measure, normalize_length, measure_length, resolve_length, UnresolvedLengthError,
   resolve_font_size, resolve_line_height, make_size, make_rect, make_point,
   make_insets, resolve_insets, deflate_size, inflate_size, bounds_overflow,
   natural, available, exact, make_request, deflate_request, resolve_sizing,
-  prepare_request, finish_size, shape_size,
+  prepare_request, finish_size, shape_size, child_measure, define_element, LayoutPass, Rect,
 } from '../src/index'
 import type { Length, SizeSpec, InsetSpec } from '../src/index'
 import { probes } from './fixtures/contracts'
 
 // Test contracts at their boundaries and in small compositions, using literal results.
 const tests: Record<string, () => void> = {
+  'measurement contexts keep local references independent and derive immutable font and path changes'() {
+    const viewport = { width: 800, height: 600 }, reference = { width: 200, height: 0 }
+    const parent = make_measure({ font_size: 20, viewport, reference, path: 'Svg/Box[0]' })
+    const child = make_measure(parent, { font_size: 10, path: 'Svg/Box[0]/Text[0]' })
+    viewport.height = 1200
+    reference.width = 400
+    assert.ok(Object.isFrozen(parent) && Object.isFrozen(parent.viewport) && Object.isFrozen(parent.reference))
+    assert.ok(!Object.isFrozen(viewport) && !Object.isFrozen(reference))
+    assert.equal(resolve_length(em(2), parent), 40)
+    assert.equal(resolve_length(em(2), child), 20)
+    assert.equal(resolve_length(vh(4), child), 24)
+    assert.equal(resolve_length(vw(25), child), 200)
+    assert.equal(resolve_length(0.5, child, child.reference.width), 100)
+    assert.equal(resolve_length(0.5, child, child.reference.height), 0)
+    assert.throws(() => resolve_length(0.5, child, undefined, 'gap'), error => {
+      assert.ok(error instanceof UnresolvedLengthError)
+      assert.equal(error.path, 'Svg/Box[0]/Text[0].gap')
+      return true
+    })
+    assert.deepEqual(measure_length(em(1), make_measure(child, { font_size: undefined })), { value: 1, unit: 'em' })
+    assert.throws(() => resolve_insets(vh(1), make_measure(child, { viewport: {} })),
+      /Svg\/Box\[0\]\/Text\[0\]\.padding.left.*viewport height/)
+  },
+
+  'child measurements inherit typography and viewport while parent references remain explicit'() {
+    const child = new Rect({ font_size: vh(5), width: em(2), height: em(1) })
+    const Parent = define_element('Parent', (_props, query) => {
+      const measure = child_measure(child, query)
+      assert.equal(measure.font_size, 30)
+      assert.deepEqual(measure.reference, {})
+      assert.equal(measure.path, 'Parent/Rect[0]')
+      const placed = child_measure(child, query, 2, { width: 200 })
+      assert.equal(resolve_length(0.5, placed, placed.reference.width), 100)
+      assert.equal(placed.path, 'Parent/Rect[2]')
+      assert.equal(query.measure.font_size, 20)
+      assert.deepEqual(query.measure.reference, { width: 500 })
+      return query.child(child, make_request())
+    })
+    const fragment = new LayoutPass().layout(new Parent({ font_size: px(20) }), make_request(),
+      { viewport: { height: 600 }, reference: { width: 500 } })
+    assert.deepEqual(fragment.size, { width: 60, height: 30 })
+  },
+
   'requests treat omitted, undefined, and null axes as natural'() {
     const empty = make_request()
     assert.deepEqual(empty, { width: natural(), height: natural() })
@@ -34,20 +77,20 @@ const tests: Record<string, () => void> = {
     assert.ok(Object.isFrozen(px(2)))
     assert.ok(!Object.isFrozen(source))
 
-    const basis = { font_size: 16, fraction: 200 }
+    const measure = { font_size: 16 }
     assert.equal(resolve_length(px(10)), 10)
-    assert.equal(resolve_length(em(2), basis), 32)
-    assert.equal(resolve_length(0.5, basis), 100)
-    assert.equal(resolve_length(-0.5, basis), -100)
+    assert.equal(resolve_length(em(2), measure, 200), 32)
+    assert.equal(resolve_length(0.5, measure, 200), 100)
+    assert.equal(resolve_length(-0.5, measure, 200), -100)
   },
 
   'intrinsic dependencies distinguish missing references from zero'() {
     assert.deepEqual(measure_length(0.5), { value: 0.5, unit: 'fraction' })
     assert.deepEqual(measure_length(em(2)), { value: 2, unit: 'em' })
-    assert.equal(resolve_length(0.5, { fraction: 0 }), 0)
+    assert.equal(resolve_length(0.5, {}, 0), 0)
     for (const length of [0, px(0), em(0)]) assert.equal(resolve_length(length), 0)
 
-    assert.throws(() => resolve_length(0.5, {}, 'root/Box.width'), error => {
+    assert.throws(() => resolve_length(0.5, { path: 'root/Box' }, undefined, 'width'), error => {
       assert.ok(error instanceof UnresolvedLengthError)
       assert.equal(error.path, 'root/Box.width')
       assert.deepEqual(error.length, { value: 0.5, unit: 'fraction' })
@@ -60,15 +103,15 @@ const tests: Record<string, () => void> = {
   'font size resolves before local em lengths'() {
     assert.equal(resolve_font_size(), 16)
     assert.equal(resolve_line_height(), 19.2)
-    const font_size = resolve_font_size(em(2), 16)
+    const font_size = resolve_font_size(em(2), { font_size: 16 })
     assert.equal(font_size, 32)
-    assert.equal(resolve_font_size(0.5, font_size), 16)
-    assert.equal(resolve_font_size(px(12), font_size), 12)
-    assert.equal(resolve_font_size(undefined, 0), 0)
+    assert.equal(resolve_font_size(0.5, { font_size }), 16)
+    assert.equal(resolve_font_size(px(12), { font_size }), 12)
+    assert.equal(resolve_font_size(undefined, { font_size: 0 }), 0)
     assert.equal(resolve_length(em(1), { font_size }), 32)
-    assert.equal(resolve_line_height(em(1.5), font_size), 48)
-    assert.equal(resolve_line_height(1.5, font_size), 48)
-    assert.equal(resolve_line_height(px(20), font_size), 20)
+    assert.equal(resolve_line_height(em(1.5), { font_size }), 48)
+    assert.equal(resolve_line_height(1.5, { font_size }), 48)
+    assert.equal(resolve_line_height(px(20), { font_size }), 20)
     assert.deepEqual(resolve_insets(em(1), { font_size }), {
       left: 32, top: 32, right: 32, bottom: 32,
     })
@@ -242,10 +285,10 @@ const tests: Record<string, () => void> = {
       assert.throws(() => make_insets({ left: value }), RangeError)
     }
     assert.throws(() => resolve_length(em(1), { font_size: Infinity }), RangeError)
-    assert.throws(() => resolve_length(1, { fraction: -1 }), RangeError)
-    assert.throws(() => resolve_length(2, { fraction: Number.MAX_VALUE }), RangeError)
-    assert.throws(() => resolve_length(NaN, {}, 'root/child.x'), /root\/child.x/)
-    assert.throws(() => resolve_length(2, { fraction: Number.MAX_VALUE }, 'root/child.x'), /root\/child.x/)
+    assert.throws(() => resolve_length(1, {}, -1), RangeError)
+    assert.throws(() => resolve_length(2, {}, Number.MAX_VALUE), RangeError)
+    assert.throws(() => resolve_length(NaN, { path: 'root/child' }, undefined, 'x'), /root\/child.x/)
+    assert.throws(() => resolve_length(2, { path: 'root/child' }, Number.MAX_VALUE, 'x'), /root\/child.x/)
     assert.throws(() => normalize_length({ value: 1, unit: 'pt' } as unknown as Length))
 
     const invalid: SizeSpec[] = [

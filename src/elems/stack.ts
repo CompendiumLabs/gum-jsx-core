@@ -10,7 +10,8 @@ import { make_point, make_size } from '../engine/geometry'
 import { available, exact, natural, make_request, finish_size, resolve_sizing } from '../engine/layout'
 import type { Axis, AxisRequest, Sizing } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { px, resolve_font_size, resolve_length } from '../engine/units'
+import { child_measure } from '../engine/pass'
+import { px, resolve_length } from '../engine/units'
 import type { Length, ReferenceBox } from '../engine/units'
 
 type StackAlign = AlignmentValue | 'baseline'
@@ -52,9 +53,9 @@ function stack_alignment(align: StackAlign, main: Axis, path: string): ResolvedS
 function stack_item(element: Element, index: number, main: Axis,
   query: LayoutQuery, reference: ReferenceBox, align: ResolvedStackAlign): Item {
   const { props } = element
-  const path = `${query.path}/${element.type.name}[${index}]`
-  const font_size = resolve_font_size(props.font_size, query.style.font_size, `${path}.font_size`)
-  const sizing = resolve_sizing(props, { font_size, reference, path })
+  const measure = child_measure(element, query, index, reference)
+  const { path } = measure
+  const sizing = resolve_sizing(props, measure)
   const grow = nonnegative(props.grow ?? 0, `${path}.grow`)
   // Unsized growth divides a finite budget from zero. Natural measurement,
   // and an explicit auto basis retain content-based starting sizes.
@@ -65,8 +66,7 @@ function stack_item(element: Element, index: number, main: Axis,
   }
   const basis = props.basis === undefined || props.basis === 'auto'
     ? sizing[main].preferred ?? (zero_basis ? 0 : undefined)
-    : nonnegative(resolve_length(props.basis, { font_size, fraction: reference[main] },
-      `${path}.basis`), `${path}.basis`)
+    : nonnegative(resolve_length(props.basis, measure, reference[main], 'basis'), `${path}.basis`)
   let self = props.align_self
   if (self === null) throw new TypeError(`${path}.align_self: expected an alignment`)
   if (typeof self === 'object') {
@@ -115,10 +115,8 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis,
     if (query.request.width.kind !== 'natural') return wrap_stack(props, query)
   }
   const cross = main === 'width' ? 'height' : 'width'
-  const align = stack_alignment(props.align ?? 'start', main, `${query.path}.align`)
-  const gap = nonnegative(resolve_length(props.gap ?? 0, {
-    font_size: query.style.font_size, fraction: reference[main],
-  }, `${query.path}.gap`), `${query.path}.gap`)
+  const align = stack_alignment(props.align ?? 'start', main, `${query.measure.path}.align`)
+  const gap = nonnegative(resolve_length(props.gap ?? 0, query.measure, reference[main], 'gap'), `${query.measure.path}.gap`)
   // Gaps are reserved like padding: child fractions along the main axis refer
   // to the length the children can occupy, so fractions summing to one tile it.
   const elements = element_children(props.children)
@@ -233,12 +231,11 @@ function wrap_stack(props: StackProps, query: LayoutQuery): Fragment {
   if (offer.kind === 'natural') throw new TypeError('Wrapping needs a width offer')
   const width = offer.value
   const reference = { ...definite_reference(query.request, query.sizing), width }
-  const basis = { font_size: query.style.font_size, fraction: width }
-  const gap = nonnegative(resolve_length(props.gap ?? 0, basis, `${query.path}.gap`), 'gap')
+  const gap = nonnegative(resolve_length(props.gap ?? 0, query.measure, width, 'gap'), 'gap')
   const line_gap = props.line_gap === undefined ? gap
     : nonnegative(resolve_length(props.line_gap,
-      { font_size: query.style.font_size, fraction: reference.height }, `${query.path}.line_gap`), 'line_gap')
-  const align = stack_alignment(props.align ?? 'start', 'width', `${query.path}.align`)
+      query.measure, reference.height, 'line_gap'), 'line_gap')
+  const align = stack_alignment(props.align ?? 'start', 'width', `${query.measure.path}.align`)
   type Entry = { element: Element; index: number }
   const lines: Entry[][] = []
   let line: Entry[] = []

@@ -8,7 +8,7 @@ import { make_point, make_rect } from '../engine/geometry'
 import type { Size } from '../engine/geometry'
 import { available, make_request, shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
-import { resolve_font_size } from '../engine/units'
+import { child_measure } from '../engine/pass'
 
 type GraphProps = ElementProps & CoordinateSpec & Readonly<{ clip?: boolean }>
 
@@ -35,12 +35,12 @@ function graph_child(element: Element, query: LayoutQuery, size: Size,
   const request = make_request({ width: available(size.width), height: available(size.height) })
   const fragment = query.child(element, request, size, index, { coordinates })
   const { x, y, anchor = 'start' } = element.props
-  const path = `${query.path}/${element.type.name}[${index}]`
-  const font = resolve_font_size(element.props.font_size, query.style.font_size, `${path}.font_size`)
+  const measure = child_measure(element, query, index, size)
+  const { path } = measure
   const align = resolve_alignment(anchor, `${path}.anchor`)
   if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
-  const left = x === undefined ? 0 : coordinate_length(x, 'x', size, font, coordinates, `${path}.x`)
-  const top = y === undefined ? 0 : coordinate_length(y, 'y', size, font, coordinates, `${path}.y`)
+  const left = x === undefined ? 0 : coordinate_length(x, 'x', size, measure, coordinates)
+  const top = y === undefined ? 0 : coordinate_length(y, 'y', size, measure, coordinates)
   return place_fragment(fragment,
     make_point(left - align.x * fragment.size.width, top - align.y * fragment.size.height))
 }

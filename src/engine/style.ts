@@ -4,8 +4,8 @@ import type { ThemeName } from './theme'
 import { finite, nonnegative } from '../lib/checks'
 import type { Paint } from './drawing'
 import type { Size } from './geometry'
-import { em, normalize_length, px, resolve_font_size, resolve_length } from './units'
-import type { Length, NormalizedLength } from './units'
+import { em, make_measure, normalize_length, px, resolve_font_size, resolve_length } from './units'
+import type { Length, NormalizedLength, LengthContext } from './units'
 
 type FontStyle = 'normal' | 'italic'
 type LineCap = 'butt' | 'round' | 'square'
@@ -66,7 +66,9 @@ const DEFAULT_STYLE: Style = Object.freeze({
 })
 
 // Resolve inherited font size before sizing. Paint lengths await shape geometry.
-function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = 'root'): Style {
+function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context: Partial<LengthContext> = {}): Style {
+  const measure = make_measure(context, { font_size: inherited.font_size })
+  const path = measure.path || 'root'
   const theme = resolve_theme(spec.theme ?? inherited.theme)
   const theme_paints: Partial<Record<'color' | 'fill' | 'stroke', string>> = {}
   const paint = (key: 'color' | 'fill' | 'stroke') => {
@@ -78,7 +80,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = '
     if (source.startsWith('theme:')) theme_paints[key] = source
     return value
   }
-  const font_size = resolve_font_size(spec.font_size, inherited.font_size, `${path}.font_size`)
+  const font_size = resolve_font_size(spec.font_size, measure)
   const font_family = spec.font_family ?? inherited.font_family
   const font_weight = finite(spec.font_weight ?? inherited.font_weight, 'font_weight')
   const font_style = spec.font_style ?? inherited.font_style
@@ -116,13 +118,15 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, path = '
 }
 
 // Scalar shape paint lengths refer to the shorter side of its resolved rectangle.
-function resolve_paint(style: Style, size: Size, path: string): Paint {
+function resolve_paint(style: Style, size: Size, context: Partial<LengthContext> = {}): Paint {
   const { fill, stroke, font_size, stroke_linecap, stroke_linejoin, stroke_miterlimit } = style
-  const basis = { font_size, fraction: Math.min(size.width, size.height) }
+  const measure = make_measure(context, { font_size })
+  const fraction = Math.min(size.width, size.height)
   const stroke_width = nonnegative(resolve_length(
-    style.stroke_width, basis, `${path}.stroke_width`,
+    style.stroke_width, measure, fraction, 'stroke_width',
   ), 'stroke_width')
-  const stroke_dasharray = style.stroke_dasharray.map(value => resolve_length(value, basis, 'stroke_dasharray'))
+  const stroke_dasharray = style.stroke_dasharray.map((value, index) =>
+    resolve_length(value, measure, fraction, `stroke_dasharray[${index}]`))
   return { fill, stroke, stroke_width, stroke_linecap, stroke_linejoin, stroke_miterlimit,
     stroke_dasharray, opacity: style.opacity }
 }

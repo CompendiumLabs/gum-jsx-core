@@ -57,13 +57,11 @@ function frame_border(size: Size, width: number, color: string, radius: RectRadi
 // Border width is resolved before measurement, so fractions use the established
 // parent's shorter side. Padding uses the corresponding parent axis on each side.
 function box_layout(props: BoxProps, query: LayoutQuery, border_cutout?: (size: Size) => Rect) {
-  const { font_size } = query.style
-  const basis = { font_size, reference: query.reference, path: query.path }
-  const padding = resolve_insets(props.padding, basis)
-  const { width, height } = query.reference
+  const padding = resolve_insets(props.padding, query.measure)
+  const { width, height } = query.measure.reference
   const fraction = width === undefined || height === undefined ? undefined : Math.min(width, height)
   const border_width = nonnegative(resolve_length(props.border_width ?? px(0),
-    { font_size, fraction }, `${query.path}.border_width`), 'border_width')
+    query.measure, fraction, 'border_width'), 'border_width')
   const border = make_insets({ left: border_width, top: border_width,
     right: border_width, bottom: border_width })
   const background = theme_color(props.background ?? 'none', query.style.theme)
@@ -76,7 +74,7 @@ function box_layout(props: BoxProps, query: LayoutQuery, border_cutout?: (size: 
   const layout = layout_content(child, query, add_insets(padding, border), props.align)
   const { size, content, guides, overflow, placement } = layout
   const rect = make_rect(0, 0, size.width, size.height)
-  const radius = resolve_rect_radius(props.radius ?? 0, size, query)
+  const radius = resolve_rect_radius(props.radius ?? 0, size, query.measure)
   const corners = make_clip(rect, radius).radius!
   const draw = background === 'none' ? [] : [draw_rect(rect,
     { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity }, corners)]
