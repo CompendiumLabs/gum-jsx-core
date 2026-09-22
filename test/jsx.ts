@@ -78,7 +78,7 @@ const tests: Record<string, () => void> = {
 
   'inline spacing survives spans, fragments, comments, and expressions'() {
     const pass = new LayoutPass()
-    const expected = pass.layout(new Text({ text: 'Hello world again' }))
+    const expected = pass.layout(new Text({ children: 'Hello world again' }))
     for (const code of [
       '<Text>Hello <Span>world</Span> again</Text>',
       '<Text><Span>Hello</Span> <Span>world</Span> again</Text>',
@@ -99,18 +99,16 @@ const tests: Record<string, () => void> = {
     assert.equal(pass.layout(evaluate('<Text>extra<Span>ordinary</Span></Text>')).label, 'extraordinary')
   },
 
-  'explicit strings and text attributes bypass JSX text normalization'() {
+  'explicit string children bypass JSX text normalization'() {
     const pass = new LayoutPass()
     const value = '\n  Revenue  \n'
     for (const code of [
       `<Text whitespace="pre">{${JSON.stringify(value)}}</Text>`,
-      `<Text whitespace="pre" text={${JSON.stringify(value)}} />`,
-      `<Text whitespace="pre" text="${value}" />`,
       '<Text whitespace="pre">{`\n  Revenue  \n`}</Text>',
     ]) {
       const element = evaluate(code)
       assert.ok(element instanceof Text)
-      assert.equal(element.props.text ?? (element.props.children as string[])[0], value)
+      assert.equal((element.props.children as string[])[0], value)
       assert.equal(pass.layout(element).label, value)
     }
     const blank = evaluate('<Text whitespace="pre">{["  ", "\\n"]}</Text>')

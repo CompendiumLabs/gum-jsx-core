@@ -243,7 +243,7 @@ const tests: Record<string, () => void> = {
     near(a.size.height, 24)
     near(b.size.height, 48)
     assert.equal(pass.layout(text, make_request(), { viewport: { height: 200 } }), a)
-    const leading = new Text({ line_height: vh(10), text: 'Leading' })
+    const leading = new Text({ line_height: vh(10), children: 'Leading' })
     near(pass.layout(leading, make_request(), { viewport: { height: 200 } }).size.height, 20)
     near(pass.layout(leading, make_request(), { viewport: { height: 400 } }).size.height, 40)
   },

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
-  Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, TitleBox, TitleFrame, TextFigure, Slide, Text, Rect,
+  Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, LegendItem, Bullets, OuterLabel,
+  TitleBox, TitleFrame, TextFigure, Slide, Text, Rect,
   LayoutPass, element_children, prefix_split, prefix_join, evaluate, render_svg, make_request, exact, px, em,
 } from '../src/index'
 import type { Element, ArrowProps, ArrowHeadStyle, Prefixed, StyleSpec } from '../src/index'
@@ -13,6 +14,13 @@ function texts(element: Element): Text[] {
 }
 
 const tests: Record<string, () => void> = {
+  'content props no longer replace children'() {
+    assert.throws(() => new LayoutPass().layout(new Text({ text: 'old' } as any)), /children instead of text/)
+    assert.throws(() => new Bullets({ items: ['old'] } as any), /children instead of items/)
+    assert.throws(() => new Label({ label: 'old' } as any), /children instead of label/)
+    assert.throws(() => new OuterLabel({ label: 'old' } as any), /children instead of label/)
+    assert.throws(() => new Legend({ entries: [] } as any), /children instead of entries/)
+  },
   'prefix helpers preserve values, reserve owner keys, and prefer the longest scope'() {
     const format = (value: number) => String(value), size = px(12)
     const props = Object.freeze({ tick: false, tick_size: size, tick_stroke: 'red',
@@ -165,11 +173,11 @@ const tests: Record<string, () => void> = {
       svg(new TextFigure({ children: content, caption: 'Caption', caption_style: { wrap: false, color: 'blue' } })))
     assert.equal(svg(new Slide({ title: 'Slide', children: 'Body', title_color: 'blue', title_wrap: false })),
       svg(new Slide({ title: 'Slide', children: 'Body', title_style: { color: 'blue', wrap: false } })))
-    const title = new Text({ text: 'Explicit', color: 'purple' })
+    const title = new Text({ children: 'Explicit', color: 'purple' })
     assert.equal(texts(new TitleBox({ title, title_color: 'red' }))[0], title)
     assert.equal(texts(new TextFigure({ caption: title, caption_color: 'red' }))[0], title)
     assert.equal(texts(new Slide({ title, title_color: 'red' }).props.body)[0], title)
-    assert.equal(texts(new Legend({ entries: [{ label: title }], label_color: 'red' }))[0], title)
+    assert.equal(texts(new Legend({ children: new LegendItem({ children: title }), label_color: 'red' }))[0], title)
     const plot = new Plot({ title, title_color: 'red', legend: title, legend_color: 'red' })
     assert.equal(plot.props.title_element, title)
     assert.equal(plot.props.legend_element, title)

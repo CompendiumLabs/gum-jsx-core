@@ -21,14 +21,13 @@ import { make_measure, resolve_line_height } from '../engine/units'
 import type { Length, NormalizedLength, LengthContext } from '../engine/units'
 
 type TextProps = ElementProps & Readonly<{
-  text?: string
   wrap?: boolean
   whitespace?: 'normal' | 'pre'
   tab_size?: number
   justify?: Exclude<AlignmentValue, 'stretch' | 'fill'>
 }>
 // Options for generated labels/captions; the owning component supplies content.
-type TextOptions = Omit<TextProps, 'text' | 'children'>
+type TextOptions = Omit<TextProps, 'children'>
 type SpanProps = StyleSpec & Readonly<{ children?: Child }>
 type Run = { text: string; style: Style; element?: Element; index?: number }
 type Metrics = Readonly<{ font: MeasuredFont; above: number; below: number }>
@@ -158,11 +157,8 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
   const { whitespace = 'normal', tab_size = DEFAULTS.tab_size } = props
   if (!['normal', 'pre'].includes(whitespace)) throw new TypeError('Unknown whitespace mode')
   if (!Number.isInteger(tab_size) || tab_size <= 0) throw new RangeError('tab_size must be positive')
-  if (props.text !== undefined && props.children !== undefined) {
-    throw new TypeError('Text accepts text or children, not both')
-  }
   const raw: Run[] = []
-  collect_runs(props.text ?? props.children, query.style, query.measure, raw)
+  collect_runs(props.children, query.style, query.measure, raw)
   const runs = normalize_runs(raw, whitespace === 'pre', tab_size)
   const text = runs.map(run => run.text).join('')
   if (!text) return { runs, tokens: [], above: 0, below: 0 }

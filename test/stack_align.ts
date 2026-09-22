@@ -52,8 +52,8 @@ const tests: Record<string, () => void> = {
 
   'natural columns reflow only stretching children before allocating heights'() {
     const pass = new LayoutPass()
-    const stretch = new Text({ text: paragraph, max_width: px(80), align_self: 'stretch' })
-    const end = new Text({ text: paragraph, max_width: px(80), align_self: 'end' })
+    const stretch = new Text({ children: paragraph, max_width: px(80), align_self: 'stretch' })
+    const end = new Text({ children: paragraph, max_width: px(80), align_self: 'end' })
     const natural = pass.layout(end)
     const source = new VStack({ gap: px(4), children: [stretch,
       new Box({ width: px(200), height: px(10) }), end] })
@@ -83,7 +83,7 @@ const tests: Record<string, () => void> = {
     } }
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
     const source = new HStack({ align: 'stretch', children: [
-      new Text({ text: paragraph, basis: 0, grow: 1 }),
+      new Text({ children: paragraph, basis: 0, grow: 1 }),
       new Box({ width: px(20), height: px(5), align_self: 'end' }),
       new Box({ width: px(10), height: px(1), align_self: 'stretch' }),
     ] })

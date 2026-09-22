@@ -49,7 +49,7 @@ const tests: Record<string, () => void> = {
   },
 
   'authored canvas dimensions establish the source while external offers bound the fitted result'() {
-    const source = new Group({ fit: true, width: px(200), height: px(100), children: new Text({ text: 'Label' }) })
+    const source = new Group({ fit: true, width: px(200), height: px(100), children: new Text({ children: 'Label' }) })
     const pass = new LayoutPass()
     assert.deepEqual(pass.layout(source).size, make_size(200, 100))
     const small = pass.layout(source, offer(100, 100))
@@ -84,8 +84,8 @@ const tests: Record<string, () => void> = {
 
   'omitted dimensions reflow naturally and alignment opts out of parent fill on either axis'() {
     const pass = new LayoutPass(), text = 'Several words make a long label that should wrap.'
-    const raw = pass.layout(new Text({ text }), offer(100))
-    const fitted = pass.layout(new Text({ text, fit: true }), offer(100))
+    const raw = pass.layout(new Text({ children: text }), offer(100))
+    const fitted = pass.layout(new Text({ children: text, fit: true }), offer(100))
     assert.ok(raw.size.height > fitted.size.height)
     assert.ok(fitted.children[0].transform![0] < 1)
     const height = pass.layout(new HStack({ height: px(80), align: 'fill', children: [

@@ -88,13 +88,13 @@ const tests = {
   'document text helpers accept mixed inline content while preserving a sole block'() {
     const pass = new LayoutPass(), item = new Inline({ width: px(30), height: px(20) })
     const mixed = ['Before ', new Span({ children: 'bold ', font_weight: 700 }), item, ' after']
-    for (const source of [new TextBox({ children: mixed }), new Bullets({ items: [mixed] }),
+    for (const source of [new TextBox({ children: mixed }), new Bullets({ children: new Text({ children: mixed }) }),
       new TextFigure({ caption: mixed, children: new Rect({ width: px(40), height: px(20) }) }),
-      new TitleBox({ title: mixed, children: new Text({ text: 'Body' }) })]) {
+      new TitleBox({ title: mixed, children: new Text({ children: 'Body' }) })]) {
       const result = pass.layout(source, make_request({ width: exact(180) }))
       assert.ok(descendants(result).some(f => f.name === 'Text' && f.label === 'Before bold item after'))
     }
-    const block = new Box({ grow: 1, children: new Text({ text: 'Block' }) })
+    const block = new Box({ grow: 1, children: new Text({ children: 'Block' }) })
     assert.equal(new TextBox({ children: ['\n', false, block] }).props.children, block)
     assert.throws(() => new TextBox({ children: [block, block] }), /one content element/)
     const context = { style: resolve_style({ color: '#c42' }) }

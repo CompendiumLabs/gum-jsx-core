@@ -137,8 +137,8 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
     const source = new Svg({ width: px(500), children: new HStack({ width: 1, gap: px(10),
       align: 'center', font_size: px(18), children: [
-        new Text({ text: 'Label', width: px(70) }),
-        new Text({ text: paragraph, grow: 1, shrink: 1 }),
+        new Text({ children: 'Label', width: px(70) }),
+        new Text({ children: paragraph, grow: 1, shrink: 1 }),
         new Square({ width: px(40), stroke: 'none' }),
       ] }) })
     const before = JSON.stringify(source), wide = pass.layout(source), count = shapes
@@ -159,7 +159,7 @@ const tests: Record<string, () => void> = {
 
   'columns wrap at their chosen width before adding natural text heights'() {
     const pass = new LayoutPass()
-    const text = new Text({ text: paragraph, font_size: px(20) })
+    const text = new Text({ children: paragraph, font_size: px(20) })
     const column = pass.layout(new VStack({ width: px(180), gap: px(8), children: [
       text, new Square({ width: px(24), stroke: 'none' }), text,
     ] }))
@@ -172,7 +172,7 @@ const tests: Record<string, () => void> = {
 
   'natural column stretch remeasures text at the shared width before packing heights'() {
     const pass = new LayoutPass()
-    const text = new Text({ text: paragraph, max_width: px(80) })
+    const text = new Text({ children: paragraph, max_width: px(80) })
     const column = pass.layout(new VStack({ align: 'stretch', gap: px(4), children: [
       text, new Box({ width: px(200), height: px(10) }),
     ] }))
@@ -187,7 +187,7 @@ const tests: Record<string, () => void> = {
 
   'row stretch follows text reflow without scaling glyphs or changing width slots'() {
     const pass = new LayoutPass()
-    const text = new Text({ text: paragraph, grow: 1, shrink: 1 })
+    const text = new Text({ children: paragraph, grow: 1, shrink: 1 })
     const row = pass.layout(new HStack({ width: px(200), align: 'stretch', children: [
       new Rect({ width: px(20), height: px(10), stroke: 'none' }), text,
     ] }))
@@ -202,8 +202,8 @@ const tests: Record<string, () => void> = {
   'baseline rows align text and bottom-edge fallbacks and propagate through columns'() {
     const pass = new LayoutPass()
     const row = new HStack({ align: 'baseline', gap: px(10), children: [
-      new Text({ text: 'Small', font_size: px(16) }),
-      new Text({ text: 'Large', font_size: px(32) }), new Square({ width: px(30) }),
+      new Text({ children: 'Small', font_size: px(16) }),
+      new Text({ children: 'Large', font_size: px(32) }), new Square({ width: px(30) }),
     ] })
     const first = pass.layout(row)
     for (const child of first.children) {
@@ -214,7 +214,7 @@ const tests: Record<string, () => void> = {
     const below = Math.max(...first.children.map(child => child.fragment.size.height
       - (child.fragment.guides.baseline ?? child.fragment.size.height)))
     near(first.size.height, above + below)
-    const column = pass.layout(new VStack({ gap: px(12), children: [row, new Text({ text: 'Last' })] }))
+    const column = pass.layout(new VStack({ gap: px(12), children: [row, new Text({ children: 'Last' })] }))
     near(column.guides.baseline!, first.guides.baseline!)
     const last = column.children[1]
     near(column.guides.last_baseline!, last.offset.y + last.fragment.guides.last_baseline!)

@@ -65,7 +65,7 @@ const tests: Record<string, () => void> = {
     assert.equal(styled.props.children.props.wrap, false)
     assert.equal('text_font_size' in styled.props, false)
     const explicit = pass.layout(new Node({ ...source, text_justify: 'start',
-      children: new Text({ text: lines, justify: 'end' }) }))
+      children: new Text({ children: lines, justify: 'end' }) }))
     const [wide, short] = explicit.children[0].fragment.children
     near(short.offset.x, wide.fragment.size.width - short.fragment.size.width)
   },
@@ -168,7 +168,7 @@ const tests: Record<string, () => void> = {
     assert.equal(pass.layout(new Circle({ width: px(80) })).connection, undefined)
 
     // Elements without a frame of their own connect at their allocation.
-    const label = new Text({ id: 't', text: 'Plain text', x: 0.5, y: 0.2, anchor: 'center' })
+    const label = new Text({ id: 't', children: 'Plain text', x: 0.5, y: 0.2, anchor: 'center' })
     const text = layout([new Edge({ start: 't', end: 'r', start_side: 'bottom', ...plain }), label, rect])
     const placed = text.children[1]
     assert.deepEqual(placed.fragment.connection!.boundary,
@@ -208,8 +208,8 @@ const tests: Record<string, () => void> = {
     near_point(ends(result.children[1].fragment)[0], { x: 180 + width / 2, y: 150 })
 
     // No element class may forward its id into a part that is also laid out.
-    const variants = [{}, { title: 'Title' }, { text: 'Body' }, { caption: 'Caption' }, { items: ['a', 'b'] },
-      { title: 'Title', children: new Text({ text: 'Child' }) }]
+    const variants = [{}, { title: 'Title' }, { children: 'Body' }, { caption: 'Caption' },
+      { title: 'Title', children: new Text({ children: 'Child' }) }]
     let connected = 0
     for (const [name, value] of Object.entries(core)) {
       if (typeof value !== 'function' || !(value.prototype instanceof core.Element)) continue
@@ -276,7 +276,7 @@ const tests: Record<string, () => void> = {
     const inner = new Network({ ...limits, width: px(100), height: px(80), x: 0.5, y: 0.2,
       children: [new Edge({ start: 'a', end: 'a' }), node('a', 0.5, 0.5)] })
     const result = layout([new Edge({ start: 'a', end: 'b', ...plain }), node('a', 0.2, 0.5),
-      node('b', 0.8, 0.5), inner, new Text({ text: 'Annotation', x: 0.5, y: 0.8 })])
+      node('b', 0.8, 0.5), inner, new Text({ children: 'Annotation', x: 0.5, y: 0.8 })])
     near_point(result.children[4].offset, { x: 300, y: 60 })
     assert.throws(() => layout([new Edge({ start: 'a', end: 'inner' }), node('a', 0.2, 0.5),
       new Network({ children: node('inner', 0, 0) })]), /Unknown node id: inner/)

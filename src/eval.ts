@@ -30,7 +30,7 @@ import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arro
 import { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
-import { Plot, BarPlot, Legend, OuterLabel } from './elems/plot'
+import { Plot, BarPlot, Legend, LegendItem, OuterLabel } from './elems/plot'
 import { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './elems/document'
 import { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
 import { sample_curve, sample_points } from './lib/sampling'
@@ -51,7 +51,7 @@ function evaluate(code: string, options: EvaluateOptions = {}): any {
     Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
-    Graph, Plot, BarPlot, Legend, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
+    Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
     CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,

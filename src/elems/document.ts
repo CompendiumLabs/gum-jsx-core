@@ -47,7 +47,7 @@ type SlideProps = ElementProps & Prefixed<'title', TextOptions> & Readonly<{
 }>
 type SlideData = SlideProps & Readonly<{ body: Element }>
 type BulletsProps = ElementProps & Readonly<{
-  items?: readonly Child[]; marker?: string; gap?: Length; indent?: Length
+  marker?: string; gap?: Length; indent?: Length
 }>
 
 // Text composition converts text at construction, so reflow always sees the same
@@ -99,7 +99,6 @@ class TextCol extends TextStack {
 class TextBox extends Element<BoxProps, TextBoxProps> {
   static defaults: Partial<BoxProps> = { align: { x: 'fill' }, padding: em(0.6) }
   static normalize(input: TextBoxProps): BoxProps {
-    if ('text' in input) throw new TypeError('Use children instead of text')
     const [style, props] = prefix_split(['text'], input)
     return { ...props, children: text_element(props.children, style) }
   }
@@ -219,10 +218,11 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
 
 class Bullets extends Element<StackProps, BulletsProps> {
   static defaults: Partial<StackProps> = { gap: em(0.5), align: 'stretch' }
-  static normalize({ items, marker = '•', indent = em(1.2), children, ...props }: BulletsProps): StackProps {
+  static normalize(input: BulletsProps): StackProps {
+    const { marker = '•', indent = em(1.2), children, ...props } = input
     return { ...props,
-      children: (items ?? text_children(children)).map(item => new HStack({
-        align: 'baseline', children: [new Text({ text: marker, width: indent }),
+      children: text_children(children).map(item => new HStack({
+        align: 'baseline', children: [new Text({ children: marker, width: indent }),
           new Box({ grow: 1, shrink: 1, basis: px(0), children: text_element(item) })],
       })),
     }

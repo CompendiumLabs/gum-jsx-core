@@ -205,15 +205,15 @@ const tests: Record<string, () => void> = {
 
   'text compositions retain baseline alignment, reflow, and finite slide geometry'() {
     const pass = new LayoutPass()
-    const row = pass.layout(new TextRow({ children: [new Text({ text: 'A', font_size: px(12) }),
-      new Text({ text: 'B', font_size: px(24) })] }))
+    const row = pass.layout(new TextRow({ children: [new Text({ children: 'A', font_size: px(12) }),
+      new Text({ children: 'B', font_size: px(24) })] }))
     const baselines = row.children.map(child => child.offset.y + child.fragment.guides.baseline!)
     near(baselines[0], baselines[1])
     const text = new TextFrame({ children: 'This paragraph wraps when its allocated width changes.' })
     const wide = pass.layout(text, make_request({ width: exact(300) }))
     const narrow = pass.layout(text, make_request({ width: exact(150) }))
     assert.ok(narrow.size.height > wide.size.height)
-    const bullets = pass.layout(new Bullets({ items: ['one', 'A longer item wraps with a hanging indent.'] }),
+    const bullets = pass.layout(new Bullets({ children: ['one', 'A longer item wraps with a hanging indent.'] }),
       make_request({ width: exact(160) }))
     assert.ok(bullets.size.height > 30)
     const slide = pass.layout(new Slide({ title: 'Title', children: new TextCol({

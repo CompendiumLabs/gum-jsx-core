@@ -120,7 +120,7 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
     const source = new Group({ width: px(400), height: px(300), children: new Text({
       x: 0.5, y: 0.5, anchor: 'center', width: 0.5, font_size: px(18),
-      text: 'A paragraph lives in a positioned region. Its words reflow when that region changes width.',
+      children: 'A paragraph lives in a positioned region. Its words reflow when that region changes width.',
     }) })
     const wide = pass.layout(source), count = shapes
     const narrow = pass.layout(source, make_request({ width: exact(200) }))

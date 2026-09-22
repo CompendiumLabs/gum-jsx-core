@@ -31,7 +31,7 @@ const tests: Record<string, () => void> = {
   'glyph advances, kerning, ink, and baselines come from the actual bundled font'() {
     const pass = new LayoutPass()
     const size = 24
-    const fragment = pass.layout(new Text({ text: 'AVofficeJgy', font_size: px(size) }))
+    const fragment = pass.layout(new Text({ children: 'AVofficeJgy', font_size: px(size) }))
     const run = shaper.layout('AVofficeJgy')
     const scale = size / shaper.unitsPerEm
     near(fragment.size.width, run.advanceWidth * scale)
@@ -76,7 +76,7 @@ const tests: Record<string, () => void> = {
 
   'span boundaries preserve words and equivalent spans preserve kerning'() {
     const pass = new LayoutPass()
-    const plain = pass.layout(new Text({ text: 'AV' }))
+    const plain = pass.layout(new Text({ children: 'AV' }))
     const split = pass.layout(new Text({ children: ['A', new Span({ children: 'V' })] }))
     near(split.size.width, plain.size.width)
     const word = new Text({ children: ['extra', new Span({ color: 'red', children: 'ordinary' })] })
@@ -110,8 +110,8 @@ const tests: Record<string, () => void> = {
 
   'tight line heights and exact frames report overflow without shrinking glyphs'() {
     const pass = new LayoutPass()
-    const loose = pass.layout(new Text({ text: 'Jgy', font_size: px(24) }))
-    const element = new Text({ text: 'Jgy', font_size: px(24), line_height: px(3) })
+    const loose = pass.layout(new Text({ children: 'Jgy', font_size: px(24) }))
+    const element = new Text({ children: 'Jgy', font_size: px(24), line_height: px(3) })
     const tight = pass.layout(element)
     near(tight.size.width, loose.size.width)
     near(tight.size.height, 3)
@@ -128,35 +128,35 @@ const tests: Record<string, () => void> = {
   'newlines, tabs, spaces, and nonbreaking spaces have explicit behavior'() {
     const pass = new LayoutPass()
     for (const [text, count] of [['', 0], ['   ', 0], ['\n', 2], ['a\n', 2], ['\n\n', 3]] as const) {
-      assert.equal(lines(pass.layout(new Text({ text }))), count)
+      assert.equal(lines(pass.layout(new Text({ children: text }))), count)
     }
     const normal = pass.layout(new Text({ children: [' \t one ', new Span({ children: '\t two\r' }), '\nthree  '] }))
     assert.equal(normal.label, 'one two\nthree'); assert.equal(lines(normal), 2)
-    const pre = pass.layout(new Text({ text: 'a\tb  ', whitespace: 'pre', font_family: 'IBM Plex Mono' }))
+    const pre = pass.layout(new Text({ children: 'a\tb  ', whitespace: 'pre', font_family: 'IBM Plex Mono' }))
     assert.equal(pre.label, 'a   b  ')
     near(pre.size.width, 7 * new Fonts().resolve('IBM Plex Mono', 400, 'normal').shape('a').advance * 16)
-    const nbsp = pass.layout(new Text({ text: ' a\u00a0b c ' }), make_request({ width: exact(1) }))
+    const nbsp = pass.layout(new Text({ children: ' a\u00a0b c ' }), make_request({ width: exact(1) }))
     assert.equal(nbsp.label, 'a\u00a0b c'); assert.equal(lines(nbsp), 2)
-    const zwsp = pass.layout(new Text({ text: 'a\u200bb' }), make_request({ width: exact(1) }))
+    const zwsp = pass.layout(new Text({ children: 'a\u200bb' }), make_request({ width: exact(1) }))
     assert.equal(lines(zwsp), 2)
-    const preserved = pass.layout(new Text({ text: '  ', whitespace: 'pre' }))
+    const preserved = pass.layout(new Text({ children: '  ', whitespace: 'pre' }))
     assert.ok(preserved.size.width > 0); assert.equal(preserved.ink, null)
   },
 
   'wrapping, alignment, and shared size limits operate independently'() {
     const pass = new LayoutPass()
     const text = 'one two three'
-    const nowrap = pass.layout(new Text({ text, wrap: false, width: px(10) }))
+    const nowrap = pass.layout(new Text({ children: text, wrap: false, width: px(10) }))
     assert.equal(lines(nowrap), 1); assert.equal(nowrap.size.width, 10)
     assert.ok(nowrap.overflow.right > 0)
     for (const [justify, fraction] of [['start', 0], ['center', 0.5], ['end', 1],
       [0, 0], [0.25, 0.25], [1, 1]] as const) {
-      const fragment = pass.layout(new Text({ text: 'wide\ni', width: px(100), justify }))
+      const fragment = pass.layout(new Text({ children: 'wide\ni', width: px(100), justify }))
       for (const child of fragment.children) {
         near(child.offset.x, (100 - child.fragment.size.width) * fraction)
       }
     }
-    const limited = new Text({ text, max_width: px(30) })
+    const limited = new Text({ children: text, max_width: px(30) })
     assert.equal(lines(pass.layout(limited)), 3)
     const forced = pass.layout(limited, make_request({ width: exact(200) }))
     assert.equal(lines(forced), 1); assert.equal(forced.size.width, 200)
@@ -195,7 +195,7 @@ const tests: Record<string, () => void> = {
     }
     assert.equal(fonts.resolve('IBM Plex Sans', 600, 'normal'), fonts.resolve('IBM Plex Sans', 700, 'normal'))
     const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
-    const root = new Svg({ width: px(100), height: px(40), children: new Text({ text: 'iii' }) })
+    const root = new Svg({ width: px(100), height: px(40), children: new Text({ children: 'iii' }) })
     const before = pass.layout(root), svg = render_svg(before)
     // Parsing a sliced byte buffer must respect its offset and length.
     const buffer = new Uint8Array(mono.length + 14); buffer.set(mono, 7)
@@ -205,8 +205,8 @@ const tests: Record<string, () => void> = {
     const after = pass.layout(root)
     assert.ok(after.children[0].fragment.size.width > before.children[0].fragment.size.width)
     assert.equal(render_svg(before), svg)
-    assert.throws(() => pass.layout(new Text({ font_family: 'missing', text: 'x' })), /Unknown font family/)
-    assert.throws(() => pass.layout(new Text({ text: '\u{10ffff}' })), /U\+10FFFF/)
+    assert.throws(() => pass.layout(new Text({ font_family: 'missing', children: 'x' })), /Unknown font family/)
+    assert.throws(() => pass.layout(new Text({ children: '\u{10ffff}' })), /U\+10FFFF/)
   },
 
   'a color face measures whole clusters from cmap and hmtx, with no outlines'() {
@@ -236,7 +236,7 @@ const tests: Record<string, () => void> = {
     assert.throws(() => font.shape('\u{1f600}A'), /Joe's Emoji has no glyph for U\+0041/)
 
     const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
-    const fragment = pass.layout(new Text({ text: '\u{1f600} \u{1f600}', font_family: "Joe's Emoji",
+    const fragment = pass.layout(new Text({ children: '\u{1f600} \u{1f600}', font_family: "Joe's Emoji",
       font_size: px(20), color: '#123', opacity: 0.5 }))
     near(fragment.size.width, 3 * 24)
     const draw = drawings(fragment)
@@ -261,14 +261,14 @@ const tests: Record<string, () => void> = {
     const noto = bundled.resolve(EMOJI_FAMILY, 400, 'normal')
     near(noto.shape('\u{1f600}').advance, 1275 / 1024); near(noto.ascent, 950 / 1024); near(noto.descent, 250 / 1024)
     assert.equal(bundled.fallback('\u{1f468}\u200d\u{1f469}\u200d\u{1f467}\u{1f1fa}\u{1f1f8}', 400, 'normal'), noto)
-    const ready = new LayoutPass().layout(new Text({ text: 'hi \u{1f600}' }))
+    const ready = new LayoutPass().layout(new Text({ children: 'hi \u{1f600}' }))
     const [word, face] = drawings(ready)
     assert.ok(word.kind === 'path' && face.kind === 'text' && face.font_family === 'Noto Color Emoji')
     near(face.advance, 16 * 1275 / 1024)
     // A provider with no fallback hook keeps the strict error.
     const strict: FontProvider = { resolve: (family, weight, style) => bundled.resolve(family, weight, style) }
     assert.throws(() => new LayoutPass({ fonts: { value: strict, version: 0 } })
-      .layout(new Text({ text: 'hi \u{1f600}' })), /IBM Plex Sans has no glyph for U\+1F600/)
+      .layout(new Text({ children: 'hi \u{1f600}' })), /IBM Plex Sans has no glyph for U\+1F600/)
     // Registration alone makes a family available; only the flag makes it a fallback,
     // and fallbacks apply in registration order, after the bundled face.
     bundled.register('Private', emoji)
@@ -289,7 +289,7 @@ const tests: Record<string, () => void> = {
     // Digits and spaces stay in Plex, although the emoji face also maps them. The
     // keycap moves as a whole cluster because Plex lacks its selector and cap.
     const text = 'AV1 \u{1f600}\u{1f468}\u200d\u{1f469}1\ufe0f\u20e3 AV'
-    const fragment = pass.layout(new Text({ text }))
+    const fragment = pass.layout(new Text({ children: text }))
     const space = sans.shape(' ').advance
     near(fragment.size.width, 16 * (sans.shape('AV1').advance + sans.shape('AV').advance + 2 * space + 3 * 1.2))
     near(fragment.size.height, 16 * 1.2)
@@ -304,16 +304,16 @@ const tests: Record<string, () => void> = {
     // Emoji inside a word, around an inline element, and across a wrap stay intact.
     const mixed = pass.layout(new Text({ children: ['a\u{1f600}b ', new Rect({ width: px(10), height: px(10) }), ' \u{1f600}'] }))
     assert.equal(drawings(mixed).filter(item => item.kind === 'text').length, 2)
-    assert.equal(lines(pass.layout(new Text({ text: '\u{1f600} \u{1f600} \u{1f600}' }), make_request({ width: exact(45) }))), 2)
+    assert.equal(lines(pass.layout(new Text({ children: '\u{1f600} \u{1f600} \u{1f600}' }), make_request({ width: exact(45) }))), 2)
     // Text that no face covers still reports the requested family.
-    assert.throws(() => pass.layout(new Text({ text: '\u{1f600} \u{1f680}' })), /IBM Plex Sans has no glyph for U\+1F680/)
+    assert.throws(() => pass.layout(new Text({ children: '\u{1f600} \u{1f680}' })), /IBM Plex Sans has no glyph for U\+1F680/)
 
     // An outlined fallback face is drawn as paths like any other. Plex Mono lacks Greek.
     const outlined = new Fonts()
     assert.throws(() => outlined.resolve('IBM Plex Mono', 400, 'normal').shape('a\u03a9'), /U\+03A9/)
     outlined.register('Greek', regular, { fallback: true })
     const greek = new LayoutPass({ fonts: { value: outlined, version: outlined.version } })
-    const replaced = greek.layout(new Text({ text: 'a\u03a9', font_family: 'IBM Plex Mono' }))
+    const replaced = greek.layout(new Text({ children: 'a\u03a9', font_family: 'IBM Plex Mono' }))
     assert.deepEqual(drawings(replaced).map(item => item.kind), ['path', 'path'])
     near(replaced.size.width, 16 * (outlined.resolve('IBM Plex Mono', 400, 'normal').shape('a').advance
       + sans.shape('\u03a9').advance))
@@ -321,7 +321,7 @@ const tests: Record<string, () => void> = {
 
   'outlined SVG is self-contained, escaped, and renderable without a font resource'() {
     const pass = new LayoutPass()
-    const fragment = pass.layout(new Text({ text: '<A & "B">', font_style: 'italic' }))
+    const fragment = pass.layout(new Text({ children: '<A & "B">', font_style: 'italic' }))
     const before = pass.stats
     const root = make_fragment({ size: make_size(180, 40), children: [place_fragment(fragment, make_point(5, 5))] })
     pass.set_resource('fonts', null, 1)

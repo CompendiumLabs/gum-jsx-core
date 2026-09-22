@@ -131,7 +131,7 @@ const tests: Record<string, () => void> = {
   'graph annotations use data positions and markers retain fixed geometry on resize'() {
     const graph = new Graph({ xlim: [0, 10], ylim: [0, 10], children: [
       new Points({ points: [{ x: 5, y: 5 }], point_size: px(8) }),
-      new Text({ text: 'middle', x: 5, y: 5, anchor: 'center', font_size: px(12) }),
+      new Text({ children: 'middle', x: 5, y: 5, anchor: 'center', font_size: px(12) }),
     ] })
     const pass = new LayoutPass(), a = pass.layout(graph, fixed)
     const b = pass.layout(graph, make_request({ width: exact(400), height: exact(200) }))

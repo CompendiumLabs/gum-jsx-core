@@ -71,7 +71,7 @@ const tests: Record<string, () => void> = {
 
   'text reflows at aspect-derived width without magnifying glyphs'() {
     const pass = new LayoutPass()
-    const props = { text: 'Aspect sets the allocated text box, not the size of the glyphs.',
+    const props = { children: 'Aspect sets the allocated text box, not the size of the glyphs.',
       font_size: px(20), height: px(100), justify: 'center' as const }
     const source = new Text({ ...props, aspect: 2 }), before = JSON.stringify(source)
     const result = pass.layout(source)
@@ -79,7 +79,7 @@ const tests: Record<string, () => void> = {
     assert.ok(result.children.length > 1)
     assert.equal(pass.layout(source), result)
     assert.equal(JSON.stringify(source), before)
-    const natural = pass.layout(new Text({ text: 'Small', aspect: 1 }))
+    const natural = pass.layout(new Text({ children: 'Small', aspect: 1 }))
     assert.equal(natural.size.width, natural.size.height)
   },
 

@@ -171,7 +171,7 @@ const tests: Record<string, () => void> = {
   'fixed-height frame aspects establish width before text reflow'() {
     const pass = new LayoutPass()
     const props = { height: px(100), padding: px(8), children: new Text({
-      text: 'This paragraph wraps using the width derived from the frame aspect.', font_size: px(20),
+      children: 'This paragraph wraps using the width derived from the frame aspect.', font_size: px(20),
     }) }
     const frame = pass.layout(new Frame({ ...props, aspect: 2 }))
     const explicit = pass.layout(new Frame({ ...props, width: px(200) }))
@@ -261,7 +261,7 @@ const tests: Record<string, () => void> = {
       return { ...font, shape(text) { shapes++; return font.shape(text); } }
     } }
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
-    const text = new Text({ text: 'A framed paragraph reflows at its offered width and keeps its font size.',
+    const text = new Text({ children: 'A framed paragraph reflows at its offered width and keeps its font size.',
       font_size: px(20), line_height: em(1.4) })
     const source = JSON.stringify(text)
     const box = new Box({ padding: px(12), border_width: px(2), children: text })

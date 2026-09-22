@@ -39,7 +39,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(prepared.width, available(120))
     assert.deepEqual(prepare_request(prepared, sizing), prepared)
     assert.equal(pass.layout(new TextBox({ max_width: px(200), padding: 0, children: 'Hi' })).size.width,
-      pass.layout(new Text({ text: 'Hi' })).size.width)
+      pass.layout(new Text({ children: 'Hi' })).size.width)
   },
 
   'box fill respects explicit widths, self alignment, local units, and limits inside padding and borders'() {
@@ -106,7 +106,7 @@ const tests: Record<string, () => void> = {
 
   'natural fill columns select their width once and reflow within child limits'() {
     const pass = new LayoutPass()
-    const text = new Text({ text: paragraph, max_width: px(80) })
+    const text = new Text({ children: paragraph, max_width: px(80) })
     const expected = pass.layout(text)
     const column = pass.layout(new VStack({ align: 'fill', gap: px(4), children: [
       text, new Fixed({ width: px(200) }), new Fixed({ align_self: 'start', content_width: px(40) }),
@@ -131,7 +131,7 @@ const tests: Record<string, () => void> = {
   'row fill follows reflowed text height and preserves explicit heights and cross-axis limits'() {
     const pass = new LayoutPass()
     const source = new HStack({ align: 'fill', children: [
-      new Text({ text: paragraph, basis: 0, grow: 1 }),
+      new Text({ children: paragraph, basis: 0, grow: 1 }),
       new Box({ width: px(10) }), new Box({ width: px(10), max_height: px(8) }),
       new Box({ width: px(10), height: px(5) }),
     ] })
@@ -209,7 +209,7 @@ const tests: Record<string, () => void> = {
     }
     const panel = evaluate(`<TextBox><>{false}{true && <TextCol>Nested</TextCol>}</></TextBox>`)
     assert.equal(new LayoutPass().layout(panel).children[0].fragment.name, 'TextCol')
-    const inline = evaluate('<TextFrame>Before <Span font-weight={700}>bold</Span> after</TextFrame>')
+    const inline = evaluate('<TextFrame>Before <Span font-weight={bold}>bold</Span> after</TextFrame>')
     const text = new LayoutPass().layout(inline).children[0].fragment
     assert.equal(text.label, 'Before bold after')
     assert.throws(() => evaluate('<TextBox><Box /><Box /></TextBox>'), /one content element/)

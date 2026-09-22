@@ -77,14 +77,14 @@ const tests: Record<string, () => void> = {
   },
 
   'slide fill respects explicit title and body sizes and body limits'() {
-    const pass = new LayoutPass(), title = new Text({ text: 'Title', width: px(100) })
+    const pass = new LayoutPass(), title = new Text({ children: 'Title', width: px(100) })
     const request = make_request({ width: exact(640), height: exact(360) })
     const fixed = pass.layout(new Slide({ title, children: new Box({ width: px(120), height: px(60) }) }), request)
     assert.equal(named(fixed, 'Text')[0].size.width, 100)
     assert.deepEqual(named(fixed, 'Box').at(-1)!.size, { width: 120, height: 60 })
     const limited = pass.layout(new Slide({ children: new Graph({ max_width: px(200), max_height: px(100) }) }), request)
     assert.deepEqual(named(limited, 'Graph')[0].size, { width: 200, height: 100 })
-    const fit = pass.layout(new Slide({ children: new Text({ text: 'Compact', align_self: { x: 'start' } }) }), request)
+    const fit = pass.layout(new Slide({ children: new Text({ children: 'Compact', align_self: { x: 'start' } }) }), request)
     assert.ok(named(fit, 'Text')[0].size.width < 100)
   },
 

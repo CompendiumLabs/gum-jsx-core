@@ -39,7 +39,7 @@ type AxisProps = AxisOptions & Prefixed<'line' | 'tick', StyleSpec>
   & Prefixed<'label', TextOptions> & Prefixed<'arrow', ArrowHeadStyle>
 type AxisItem = Readonly<{ value: number; label: Element }>
 type AxisData = Omit<AxisOptions, 'ticks' | 'format'> & Readonly<{ items: readonly AxisItem[]; lim: Limit }>
-type LabelProps = Omit<AxisProps, 'ticks'> & Readonly<{ value?: number; label?: string | number | Element }>
+type LabelProps = Omit<AxisProps, 'ticks'> & Readonly<{ value?: number }>
 type MeshProps = ElementProps & Readonly<{
   lim?: Limit; ticks?: TickSpec; interval?: number; direction?: 'x' | 'y'
 }>
@@ -75,7 +75,7 @@ function axis_data(input: AxisProps): AxisData {
   const items = tick_values(ticks, lim, props.interval).map((tick, i) => {
     const value = typeof tick === 'number' ? tick : tick[0]
     const content = typeof tick === 'number' ? format(tick, i) : tick[1]
-    const text = content instanceof Element ? content : new Text({ text: String(content), ...props.label_style })
+    const text = content instanceof Element ? content : new Text({ children: String(content), ...props.label_style })
     // Placement metadata belongs to the label seen by Axis. Preserve it when
     // rotation introduces a wrapper around generated or supplied content.
     const label = props.rotate
@@ -192,10 +192,10 @@ class VLabels extends Labels {
 class Label extends Element<AxisData, LabelProps> {
   static data_bounds = Axis.data_bounds
   static normalize(input: LabelProps): AxisData {
-    const { value = 0, label, children, ...props } = axis_props(input)
+    const { value = 0, children, ...props } = axis_props(input)
     return axis_data({ ...props,
-      ticks: [[value, label ?? (children === undefined ? format_tick(value)
-        : children instanceof Element ? children : new Text({ ...props.label_style, children }))]],
+      ticks: [[value, children === undefined ? format_tick(value)
+        : children instanceof Element ? children : new Text({ ...props.label_style, children })]],
     })
   }
   static layout = Labels.layout

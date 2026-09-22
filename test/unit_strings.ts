@@ -142,7 +142,7 @@ const tests: Record<string, () => void> = {
       assert.ok(Math.abs(b.size.height - 2 * a.size.height) < 1e-8)
       assert.equal(pass.layout(source, make_request(), { viewport: { width: 200, height: 200 } }), a)
     }
-    for (const source of [new Text({ line_height: '10vh', text: 'Leading' }),
+    for (const source of [new Text({ line_height: '10vh', children: 'Leading' }),
       new Text({ children: new Span({ line_height: '10vh', children: 'Leading' }) })]) {
       assert.equal(pass.layout(source, make_request(), { viewport: { height: 200 } }).size.height, 20)
       assert.equal(pass.layout(source, make_request(), { viewport: { height: 400 } }).size.height, 40)

@@ -40,7 +40,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(bounded.fragment.children[0].transform, [0.5, 0, 0, 0.5, 0, 0])
     assert.equal(bounded.fragment.guides.baseline, 20)
 
-    const text = new Text({ text: 'Reflow keeps these words on the same lines before fitting.', font_size: px(20) })
+    const text = new Text({ children: 'Reflow keeps these words on the same lines before fitting.', font_size: px(20) })
     const natural = render_element(text, { wrap: { max_width: px(120) } })
     const fitted = render_element(text, { wrap: { max_width: px(120), max_height: px(20) } })
     assert.ok(natural.size.height > 20)

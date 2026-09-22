@@ -36,10 +36,14 @@ import type { Length } from '../engine/units'
 type LegendEntry = Readonly<{
   label: string | Element; color?: string; kind?: 'line' | 'point' | 'bar'; badge?: Element
 }>
-type LegendProps = BoxProps & Prefixed<'label', TextOptions> & Readonly<{
-  entries?: readonly LegendEntry[]; gap?: Length; badge_width?: Length; label_style?: TextOptions
+type LegendItemProps = ElementProps & Readonly<{
+  badge_color?: string; kind?: LegendEntry['kind']; badge?: Element
+  badge_width?: Length; label_style?: TextOptions
 }>
-type LegendOptions = Omit<LegendProps, 'entries' | 'children'>
+type LegendProps = BoxProps & Prefixed<'label', TextOptions> & Readonly<{
+  gap?: Length; badge_width?: Length; label_style?: TextOptions
+}>
+type LegendOptions = Omit<LegendProps, 'children'>
 type PlotProps = GraphProps & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
   & Prefixed<'tick', StyleSpec> & Prefixed<'label' | 'title' | 'xlabel' | 'ylabel', TextOptions>
   & Prefixed<'grid' | 'xgrid' | 'ygrid', MeshProps> & Prefixed<'legend', LegendOptions> & Readonly<{
@@ -60,9 +64,30 @@ type PlotData = Omit<PlotProps, 'title' | 'xlabel' | 'ylabel' | 'legend'> & Read
 }>
 type BarPlotProps = Omit<PlotProps, 'direction'> & BarsProps
 type OuterLabelProps = ElementProps & Readonly<{
-  side?: Side; offset?: Length; label?: string | Element; rotate?: number
+  side?: Side; offset?: Length; rotate?: number
 }>
 type OuterLabelData = ElementProps & Readonly<{ side?: Side; offset?: Length; label_element: Element }>
+
+function legend_item(input: LegendItemProps, badge_width: Length, label_style: TextOptions): HStack {
+  const { badge_color = 'theme:accent', kind, badge, badge_width: own_width,
+    label_style: own_style, children, ...props } = input
+  const icon = badge ?? (kind === 'bar'
+    ? new Rect({ width: badge_width, height: em(0.7), fill: badge_color, stroke: 'none' })
+    : kind === 'point' ? new Points({ width: badge_width, height: em(0.8), space: 'local',
+      points: [{ x: 0.5, y: 0.5 }], fill: badge_color, point_size: px(7) })
+      : new Line({ width: badge_width, height: em(0.8), from: { x: 0, y: 0.5 },
+        to: { x: 1, y: 0.5 }, stroke: badge_color, stroke_width: px(2) }))
+  return new HStack({ ...props, gap: em(0.5), align: 'center',
+    children: [icon, text_element(children, label_style)] })
+}
+
+class LegendItem extends Element<LegendItemProps> {
+  static layout(props: LegendItemProps, query: LayoutQuery) {
+    const row = query.prepare('legend-item', () => legend_item(props,
+      props.badge_width ?? em(1.8), props.label_style ?? {}))
+    return HStack.layout(row.props, query)
+  }
+}
 
 class Legend extends Element<BoxProps, LegendProps> {
   static defaults: Partial<BoxProps> = { padding: em(0.6), border_width: px(1), border_color: 'theme:border', border_radius: px(4) }
@@ -70,18 +95,11 @@ class Legend extends Element<BoxProps, LegendProps> {
     return null
   }
   static normalize(input: LegendProps): BoxProps {
-    const { entries = [], gap = em(0.4), badge_width = em(1.8), label_style, ...props } = scope_props(input, ['label'])
+    const { children, gap = em(0.4), badge_width = em(1.8), label_style, ...props } = scope_props(input, ['label'])
     return { ...props,
-      children: new VStack({ gap, children: entries.map(entry => {
-        const color = entry.color ?? 'theme:accent'
-        const badge = entry.badge ?? (entry.kind === 'bar'
-          ? new Rect({ width: badge_width, height: em(0.7), fill: color, stroke: 'none' })
-          : entry.kind === 'point' ? new Points({ width: badge_width, height: em(0.8), space: 'local',
-            points: [{ x: 0.5, y: 0.5 }], fill: color, point_size: px(7) })
-            : new Line({ width: badge_width, height: em(0.8), from: { x: 0, y: 0.5 },
-              to: { x: 1, y: 0.5 }, stroke: color, stroke_width: px(2) }))
-        return new HStack({ gap: em(0.5), align: 'center', children: [badge, text_element(entry.label, label_style)] })
-      }) }),
+      children: new VStack({ gap, children: element_children(children).map(item => item instanceof LegendItem
+        ? legend_item(item.props, item.props.badge_width ?? badge_width,
+          { ...label_style, ...item.props.label_style }) : item) }),
     }
   }
   static layout = box_layout
@@ -125,7 +143,8 @@ function plot_data(input: PlotProps): PlotData {
     y_label: ylabel === undefined ? undefined : new Rotate({ angle: -90,
       children: text_element(ylabel, { ...label_style, ...ylabel_style }) }),
     legend_element: legend === undefined ? undefined : legend instanceof Element ? legend
-      : new Legend({ ...merge_scoped<LegendOptions>([legend_style, legendprops], ['label']), entries: legend }),
+      : new Legend({ ...merge_scoped<LegendOptions>([legend_style, legendprops], ['label']),
+        children: legend.map(({ label, color, ...entry }) => new LegendItem({ ...entry, badge_color: color, children: label })) }),
   }
 }
 
@@ -226,8 +245,9 @@ class OuterLabel extends Element<OuterLabelData, OuterLabelProps> {
   static data_bounds() {
     return null
   }
-  static normalize({ label, children, rotate, ...props }: OuterLabelProps): OuterLabelData {
-    const element = text_element(label ?? children)
+  static normalize(input: OuterLabelProps): OuterLabelData {
+    const { children, rotate, ...props } = input
+    const element = text_element(children)
     return { ...props, label_element: rotate ? new Rotate({ angle: rotate, children: element }) : element }
   }
   static layout(props: OuterLabelData, query: LayoutQuery) {
@@ -244,5 +264,5 @@ class OuterLabel extends Element<OuterLabelData, OuterLabelProps> {
   }
 }
 
-export { Plot, BarPlot, Legend, OuterLabel }
-export type { PlotProps, BarPlotProps, LegendProps, LegendEntry, OuterLabelProps }
+export { Plot, BarPlot, Legend, LegendItem, OuterLabel }
+export type { PlotProps, BarPlotProps, LegendProps, LegendItemProps, LegendEntry, OuterLabelProps }
