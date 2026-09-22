@@ -18,7 +18,7 @@ import { transform_path } from '../engine/path'
 import { resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
 import { make_measure, resolve_line_height } from '../engine/units'
-import type { Length, NormalizedLength, LengthContext } from '../engine/units'
+import type { LengthContext } from '../engine/units'
 
 type TextProps = ElementProps & Readonly<{
   wrap?: boolean
@@ -43,20 +43,6 @@ type PreparedText = Readonly<{
 }>
 type MeasuredText = Readonly<{ text: string; tokens: readonly (Token<Part> & { width: number })[]; above: number; below: number }>
 type Line = { parts: Part[]; width: number; above: number; below: number }
-
-function viewport_length(length?: Length | NormalizedLength): boolean {
-  const unit = typeof length === 'string' ? length.trim().slice(-2)
-    : typeof length === 'object' ? length.unit : undefined
-  return unit === 'vw' || unit === 'vh'
-}
-
-// Keep ordinary glyph preparation reusable when only the canvas changes. Inline
-// elements are measured later; only Span typography affects prepared prose.
-function viewport_spans(child: Child): boolean {
-  if (Array.isArray(child)) return child.some(viewport_spans)
-  return child instanceof Span && (viewport_length(child.props.font_size)
-    || viewport_length(child.props.line_height) || viewport_spans(child.props.children))
-}
 
 // Merge equivalent adjacent styles so a redundant Span does not disrupt kerning.
 function append_run(runs: Run[], text: string, style: Style): void {
@@ -277,9 +263,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   }
   const alignment = resolve_alignment(justify, `${query.measure.path}.justify`).x
   if (typeof alignment !== 'number') throw new TypeError('Text.justify must be start, center, end, or a fraction')
-  const dependencies = viewport_length(query.style.line_height) || viewport_spans(props.children)
-    ? [query.measure.viewport] : []
-  const prepared = measure_text(query.prepare('text', () => prepare_text(props, query), dependencies), query)
+  const prepared = measure_text(query.prepare('text', () => prepare_text(props, query)), query)
   const offer = query.request.width
   const budget = wrap && offer.kind !== 'natural' ? offer.value : Infinity
   const lines = flow_lines(prepared, budget)

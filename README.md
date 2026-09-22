@@ -68,9 +68,9 @@ layout content overflows.
 
 ## Lengths and references
 
-Length properties accept fractions as raw numbers, explicit `em()` / `px()` /
-`vw()` / `vh()` values, and unit strings such as `"1.5em"`, `"24px"`, `"25vw"`,
-`"4vh"`, and `"50%"`. Percent strings normalize to fractions; bare numbers retain
+Length properties accept fractions as raw numbers, explicit `em()` / `px()`
+values, and unit strings such as `"1.5em"`, `"24px"`, and `"50%"`.
+Percent strings normalize to fractions; bare numbers retain
 their existing meaning. The unitless string `"0"` is also accepted. Helpers and
 normalized values are immutable; normalization copies input
 objects. Negative lengths are valid for coordinates. Sizing and inset operations
@@ -97,7 +97,7 @@ a percentage reference from an offer. A caller can resolve a retained value agai
 once its reference becomes definite. General percentage cycles are deferred.
 
 Length helpers share the immutable `LengthContext` at `query.measure`, containing
-`font_size`, `reference: { width?, height? }`, `viewport`, and a diagnostic `path`.
+`font_size`, `reference: { width?, height? }`, and a diagnostic `path`.
 `make_measure(context, patch)` derives local changes while preserving the other
 fields. `resolve_sizing` and `resolve_insets` select percentage axes: width and
 horizontal insets use reference width; height and vertical insets use reference
@@ -114,8 +114,7 @@ the actual parent offer. The layout pass supplies it automatically. Resolving fi
 once keeps an own maximum from turning natural measurement into a full-width request.
 
 Resolve `font_size` first using `resolve_font_size(value, inherited_measure)`.
-Its em and percentage forms refer to the inherited font size; viewport units use
-the reference canvas. Subsequent em lengths and line height
+Its em and percentage forms refer to the inherited font size. Subsequent em lengths and line height
 use the resolved local font size. Defaults live in [defaults.ts](./src/engine/defaults.ts):
 16px text, 1.2em line height, a 16px natural shape fallback, and 1px stroke width. The
 line-height helper also accepts a raw fraction of the local font size.
@@ -362,10 +361,10 @@ The layout function receives readonly props and a frozen query:
 | `request` | Prepared pixel requests, including explicit preferred dimensions. |
 | `sizing` | Resolved preferred sizes, min/max, and aspect. |
 | `style` | Inherited font and paint; font size is resolved, relative line height and stroke width retain their units. |
-| `measure` | Shared font size, established parent reference, root viewport, and diagnostic path for length resolution. |
+| `measure` | Shared font size, established parent reference, and diagnostic path for length resolution. |
 | `child(element, request, reference?, index?)` | Query a child with inherited style and its own path. |
 | `resource(name)` | Read a pass-owned resource during measurement. |
-| `prepare(name, compute, dependencies?)` | Cache source/style/resource work independently of requests and parent references; dependencies default to the root viewport. |
+| `prepare(name, compute)` | Cache source/style/resource work independently of requests and parent references. |
 
 Pass a child's percentage reference explicitly once the container establishes its
 own content box. Omission leaves the reference indefinite. A finite available offer

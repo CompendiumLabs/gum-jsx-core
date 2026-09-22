@@ -12,7 +12,7 @@ export * from './lib/vectors'
 export * from './lib/random'
 export { interp, palette } from './lib/colors'
 export {
-  em, px, vw, vh, make_measure, normalize_length, measure_length, resolve_length,
+  em, px, make_measure, normalize_length, measure_length, resolve_length,
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 } from './engine/units'
 export type {

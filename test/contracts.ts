@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  em, px, vw, vh, make_measure, normalize_length, measure_length, resolve_length, UnresolvedLengthError,
+  em, px, make_measure, normalize_length, measure_length, resolve_length, UnresolvedLengthError,
   resolve_font_size, resolve_line_height, make_size, make_rect, make_point,
   make_insets, resolve_insets, deflate_size, inflate_size, bounds_overflow,
   natural, available, exact, make_request, deflate_request, resolve_sizing,
@@ -12,17 +12,14 @@ import { probes } from './fixtures/contracts'
 // Test contracts at their boundaries and in small compositions, using literal results.
 const tests: Record<string, () => void> = {
   'measurement contexts keep local references independent and derive immutable font and path changes'() {
-    const viewport = { width: 800, height: 600 }, reference = { width: 200, height: 0 }
-    const parent = make_measure({ font_size: 20, viewport, reference, path: 'Svg/Box[0]' })
+    const reference = { width: 200, height: 0 }
+    const parent = make_measure({ font_size: 20, reference, path: 'Svg/Box[0]' })
     const child = make_measure(parent, { font_size: 10, path: 'Svg/Box[0]/Text[0]' })
-    viewport.height = 1200
     reference.width = 400
-    assert.ok(Object.isFrozen(parent) && Object.isFrozen(parent.viewport) && Object.isFrozen(parent.reference))
-    assert.ok(!Object.isFrozen(viewport) && !Object.isFrozen(reference))
+    assert.ok(Object.isFrozen(parent) && Object.isFrozen(parent.reference))
+    assert.ok(!Object.isFrozen(reference))
     assert.equal(resolve_length(em(2), parent), 40)
     assert.equal(resolve_length(em(2), child), 20)
-    assert.equal(resolve_length(vh(4), child), 24)
-    assert.equal(resolve_length(vw(25), child), 200)
     assert.equal(resolve_length(0.5, child, child.reference.width), 100)
     assert.equal(resolve_length(0.5, child, child.reference.height), 0)
     assert.throws(() => resolve_length(0.5, child, undefined, 'gap'), error => {
@@ -31,12 +28,10 @@ const tests: Record<string, () => void> = {
       return true
     })
     assert.deepEqual(measure_length(em(1), make_measure(child, { font_size: undefined })), { value: 1, unit: 'em' })
-    assert.throws(() => resolve_insets(vh(1), make_measure(child, { viewport: {} })),
-      /Svg\/Box\[0\]\/Text\[0\]\.padding.left.*viewport height/)
   },
 
-  'child measurements inherit typography and viewport while parent references remain explicit'() {
-    const child = new Rect({ font_size: vh(5), width: em(2), height: em(1) })
+  'child measurements inherit typography while parent references remain explicit'() {
+    const child = new Rect({ font_size: em(1.5), width: em(2), height: em(1) })
     const Parent = define_element('Parent', (_props, query) => {
       const measure = child_measure(child, query)
       assert.equal(measure.font_size, 30)
@@ -50,7 +45,7 @@ const tests: Record<string, () => void> = {
       return query.child(child, make_request())
     })
     const fragment = new LayoutPass().layout(new Parent({ font_size: px(20) }), make_request(),
-      { viewport: { height: 600 }, reference: { width: 500 } })
+      { reference: { width: 500 } })
     assert.deepEqual(fragment.size, { width: 60, height: 30 })
   },
 

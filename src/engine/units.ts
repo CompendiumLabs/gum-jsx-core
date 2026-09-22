@@ -1,7 +1,7 @@
 import { finite, nonnegative } from '../lib/checks'
 import { DEFAULTS } from './defaults'
 
-type UnitLength = Readonly<{ value: number; unit: 'em' | 'px' | 'vw' | 'vh' }>
+type UnitLength = Readonly<{ value: number; unit: 'em' | 'px' }>
 type LengthString = `${number}${UnitLength['unit'] | '%'}` | '0'
 type Length = number | UnitLength | LengthString
 type NormalizedLength = Readonly<{
@@ -14,7 +14,6 @@ type ReferenceBox = Readonly<{ width?: number; height?: number }>
 type LengthContext = Readonly<{
   font_size?: number
   reference: ReferenceBox
-  viewport: ReferenceBox
   path: string
 }>
 
@@ -22,10 +21,9 @@ const EMPTY_REFERENCE: ReferenceBox = Object.freeze({})
 
 // Derive local measurement state without mutating or freezing caller-owned boxes.
 function make_measure(context: Partial<LengthContext> = {}, patch: Partial<LengthContext> = {}): LengthContext {
-  const { font_size, reference = EMPTY_REFERENCE, viewport = EMPTY_REFERENCE, path = '' } = { ...context, ...patch }
+  const { font_size, reference = EMPTY_REFERENCE, path = '' } = { ...context, ...patch }
   return Object.freeze({ font_size, path,
     reference: Object.isFrozen(reference) ? reference : Object.freeze({ ...reference }),
-    viewport: Object.isFrozen(viewport) ? viewport : Object.freeze({ ...viewport }),
   })
 }
 
@@ -43,22 +41,13 @@ function px(value: number) {
   return Object.freeze({ value: finite(value, 'px'), unit: 'px' })
 }
 
-// Viewport units are percentages of the reference canvas, independent of nesting.
-function vw(value: number) {
-  return Object.freeze({ value: finite(value, 'vw'), unit: 'vw' })
-}
-
-function vh(value: number) {
-  return Object.freeze({ value: finite(value, 'vh'), unit: 'vh' })
-}
-
 // Copy the input so normalization never freezes a caller's own object.
 function normalize_length(length: Length | NormalizedLength, path = 'length'): NormalizedLength {
   if (typeof length === 'string') {
     const source = length.trim()
     if (source === '0') return Object.freeze({ value: 0, unit: 'px' })
-    const match = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)(px|em|vw|vh|%)$/.exec(source)
-    if (!match) throw new TypeError(`${path}: expected a length with px, em, vw, vh, or %; received ${JSON.stringify(length)}`)
+    const match = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)(px|em|%)$/.exec(source)
+    if (!match) throw new TypeError(`${path}: expected a length with px, em, or %; received ${JSON.stringify(length)}`)
     const value = finite(Number(match[1]), path), unit = match[2] as UnitLength['unit'] | '%'
     length = { value: unit === '%' ? value / 100 : value, unit: unit === '%' ? 'fraction' : unit }
   }
@@ -67,7 +56,7 @@ function normalize_length(length: Length | NormalizedLength, path = 'length'): N
     : length
 
   finite(value, path)
-  if (unit !== 'fraction' && unit !== 'em' && unit !== 'px' && unit !== 'vw' && unit !== 'vh') {
+  if (unit !== 'fraction' && unit !== 'em' && unit !== 'px') {
     throw new RangeError(`${path}: Unknown length unit: ${unit}`)
   }
   return Object.freeze({ value, unit })
@@ -85,11 +74,10 @@ function measure_length(
   const { value, unit } = normalized
   if (value === 0 || unit === 'px') return value
 
-  const reference = unit === 'em' ? context.font_size : unit === 'vw' ? context.viewport?.width
-    : unit === 'vh' ? context.viewport?.height : fraction
+  const reference = unit === 'em' ? context.font_size : fraction
   if (reference === undefined) return normalized
   nonnegative(reference, `${path} ${unit} reference`)
-  return finite((unit === 'vw' || unit === 'vh' ? value / 100 : value) * reference, path)
+  return finite(value * reference, path)
 }
 
 // Final layout must resolve every length; include the source property in errors.
@@ -132,8 +120,7 @@ class UnresolvedLengthError extends Error {
   readonly path: string
 
   constructor(length: NormalizedLength, path: string) {
-    const reference = length.unit === 'em' ? 'font size' : length.unit === 'vw' ? 'viewport width'
-      : length.unit === 'vh' ? 'viewport height' : 'fraction reference'
+    const reference = length.unit === 'em' ? 'font size' : 'fraction reference'
     super(`${path}: ${length.value} ${length.unit} requires a definite ${reference}`)
     this.name = 'UnresolvedLengthError'
     this.length = length
@@ -142,7 +129,7 @@ class UnresolvedLengthError extends Error {
 }
 
 export {
-  em, px, vw, vh, make_measure, normalize_length, measure_length, resolve_length,
+  em, px, make_measure, normalize_length, measure_length, resolve_length,
   resolve_font_size, resolve_line_height, UnresolvedLengthError,
 }
 export type {

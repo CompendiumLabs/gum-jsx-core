@@ -7,13 +7,10 @@ import type { Alignment } from '../lib/composition'
 import type { LayoutQuery } from './pass'
 import type { StyleSpec } from './style'
 import type { DataBounds } from './coordinates'
-import type { ReferenceBox } from './units'
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
 type ElementProps = SizeSpec & FitSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
   children?: Child
-  // At the document root, supply reference pixels without allocating output space.
-  viewport?: ReferenceBox
   // Any identified element is a connection target for the enclosing Network.
   id?: string
   // Outline this element's allocated and content boxes without inheriting to children.
@@ -27,14 +24,11 @@ type ElementType = Readonly<{
   layout: (element: Element, query: LayoutQuery) => Fragment
   // Intrinsic sources fit ordinary layout offers, but not internal math allocations.
   auto_fit?: boolean
-  // Root viewports can establish unit references from definite sizing policies.
-  viewport?: boolean
   // Graph containers inspect source geometry without measuring or cloning it.
   data_bounds?: (element: Element) => DataBounds | null
 }>
 type ElementOptions<Props, Input> = Readonly<{
   auto_fit?: boolean
-  viewport?: boolean
   normalize?: (props: Input) => Props
   data_bounds?: (props: Readonly<Props>) => DataBounds | null
 }>
@@ -74,7 +68,6 @@ function define_element<Props extends ElementProps = ElementProps, Input extends
     static normalize = options.normalize
     static data_bounds = options.data_bounds
     static auto_fit = options.auto_fit
-    static viewport = options.viewport
   }
 }
 
@@ -133,11 +126,10 @@ function element_definition(ctor: ElementClass): ElementDefinition {
   const inherited = parent === Element || parent.prototype instanceof Element
     ? element_definition(parent).defaults : {}
   const defaults = copy_data({ ...inherited, ...(Object.hasOwn(ctor, 'defaults') ? ctor.defaults : {}) })
-  const { layout, normalize, data_bounds, auto_fit, viewport } = ctor
+  const { layout, normalize, data_bounds, auto_fit } = ctor
   const name = Object.hasOwn(ctor, 'element_name') ? ctor.element_name! : ctor.name
   if (typeof name !== 'string' || !name) throw new TypeError('Element name must be a nonempty string')
   if (auto_fit !== undefined && typeof auto_fit !== 'boolean') throw new TypeError(`${name}.auto_fit must be a boolean`)
-  if (viewport !== undefined && typeof viewport !== 'boolean') throw new TypeError(`${name}.viewport must be a boolean`)
   for (const [key, hook] of Object.entries({ layout, normalize, data_bounds })) {
     if (hook !== undefined && typeof hook !== 'function') throw new TypeError(`${name}.${key} must be a function`)
   }
@@ -145,7 +137,6 @@ function element_definition(ctor: ElementClass): ElementDefinition {
     name,
     layout: (element: Element, query: LayoutQuery) => layout.call(ctor, element.props, query),
     ...(auto_fit === undefined ? {} : { auto_fit }),
-    ...(viewport === undefined ? {} : { viewport }),
     ...(data_bounds ? { data_bounds: (element: Element) => data_bounds.call(ctor, element.props) } : {}),
   })
   const definition = Object.freeze({ defaults, type, normalize: normalize?.bind(ctor) })

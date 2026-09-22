@@ -13,7 +13,6 @@ import type { UnitLength, LengthString } from '../engine/units'
 type SvgProps = ElementProps & Readonly<{ width?: UnitLength | LengthString; height?: UnitLength | LengthString; background?: string }>
 
 class Svg extends Element<SvgProps> {
-  static viewport = true
   static layout(props: SvgProps, query: LayoutQuery) {
     // Omitted axes hug content. Specified viewport lengths remain explicit pixels;
     // a tight resize changes layout rather than magnifying a completed drawing.
