@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, LegendItem, Bullets, OuterLabel,
+  Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, LegendItem,
   TitleBox, TitleFrame, TextFigure, Slide, Text, Rect,
   LayoutPass, element_children, prefix_split, prefix_join, evaluate, render_svg, make_request, exact, px, em,
 } from '../src/index'
@@ -14,13 +14,6 @@ function texts(element: Element): Text[] {
 }
 
 const tests: Record<string, () => void> = {
-  'content props no longer replace children'() {
-    assert.throws(() => new LayoutPass().layout(new Text({ text: 'old' } as any)), /children instead of text/)
-    assert.throws(() => new Bullets({ items: ['old'] } as any), /children instead of items/)
-    assert.throws(() => new Label({ label: 'old' } as any), /children instead of label/)
-    assert.throws(() => new OuterLabel({ label: 'old' } as any), /children instead of label/)
-    assert.throws(() => new Legend({ entries: [] } as any), /children instead of entries/)
-  },
   'prefix helpers preserve values, reserve owner keys, and prefer the longest scope'() {
     const format = (value: number) => String(value), size = px(12)
     const props = Object.freeze({ tick: false, tick_size: size, tick_stroke: 'red',

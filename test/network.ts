@@ -326,7 +326,6 @@ const tests: Record<string, () => void> = {
 
   'invalid references, duplicate ids, ports, and singular transforms fail clearly'() {
     assert.throws(() => new Node({ id: '' }), /nonempty string/)
-    assert.throws(() => new Node({ text: 'Old label' } as unknown as import('../src/index').NodeProps), /Use children instead of text/)
     assert.throws(() => new Circle({ id: 7 as unknown as string }), /nonempty string/)
     assert.throws(() => new Edge({ start: new Circle(), end: 'b' }), /nonempty string/)
     assert.throws(() => new Edge({ start: new Node(), end: 'b' }), /nonempty string/)

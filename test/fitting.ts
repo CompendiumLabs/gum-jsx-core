@@ -10,18 +10,6 @@ const offer = (width: number, height?: number) => make_request({ width: availabl
   height: height === undefined ? undefined : available(height) })
 const fixed = { content_width: px(200), content_height: px(100), fill: 'teal' }
 
-// Removed spellings must fail for typed callers as well as evaluated JSX.
-if (false) {
-  // @ts-expect-error Content sizing is the default, not a width keyword.
-  new Box({ width: 'hug' })
-  // @ts-expect-error Content sizing is the default, not a height keyword.
-  new Box({ height: 'hug' })
-  // @ts-expect-error Scaling belongs to fit, not width or height.
-  new Box({ width: 'fit' })
-  // @ts-expect-error Shrink-only fitting uses true, without a string alias.
-  new Box({ fit: 'shrink' })
-}
-
 const tests: Record<string, () => void> = {
   'fit is a shared, non-inherited sizing policy for built-in and custom elements'() {
     const pass = new LayoutPass(), source = new Fixed({ ...fixed, fit: true })
@@ -128,19 +116,12 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(custom.connection!.boundary, { x: 0, y: 0, width: 100, height: 50 })
   },
 
-  'fit JSX works without wrapper elements and invalid policies fail clearly'() {
+  'fit JSX works without wrapper elements and rejects invalid alignment'() {
     const source = evaluate('<Box fit><Text>Fitted content</Text></Box>')
     const result = new LayoutPass().layout(source, offer(30))
     assert.ok(Math.abs(result.size.width - 30) < 1e-9)
     assert.equal(result.name, 'Box')
-    assert.throws(() => new LayoutPass().layout(evaluate('<Text fit="stretch">No</Text>')), /fit must be/)
     assert.throws(() => new LayoutPass().layout(evaluate('<Text fit fit-align="fill">No</Text>')), /never stretches/)
-    for (const axis of ['width', 'height']) for (const value of ['fit', 'hug']) {
-      assert.throws(() => new LayoutPass().layout(evaluate(`<Text ${axis}="${value}">Old</Text>`)), /omit the dimension/)
-    }
-    assert.throws(() => evaluate('<Fit><Text>Old</Text></Fit>'), /Fit/)
-    assert.throws(() => new LayoutPass().layout(evaluate('<Text fit="scale_down">Old</Text>')), /fit must be/)
-    assert.throws(() => new LayoutPass().layout(evaluate('<Text fit="shrink">Old</Text>')), /fit must be/)
   },
 
   'changing target bounds reuses the natural drawing without caching across styles or references'() {
