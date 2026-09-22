@@ -2,19 +2,22 @@ import { DEFAULTS } from './defaults'
 import { resolve_theme, theme_color } from './theme'
 import type { ThemeName } from './theme'
 import { finite, nonnegative } from '../lib/checks'
+import { light, regular, bold } from '../lib/constants'
 import type { Paint } from './drawing'
 import type { Size } from './geometry'
 import { em, make_measure, normalize_length, px, resolve_font_size, resolve_length } from './units'
 import type { Length, NormalizedLength, LengthContext } from './units'
 
 type FontStyle = 'normal' | 'italic'
+const FONT_WEIGHTS = Object.freeze({ light, regular, normal: regular, bold })
+type FontWeight = number | keyof typeof FONT_WEIGHTS
 type LineCap = 'butt' | 'round' | 'square'
 type LineJoin = 'miter' | 'round' | 'bevel'
 type StyleSpec = Readonly<{
   theme?: ThemeName
   font_size?: Length
   font_family?: string
-  font_weight?: number
+  font_weight?: FontWeight
   font_style?: FontStyle
   line_height?: Length
   color?: string
@@ -24,7 +27,7 @@ type StyleSpec = Readonly<{
   stroke_linecap?: LineCap
   stroke_linejoin?: LineJoin
   stroke_miterlimit?: number
-  stroke_dasharray?: readonly Length[]
+  stroke_dasharray?: Length | readonly Length[]
   opacity?: number
 }>
 type Style = Readonly<{
@@ -82,7 +85,11 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   }
   const font_size = resolve_font_size(spec.font_size, measure)
   const font_family = spec.font_family ?? inherited.font_family
-  const font_weight = finite(spec.font_weight ?? inherited.font_weight, 'font_weight')
+  const weight = spec.font_weight ?? inherited.font_weight
+  if (typeof weight === 'string' && !Object.hasOwn(FONT_WEIGHTS, weight)) {
+    throw new TypeError(`${path}.font_weight must be a number, light, regular, normal, or bold; received ${weight}`)
+  }
+  const font_weight = finite(typeof weight === 'string' ? FONT_WEIGHTS[weight] : weight, 'font_weight')
   const font_style = spec.font_style ?? inherited.font_style
   const line_height = normalize_length(spec.line_height ?? inherited.line_height, `${path}.line_height`)
   const color = paint('color')
@@ -101,7 +108,9 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const stroke_width = normalize_length(spec.stroke_width ?? inherited.stroke_width, `${path}.stroke_width`)
   const opacity = finite(spec.opacity ?? inherited.opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
-  const stroke_dasharray = Object.freeze((spec.stroke_dasharray ?? inherited.stroke_dasharray).map((value, index) => {
+  const dashes = spec.stroke_dasharray ?? inherited.stroke_dasharray
+  const dash_lengths = Array.isArray(dashes) ? dashes : [dashes, dashes]
+  const stroke_dasharray = Object.freeze(dash_lengths.map((value, index) => {
     const location = `${path}.stroke_dasharray[${index}]`
     const length = normalize_length(value, location)
     nonnegative(length.value, location)
@@ -133,4 +142,4 @@ function resolve_paint(style: Style, size: Size, context: Partial<LengthContext>
 }
 
 export { resolve_style, resolve_paint }
-export type { StyleSpec, Style, FontStyle, LineCap, LineJoin }
+export type { StyleSpec, Style, FontStyle, FontWeight, LineCap, LineJoin }

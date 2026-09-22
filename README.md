@@ -834,7 +834,7 @@ An inherited `line-height={px(20)}` remains 20px even in a larger span.
 | `whitespace="pre"` | Preserve spaces and expand tabs at `tab_size` column stops (default 4). Wrapping remains independently controlled by `wrap`. |
 | `justify` | `start` (default), `center`, `end`, or a fraction from 0 to 1, inside the final allocated width. |
 | `font_family` | `IBM Plex Sans`, `IBM Plex Mono`, or a registered family. |
-| `font_weight` | Numeric 1–1000; choose the nearest available weight, lower on ties. Bundled weights are 300, 400, 700. |
+| `font_weight` | Numeric 1–1000 or `"light"` (300), `"regular"`/`"normal"` (400), `"bold"` (700); choose the nearest available weight, lower on ties. |
 | `font_style` | `normal` or `italic`; a registered italic face is preferred, otherwise synthesize a 12° oblique outline. |
 
 Newlines include CRLF/CR and Unicode line/paragraph separators. A trailing newline

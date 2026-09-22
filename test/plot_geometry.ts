@@ -4,7 +4,7 @@ import {
   TextFrame, Bullets, Slide, Graph, Points, Arc, Arrow, Spline, RoundedLine, HFill,
   Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d, evaluate,
 } from '../src/index'
-import type { Alignment, AnchorSpec, Element, PathDraw, Side } from '../src/index'
+import type { Alignment, AnchorSpec, Element, Length, PathDraw, Side } from '../src/index'
 
 function near(a: number, b: number): void { assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`); }
 const fixed = make_request({ width: exact(200), height: exact(100) })
@@ -236,6 +236,46 @@ const tests: Record<string, () => void> = {
     assert.equal(pass.layout(new Rect({ fill: 'blue', opacity: 0 })).ink, null)
     assert.throws(() => pass.layout(new Rect({ opacity: 1.1 })), /opacity/)
     assert.throws(() => pass.layout(new Rect({ stroke_dasharray: [px(-1)] })), /nonnegative/)
+  },
+
+  'scalar dash lengths broadcast with the same units and inheritance as arrays'() {
+    const pass = new LayoutPass()
+    for (const length of [px(4), em(0.2), '4px', '0.2em', 0.04, '4%'] satisfies Length[]) {
+      const props = { font_size: px(20), children: new Rect() }
+      const scalar = pass.layout(new Graph({ ...props, stroke_dasharray: length }), fixed)
+      const array = pass.layout(new Graph({ ...props, stroke_dasharray: [length, length] }), fixed)
+      assert.deepEqual(scalar.children[0].fragment.draw[0].stroke_dasharray, [4, 4])
+      assert.equal(render_svg(scalar), render_svg(array))
+      assert.match(render_svg(scalar), /stroke-dasharray="4 4"/)
+    }
+    const inherited = pass.layout(new Box({ font_size: px(20), stroke_dasharray: em(0.2),
+      children: new Rect({ font_size: px(40), width: px(80), height: px(40) }) }))
+    assert.deepEqual(inherited.children[0].fragment.draw[0].stroke_dasharray, [8, 8])
+    const override = pass.layout(new Box({ stroke_dasharray: px(4),
+      children: new Rect({ width: px(80), height: px(40), stroke_dasharray: [] }) }))
+    assert.deepEqual(override.children[0].fragment.draw[0].stroke_dasharray, [])
+    for (const stroke_dasharray of [0, px(0), '0px', [], [px(0), px(0)]] satisfies (Length | readonly Length[])[]) {
+      assert.doesNotMatch(render_svg(pass.layout(new Rect({ stroke_dasharray }), fixed)), /stroke-dasharray=/)
+    }
+    for (const length of [-0.1, px(-1), em(-1), '-1px'] satisfies Length[]) {
+      assert.throws(() => pass.layout(new Rect({ stroke_dasharray: length }), fixed), /stroke_dasharray.*nonnegative/)
+    }
+    for (const length of [NaN, Infinity]) {
+      assert.throws(() => pass.layout(new Rect({ stroke_dasharray: length }), fixed), /stroke_dasharray.*finite/)
+    }
+  },
+
+  'scoped JSX dash scalars reach generated plot grid lines'() {
+    const code = `
+      <Plot width={px(320)} height={px(200)} grid grid-stroke-dasharray={px(4)}>
+        <Spline points={[[0, 0], [1, 1]]} />
+      </Plot>
+    `
+    const pass = new LayoutPass()
+    const scalar = render_svg(pass.layout(evaluate(code) as Element))
+    const array = render_svg(pass.layout(evaluate(code.replace('{px(4)}', '{[px(4), px(4)]}')) as Element))
+    assert.match(scalar, /stroke-dasharray="4 4"/)
+    assert.equal(scalar, array)
   },
 }
 for (const [name, test] of Object.entries(tests)) { test(); console.log(`ok - ${name}`); }

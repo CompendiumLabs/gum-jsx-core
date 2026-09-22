@@ -5,7 +5,7 @@ import { create } from 'fontkit'
 import type { Font } from 'fontkit'
 import {
   Fonts, EMOJI_FAMILY, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
-  resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point,
+  resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point, evaluate,
 } from '../src/index'
 import type { Drawing, FontProvider, Fragment, TextProps } from '../src/index'
 import { color_font } from './fixtures/color_font'
@@ -28,6 +28,43 @@ const emoji = color_font([[0x20, 1200], [0x31, 1200], [0x20e3, 1200], [0x200d, 0
   [0x1f468, 1200], [0x1f469, 1200], [0x1f600, 1200]])
 
 const tests: Record<string, () => void> = {
+  'named font weights render like numbers and inherit through text and spans'() {
+    const pass = new LayoutPass()
+    for (const [name, weight] of [['light', 300], ['regular', 400], ['normal', 400], ['bold', 700]] as const) {
+      const style = resolve_style({ font_weight: name })
+      assert.equal(style.font_weight, weight)
+      assert.equal(resolve_style({}, style).font_weight, weight)
+      assert.equal(resolve_style({ font_weight: 'normal' }, style).font_weight, 400)
+      const children = new Text({ children: ['Inherited ', new Span({ font_weight: 'bold', children: 'bold' })] })
+      const named = pass.layout(new Svg({ font_weight: name, children }))
+      const numeric = pass.layout(new Svg({ font_weight: weight,
+        children: new Text({ children: ['Inherited ', new Span({ font_weight: 700, children: 'bold' })] }) }))
+      assert.equal(render_svg(named), render_svg(numeric))
+    }
+    for (const weight of [1, 350, 1000]) assert.equal(resolve_style({ font_weight: weight }).font_weight, weight)
+  },
+
+  'quoted JSX weights match constants on text, spans, and scoped titles'() {
+    const pass = new LayoutPass()
+    const source = `
+      <TitleFrame title="Title" title-font-weight="bold">
+        <Text font-weight="light">
+          Light <Span font-weight="bold">bold</Span>
+        </Text>
+      </TitleFrame>
+    `
+    const quoted = pass.layout(evaluate(source))
+    const constants = pass.layout(evaluate(source.replaceAll('="bold"', '={bold}').replaceAll('="light"', '={light}')))
+    assert.equal(render_svg(quoted), render_svg(constants))
+    assert.notEqual(render_svg(quoted), render_svg(pass.layout(evaluate(source.replaceAll('="bold"', '="regular"')))))
+    for (const weight of ['heavy', 'constructor', 'toString']) {
+      assert.throws(() => pass.layout(evaluate(`<Text font-weight="${weight}">Invalid</Text>`)), /font_weight must be a number/)
+    }
+    for (const weight of [0, 1001, NaN, Infinity]) {
+      assert.throws(() => resolve_style({ font_weight: weight }), /weight/)
+    }
+  },
+
   'glyph advances, kerning, ink, and baselines come from the actual bundled font'() {
     const pass = new LayoutPass()
     const size = 24

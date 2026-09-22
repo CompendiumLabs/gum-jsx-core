@@ -39,7 +39,7 @@ export type { Paint, Drawing, RectDraw, EllipseDraw, PathDraw, ImageDraw, TextDr
 export { move_to, line_to, quad_to, curve_to, close_path, transform_path } from './engine/path'
 export type { PathCommand, PathSegment } from './engine/path'
 export { resolve_style, resolve_paint } from './engine/style'
-export type { Style, StyleSpec, FontStyle, LineCap, LineJoin } from './engine/style'
+export type { Style, StyleSpec, FontStyle, FontWeight, LineCap, LineJoin } from './engine/style'
 export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY } from './engine/fonts'
 export type { FontProvider, MeasuredFont, GlyphShape, LiveCluster, FontOptions, FontData } from './engine/fonts'
 export { Element, define_element, define_component, element_children, content_child } from './engine/element'
