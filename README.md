@@ -5,13 +5,10 @@ text, boxes and stacks, plots, network diagrams, and reusable element components
 Elements describe a figure; layout produces immutable pixel fragments; rendering
 serializes those fragments to SVG.
 
-See the [Gum project](https://github.com/CompendiumLabs/gum-jsx#readme) for workspace
-setup, command-line rendering, and the package overview. Install dependencies with
-`bun install` at the workspace root before running these examples.
+See the [Gum project](https://github.com/CompendiumLabs/gum-jsx#readme) for
+getting started, command-line rendering, and the package overview.
 
 ## JSX to SVG
-
-In a workspace package that depends on `@gum-jsx/core`:
 
 ```ts
 import { evaluate, render_element } from '@gum-jsx/core'
@@ -87,7 +84,7 @@ For authoring examples, start with the
 
 ## Development
 
-From this package directory after workspace installation:
+From this package directory:
 
 ```sh
 bun run test
