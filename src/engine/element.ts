@@ -7,6 +7,7 @@ import type { Alignment } from '../lib/composition'
 import type { LayoutQuery } from './pass'
 import type { StyleSpec } from './style'
 import type { DataBounds } from './coordinates'
+import { validate_props } from './prop_validation'
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
 type ElementProps = SizeSpec & FitSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
@@ -75,7 +76,9 @@ function define_element<Props extends ElementProps = ElementProps, Input extends
 // immutable description. It introduces neither a layout wrapper nor callbacks.
 function define_component<Input extends ElementProps>(name: string, build: (props: Input) => Element) {
   return class extends Element {
+    static element_name = name
     constructor(props: Input = {} as Input) {
+      validate_props(new.target, props)
       const source = build(props)
       super({ ...source.type, name }, source.props)
     }
@@ -160,6 +163,7 @@ class Element<Props extends ElementProps = ElementProps, Input extends ElementPr
       this.type = definition.type
       // Normalize raw input once, then apply source defaults, just like define_element.
       const input = args[0] === undefined ? {} as Input : args[0]
+      validate_props(new.target, input)
       const source = definition.normalize ? definition.normalize(input) : input
       this.props = copy_data({ ...definition.defaults, ...source } as Props)
     }

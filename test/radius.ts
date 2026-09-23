@@ -20,9 +20,9 @@ const tests: Record<string, () => void> = {
     for (const [key, selected] of Object.entries(selections)) {
       const radius = { [key]: px(8) }
       const expected = corners(Object.fromEntries(selected.map(corner => [corner, { x: 8, y: 8 }])))
-      const props = { border_radius: radius, background: 'blue' }
+      const props = { border_radius: radius }
       for (const Shape of [Rect, RoundedRect, Square, Box, Frame]) {
-        const fragment = pass.layout(new Shape(props), fixed)
+        const fragment = pass.layout(new Shape({ ...props, ...(Shape === Box || Shape === Frame ? { background: 'blue' } : { fill: 'blue' }) }), fixed)
         assert.deepEqual(radius_of(fragment), expected, `${Shape.name}.${key}`)
       }
     }
@@ -45,7 +45,8 @@ const tests: Record<string, () => void> = {
     ]
     for (const [radius, expected] of inputs) {
       for (const Shape of [Rect, Box, Frame]) {
-        const fragment = pass.layout(new Shape({ border_radius: radius, background: 'blue', font_size: px(10) }), fixed)
+        const fragment = pass.layout(new Shape({ border_radius: radius, font_size: px(10),
+          ...(Shape === Box || Shape === Frame ? { background: 'blue' } : { fill: 'blue' }) }), fixed)
         assert.deepEqual(radius_of(fragment), expected)
         assert.match(render_svg(fragment), new RegExp(`rx="${expected.x}" ry="${expected.y}"`))
         assert.doesNotMatch(render_svg(fragment), /<path/)
@@ -110,7 +111,9 @@ const tests: Record<string, () => void> = {
 
   'bars and BarPlot accept corner radii in screen coordinates while retaining scalar sizing'() {
     for (const Mark of [Bars, VBars, HBars, Bar, VBar, HBar]) {
-      const bars = new Mark({ values: [1, -1, 0], positions: [1, 2, 3], value: 1, position: 1, border_radius: { t: px(8) } })
+      const values = Mark === Bar || Mark === VBar || Mark === HBar
+        ? { value: 1, position: 1 } : { values: [1, -1, 0], positions: [1, 2, 3] }
+      const bars = new Mark({ ...values, border_radius: { t: px(8) } })
       const fragment = pass.layout(new Graph({ children: bars }), fixed).children[0].fragment
       for (const draw of fragment.draw as readonly RectDraw[]) {
         const r = { x: Math.min(8, draw.rect.width / 2), y: Math.min(8, draw.rect.height / 2) }

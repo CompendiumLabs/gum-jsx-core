@@ -479,3 +479,19 @@ export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   head_scope, arrow_head_options, resolve_arrow_head }
 export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
   ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }
+
+// Generated prop registrations; run the workspace props:generate command.
+import { register_props } from '../engine/prop_validation'
+import { prop_schemas } from '../prop-schemas'
+register_props(CoordLine, prop_schemas.CoordLine)
+register_props(Spline, prop_schemas.Spline)
+register_props(RoundedLine, prop_schemas.RoundedLine)
+register_props(Segments, prop_schemas.Segments)
+register_props(Arc, prop_schemas.Arc)
+register_props(Fill, prop_schemas.Fill)
+register_props(VFill, prop_schemas.VFill)
+register_props(HFill, prop_schemas.HFill)
+register_props(Arrow, prop_schemas.Arrow)
+register_props(ArrowHead, prop_schemas.ArrowHead)
+register_props(Ray, prop_schemas.Ray)
+register_props(Points, prop_schemas.Points)

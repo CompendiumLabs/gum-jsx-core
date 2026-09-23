@@ -201,3 +201,21 @@ export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Pa
   UnitLine, HLine, VLine, Dot, Triangle }
 export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
   LineProps, PolylineProps, PolygonProps, PathProps }
+
+// Generated prop registrations; run the workspace props:generate command.
+import { register_props } from '../engine/prop_validation'
+import { prop_schemas } from '../prop-schemas'
+register_props(Rect, prop_schemas.Rect)
+register_props(RoundedRect, prop_schemas.RoundedRect)
+register_props(Square, prop_schemas.Square)
+register_props(Circle, prop_schemas.Circle)
+register_props(Ellipse, prop_schemas.Ellipse)
+register_props(Line, prop_schemas.Line)
+register_props(Polyline, prop_schemas.Polyline)
+register_props(Polygon, prop_schemas.Polygon)
+register_props(Path, prop_schemas.Path)
+register_props(UnitLine, prop_schemas.UnitLine)
+register_props(HLine, prop_schemas.HLine)
+register_props(VLine, prop_schemas.VLine)
+register_props(Dot, prop_schemas.Dot)
+register_props(Triangle, prop_schemas.Triangle)

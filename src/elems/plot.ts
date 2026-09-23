@@ -266,3 +266,12 @@ class OuterLabel extends Element<OuterLabelData, OuterLabelProps> {
 
 export { Plot, BarPlot, Legend, LegendItem, OuterLabel }
 export type { PlotProps, BarPlotProps, LegendProps, LegendItemProps, LegendEntry, OuterLabelProps }
+
+// Generated prop registrations; run the workspace props:generate command.
+import { register_props } from '../engine/prop_validation'
+import { prop_schemas } from '../prop-schemas'
+register_props(LegendItem, prop_schemas.LegendItem)
+register_props(Legend, prop_schemas.Legend)
+register_props(Plot, prop_schemas.Plot)
+register_props(BarPlot, prop_schemas.BarPlot)
+register_props(OuterLabel, prop_schemas.OuterLabel)

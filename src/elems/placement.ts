@@ -128,3 +128,12 @@ class Anchor extends Element<AnchorProps> {
 
 export { Overlay, TransformBox, Rotate, Attach, Anchor }
 export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, AnchorProps }
+
+// Generated prop registrations; run the workspace props:generate command.
+import { register_props } from '../engine/prop_validation'
+import { prop_schemas } from '../prop-schemas'
+register_props(Overlay, prop_schemas.Overlay)
+register_props(TransformBox, prop_schemas.TransformBox)
+register_props(Rotate, prop_schemas.Rotate)
+register_props(Attach, prop_schemas.Attach)
+register_props(Anchor, prop_schemas.Anchor)

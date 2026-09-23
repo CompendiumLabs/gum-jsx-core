@@ -108,3 +108,13 @@ class HBar extends Bar {
 
 export { Bar, VBar, HBar, Bars, VBars, HBars }
 export type { PerBar, BarStyle, BarProps, BarsProps }
+
+// Generated prop registrations; run the workspace props:generate command.
+import { register_props } from '../engine/prop_validation'
+import { prop_schemas } from '../prop-schemas'
+register_props(Bars, prop_schemas.Bars)
+register_props(VBars, prop_schemas.VBars)
+register_props(HBars, prop_schemas.HBars)
+register_props(Bar, prop_schemas.Bar)
+register_props(VBar, prop_schemas.VBar)
+register_props(HBar, prop_schemas.HBar)

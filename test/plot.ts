@@ -46,7 +46,7 @@ const tests: Record<string, () => void> = {
       assert.deepEqual(coord.xlim, [8, 22])
       assert.deepEqual(coord.ylim, [22, 58])
       for (const Container of [Graph, Plot, BarPlot]) {
-        const props = { values: [10, 20], children: line }
+        const props = { ...(Container === BarPlot ? { values: [10, 20] } : {}), children: line }
         assert.deepEqual(pass.layout(new Container({ ...props, padding }), fixed),
           pass.layout(new Container({ ...props, padding: canonical }), fixed), Container.name)
       }
