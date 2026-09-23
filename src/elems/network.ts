@@ -163,10 +163,3 @@ class Network extends Element<NetworkProps> {
 
 export { Node, Edge, Network }
 export type { NodeProps, EdgeProps, NetworkProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(Node, prop_schemas.Node)
-register_props(Edge, prop_schemas.Edge)
-register_props(Network, prop_schemas.Network)

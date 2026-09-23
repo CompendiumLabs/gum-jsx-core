@@ -303,10 +303,3 @@ class Spacer extends Element<ElementProps> {
 
 export { HStack, VStack, Spacer, stack_layout }
 export type { StackProps, StackAlign, StackJustify }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(HStack, prop_schemas.HStack)
-register_props(VStack, prop_schemas.VStack)
-register_props(Spacer, prop_schemas.Spacer)

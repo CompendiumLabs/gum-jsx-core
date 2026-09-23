@@ -60,8 +60,3 @@ class Graph extends Element<GraphProps> {
 
 export { Graph, graph_size, graph_children, graph_child }
 export type { GraphProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(Graph, prop_schemas.Graph)

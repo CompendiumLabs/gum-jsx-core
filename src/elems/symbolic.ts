@@ -131,14 +131,3 @@ const SymField = define_component<SymFieldProps>('SymField', ({ f, xlim = [-1, 1
 export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField }
 export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
   VectorSample, VectorSampleValue, FieldProps, SymFieldProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(SymLine, prop_schemas.SymLine)
-register_props(SymSpline, prop_schemas.SymSpline)
-register_props(SymPoly, prop_schemas.SymPoly)
-register_props(SymPoints, prop_schemas.SymPoints)
-register_props(SymFill, prop_schemas.SymFill)
-register_props(Field, prop_schemas.Field)
-register_props(SymField, prop_schemas.SymField)

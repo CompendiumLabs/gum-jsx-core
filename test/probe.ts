@@ -1,4 +1,4 @@
-import { probes } from '../test/fixtures/contracts'
+import { probes } from './fixtures/contracts'
 
 // Run the contract gallery, or inspect a single named example as JSON.
 const name = process.argv[2]

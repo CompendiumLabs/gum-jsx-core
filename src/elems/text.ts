@@ -322,9 +322,3 @@ class Span extends Element<SpanProps> {
 
 export { Text, Span }
 export type { TextProps, TextOptions, SpanProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(Text, prop_schemas.Text)
-register_props(Span, prop_schemas.Span)

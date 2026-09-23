@@ -33,8 +33,3 @@ class PngImage extends Element<PngImageProps> {
 
 export { PngImage }
 export type { PngImageProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(PngImage, prop_schemas.PngImage)

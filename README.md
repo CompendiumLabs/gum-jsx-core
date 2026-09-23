@@ -32,9 +32,6 @@ if (result.kind === 'svg') {
 size, fragment, and layout pass. Sources returning ordinary JavaScript values
 produce a `{ kind: 'value', value }` result instead.
 
-Built-in elements reject unknown prop names and suggest close spelling matches.
-See [prop diagnostics](./API.md#prop-diagnostics) for custom-element behavior.
-
 Evaluation executes JavaScript in the host environment. Use trusted source or
 provide a separate isolation boundary in your application.
 

@@ -265,23 +265,3 @@ class Mesh2D extends Element<ElementProps, Mesh2DProps> {
 export { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D, tick_values, merge_axis_props }
 export type { Tick, TickSpec, TickSide, AxisProps, LabelProps, MeshProps, Mesh2DProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(Axis, prop_schemas.Axis)
-register_props(HAxis, prop_schemas.HAxis)
-register_props(VAxis, prop_schemas.VAxis)
-register_props(Scale, prop_schemas.Scale)
-register_props(HScale, prop_schemas.HScale)
-register_props(VScale, prop_schemas.VScale)
-register_props(Labels, prop_schemas.Labels)
-register_props(HLabels, prop_schemas.HLabels)
-register_props(VLabels, prop_schemas.VLabels)
-register_props(Label, prop_schemas.Label)
-register_props(HLabel, prop_schemas.HLabel)
-register_props(VLabel, prop_schemas.VLabel)
-register_props(Mesh, prop_schemas.Mesh)
-register_props(HMesh, prop_schemas.HMesh)
-register_props(VMesh, prop_schemas.VMesh)
-register_props(Mesh2D, prop_schemas.Mesh2D)

@@ -271,17 +271,3 @@ class Slide extends Element<SlideData, SlideProps> {
 export { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
   text_element, text_children }
 export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, TitleFrameProps, TitleFrameTitleStyle, BulletsProps, SlideProps }
-
-// Generated prop registrations; run the workspace props:generate command.
-import { register_props } from '../engine/prop_validation'
-import { prop_schemas } from '../prop-schemas'
-register_props(TextStack, prop_schemas.TextStack)
-register_props(TextRow, prop_schemas.TextRow)
-register_props(TextCol, prop_schemas.TextCol)
-register_props(TextBox, prop_schemas.TextBox)
-register_props(TextFrame, prop_schemas.TextFrame)
-register_props(TextFigure, prop_schemas.TextFigure)
-register_props(TitleBox, prop_schemas.TitleBox)
-register_props(TitleFrame, prop_schemas.TitleFrame)
-register_props(Bullets, prop_schemas.Bullets)
-register_props(Slide, prop_schemas.Slide)

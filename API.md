@@ -17,7 +17,6 @@ first example, see the [package README](./README.md).
 - [Networks](#networks)
 - [Scoped component props](#scoped-component-props)
 - [Rendering and inspection](#rendering-and-inspection)
-- [Prop diagnostics](#prop-diagnostics)
 - [Contributor notes](#contributor-notes)
 
 ## Lengths and references
@@ -1227,24 +1226,6 @@ The renderer uses the fragment's allocated size directly as both SVG dimensions
 and viewBox extent. Ordinary resizing relays a new request through the layout pass;
 only an explicit placement matrix scales completed geometry and strokes.
 
-## Prop diagnostics
-
-Built-in constructors validate input prop names before normalization. Unknown keys
-throw a `TypeError` with the element name and a spelling suggestion when a close
-match exists. JSX evaluation wraps this with the source construction site. Scoped props
-and parent-owned sizing, flex, and position metadata remain valid. Supported
-callback props are checked before their normalizers consume them.
-
-Validation is registered for exact constructors, so application subclasses and
-function components retain their own input vocabulary. A custom constructor can
-opt in with `register_props(Custom, ['children', 'label', 'width'])`; supply its
-complete supported key list. Low-level descriptor adoption preserves normalized
-source data and does not revalidate it as constructor input.
-
-The generated allowlists cover prop names, not every nested value. Existing
-normalization, layout, and value checks still apply. Inline Span styling and
-parent-owned props retain their context-specific behavior.
-
 ## Contributor notes
 
 Install dependencies from the parent Bun workspace with `bun install`. Run this
@@ -1290,13 +1271,6 @@ Do not round widths to improve cache hits: text break boundaries are observable.
 current request, reference box, coordinate context, or path. Resource revisions
 invalidate the pass's layout and preparation caches. Reuse source identities to reuse fragments; equal
 props on two newly constructed elements do not give them a shared cache entry.
-
-Built-in prop schemas come from the constructor input types. After changing those
-types, run `bun run props:generate` at the workspace root, then `bun run props:check`.
-The development generator uses TypeScript 7.0.2's compiler API under Node because
-its synchronous pipe transport is incompatible with Bun. Runtime packages do not
-import TypeScript or need that generator. The generated registrations live beside
-the built-in classes; custom subclasses are not implicitly registered.
 
 When adding a public element, export it and its types in `src/index.ts`, add its JSX
 binding in `src/eval.ts`, and wire relevant checks into `test/run.ts`. Add concise

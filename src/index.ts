@@ -43,7 +43,6 @@ export type { Style, StyleSpec, FontStyle, FontWeight, LineCap, LineJoin } from 
 export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY } from './engine/fonts'
 export type { FontProvider, MeasuredFont, GlyphShape, LiveCluster, FontOptions, FontData } from './engine/fonts'
 export { Element, define_element, define_component, element_children, content_child } from './engine/element'
-export { register_props } from './engine/prop_validation'
 export type { Child, ElementProps, ElementType, LayoutMethod, ElementOptions } from './engine/element'
 export { prefix_split, prefix_join } from './lib/props'
 export type { Prefixed } from './lib/props'
