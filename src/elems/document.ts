@@ -14,6 +14,8 @@ import { graph_size } from './graph'
 import { available, exact, make_request, deflate_request, prepare_request, finish_size } from '../engine/layout'
 import { HStack, VStack, stack_layout } from './stack'
 import type { StackProps } from './stack'
+import { Grid } from './grid'
+import type { GridProps } from './grid'
 import { resolve_rect_radius } from './shapes'
 import { prefix_split, scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
@@ -96,6 +98,14 @@ class TextCol extends TextStack {
     return stack_layout(props, query, 'height')
   }
 }
+
+class TextGrid extends Grid {
+  static defaults: Partial<GridProps> = { gap: em(0.6) }
+  static normalize(props: GridProps) {
+    return { ...props, children: text_children(props.children) }
+  }
+}
+
 class TextBox extends Element<BoxProps, TextBoxProps> {
   static defaults: Partial<BoxProps> = { align: { x: 'fill' }, padding: em(0.6) }
   static normalize(input: TextBoxProps): BoxProps {
@@ -268,6 +278,6 @@ class Slide extends Element<SlideData, SlideProps> {
   }
 }
 
-export { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
+export { TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
   text_element, text_children }
 export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, TitleFrameProps, TitleFrameTitleStyle, BulletsProps, SlideProps }

@@ -8,6 +8,7 @@ import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Pa
 import { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
 import { Box, Frame } from './elems/box'
 import { HStack, VStack, Spacer } from './elems/stack'
+import { Grid } from './elems/grid'
 import { Group } from './elems/group'
 import { Text, Span } from './elems/text'
 import { move_to, line_to, quad_to, curve_to, close_path } from './engine/path'
@@ -31,7 +32,7 @@ import { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
 import { Plot, BarPlot, Legend, LegendItem, OuterLabel } from './elems/plot'
-import { TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './elems/document'
+import { TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './elems/document'
 import { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
 import { sample_curve, sample_points } from './lib/sampling'
 import { linear_ticks, format_tick } from './lib/ticks'
@@ -46,14 +47,14 @@ function evaluation_scope({ scope = {}, seed }: EvaluateOptions): Record<string,
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
-    Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Group, Rect, RoundedRect, Square, Circle, Ellipse,
+    Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Grid, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
     Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
     CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,
-    TextStack, TextRow, TextCol, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
+    TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
     SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,

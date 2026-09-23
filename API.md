@@ -9,6 +9,7 @@ first example, see the [package README](./README.md).
 - [Elements and layout passes](#elements-and-layout-passes)
 - [Box composition](#box-composition)
 - [Stacks](#stacks)
+- [Grids](#grids)
 - [Positioned groups](#positioned-groups)
 - [Text and fonts](#text-and-fonts)
 - [Shapes and paths](#shapes-and-paths)
@@ -334,7 +335,7 @@ pass resolves shared style and sizing, runs the layout method, validates its siz
 and caches the fragment. Insets, placement, and decoration belong to elements.
 Element-specific properties are interpreted by the element's layout method.
 The direct stack parent interprets a child's `basis`, `grow`, and `shrink`.
-Stacks and single-content containers interpret `align_self`; these placement
+Stacks, grids, and single-content containers interpret `align_self`; these placement
 properties introduce no policy in the layout pass and do not inherit.
 Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
 do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
@@ -698,6 +699,57 @@ available width. Set `basis` or `min_width` on growing items to choose useful
 breakpoints. `gap` separates items; `line_gap` defaults to `gap`. Each row applies
 ordinary flex and alignment. A natural-width request produces a single row.
 
+## Grids
+
+`Grid` places children row by row with shared column widths and content-sized rows.
+`TextGrid` uses the same layout, converts strings/numbers to Text at construction,
+and defaults to an `em(0.6)` gap. Both are exported and available in JSX.
+
+```jsx
+<Grid columns={2} width={em(24)} gap={em(1)} align="fill">
+  <TextFrame>First panel</TextFrame>
+  <TextFrame>A longer panel that wraps within its column.</TextFrame>
+  <TextFrame>Third panel</TextFrame>
+</Grid>
+```
+
+| Grid prop | Meaning |
+|---|---|
+| `columns` | Positive count (default `1`) for equal columns, or a nonempty array of `Length` / `"auto"` tracks. Maximum 100000 columns. |
+| `gap` | Row and column spacing, default `0` on Grid, `em(0.6)` on TextGrid. |
+| `column_gap`, `row_gap` | Override spacing on one axis. |
+| `align` | Two-axis cell alignment, default `{ x: "fill", y: "start" }`. Children can override it with `align_self`. |
+
+Equal columns divide a finite width offer after subtracting column gaps. With no
+offer, each column uses the widest natural cell, enlarged by an own minimum width
+if needed. An incomplete final row retains the full column structure. An empty
+Grid hugs zero unless its own sizing reserves space.
+
+An explicit track array, such as `[em(6), "auto", em(12)]`, determines both count
+and widths. Auto columns use their widest natural cell. These tracks do not flex
+to consume an offer, and their combined width sets the natural Grid width.
+Numeric tracks are fractional lengths of the selected width after column gaps;
+`[0.25, 0.75]` tiles it in those proportions. They require a finite width or offer.
+Column gaps reference that width before gaps; fractional row gaps require an
+established Grid height. Absolute/em gaps work on natural axes.
+
+Cells are measured at the selected widths before row heights are chosen. The
+column width is the child's percentage reference; the row height stays indefinite
+throughout measurement, so percentage cell heights and vertical padding report an
+unresolved dependency. A natural column also cannot be sized by a percentage of
+itself. Cell `height="fill"` or vertical fill/stretch can occupy the selected row
+height, keeping the measured width fixed. Fill respects explicit sizes and limits;
+stretch overrides them. Rows never distribute spare Grid height. Tracks remain
+fixed if finishing the Grid's own aspect or limits changes its frame.
+
+Null/boolean children and blank JSX whitespace are skipped; nested arrays flatten.
+Use `<Box />` for an empty cell. Overflow is retained. There are no spans, baseline
+groups, automatic column counts, flex track weights, or inferred overall aspect.
+Child `basis`/`grow`/`shrink` are not Grid track settings.
+
+See the [Grid reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Grid.md)
+and [grid tests](./test/grid.ts) for the sizing contract.
+
 ## Positioned groups
 
 `Group` is a canvas for independently positioned children. It establishes its
@@ -770,8 +822,8 @@ Clipping affects visible ink and leaves allocations and unclipped overflow inspe
 See the [Group implementation](./src/elems/group.ts) and the
 [canvas](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Group.md),
 [anchors](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/group_anchors.md), and
-[clipping](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/group_clip.md) examples. Horizontal stacks support `wrap` and `line_gap`. Grid tracks remain future work;
-use nested stacks or positioned children for grids.
+[clipping](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/group_clip.md) examples. Horizontal stacks support `wrap` and `line_gap`;
+Grid supplies shared columns across rows.
 
 ## Text and fonts
 
@@ -1045,7 +1097,7 @@ ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
 | Sampling | [SymLine](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/SymLine.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
-| Text and slides | TextStack/Row/Col, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
+| Text and slides | TextStack/Row/Col, TextGrid, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
 `Attach` uses `at` to select a point along the content edge and `child_anchor`
 to select the attachment's own point along that edge; both default to 0.5. The
@@ -1254,6 +1306,7 @@ inspection (`inspect.ts`). Package consumers should import from `@gum-jsx/core`.
 | Queries, caches, resources, and diagnostics | [pass.ts](./src/engine/pass.ts) |
 | Box, root Svg, and explicit fitting | [box.ts](./src/elems/box.ts), [Svg](./src/elems/svg.ts) |
 | Stack queries versus pure flex allocation | [stack.ts](./src/elems/stack.ts), [flex.ts](./src/lib/flex.ts) |
+| Shared grid columns and content-sized rows | [grid.ts](./src/elems/grid.ts), [grid tests](./test/grid.ts) |
 | Positioned canvas and direct-child metadata | [group.ts](./src/elems/group.ts) |
 | Text preparation/reflow and font adapter | [text.ts](./src/elems/text.ts), [fonts.ts](./src/engine/fonts.ts) |
 | Shapes, path commands, drawing, and immutable results | [shapes.ts](./src/elems/shapes.ts), [path.ts](./src/engine/path.ts), [drawing.ts](./src/engine/drawing.ts), [fragment.ts](./src/engine/fragment.ts) |
