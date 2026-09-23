@@ -1,8 +1,30 @@
 import assert from 'node:assert/strict'
-import { evaluate, LayoutPass, Text, element_children } from '../src/index'
+import { evaluate, evaluate_prelude, LayoutPass, Text, element_children } from '../src/index'
 import { ErrorRuntime } from '../src/lib/errors'
 
 const tests: Record<string, () => void> = {
+  'preludes expose declarations and JSX helpers with reusable closures'() {
+    let calls = 0
+    const scope = evaluate_prelude(`
+      record()
+      const { color } = settings
+      const [size] = [px(24)]
+      let counter = 0
+      function Label() {
+        return <Text color={color} font_size={size}>{++counter}</Text>
+      }
+    `, { scope: { record: () => calls++, settings: { color: 'navy' } } })
+    const first = evaluate('<Label />', { scope }), second = evaluate('<Label />', { scope })
+    assert.equal(calls, 1)
+    assert.equal(first.props.color, 'navy')
+    assert.deepEqual(first.props.font_size, { unit: 'px', value: 24 })
+    assert.deepEqual(first.props.children, [1])
+    assert.deepEqual(second.props.children, [2])
+    assert.equal(evaluate('const color = "red"; return color', { scope }), 'red')
+    assert.equal(scope.color, 'navy')
+    assert.deepEqual(evaluate_prelude(''), {})
+    assert.throws(() => evaluate_prelude('throw new Error("prelude failed")', { name: 'shared.jsx' }), ErrorRuntime)
+  },
   'dashed JSX attributes produce the same properties and layout as underscore attributes'() {
     const pass = new LayoutPass()
     const dashed = evaluate('<Text font-size={px(24)} font-weight={bold} line-height={em(1.5)} justify="center">April-June</Text>')

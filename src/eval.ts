@@ -1,5 +1,5 @@
 // The existing parser depends only on Acorn and source-error helpers, not layout.
-import { runJSX } from './lib/parse'
+import { runJSX, runPrelude } from './lib/parse'
 import { Element, define_element, define_component, element_children } from './engine/element'
 import { prefix_split, prefix_join } from './lib/props'
 import { Svg } from './elems/svg'
@@ -40,11 +40,9 @@ import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, 
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>
 
-// Evaluation returns the source's result unchanged, without performing layout.
-function evaluate(code: string, options: EvaluateOptions = {}): any {
-  const { scope = {}, name = 'gum.jsx', seed } = options
+function evaluation_scope({ scope = {}, seed }: EvaluateOptions): Record<string, unknown> {
   const rng = new RNG(seed)
-  const bindings = {
+  return {
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
@@ -65,8 +63,17 @@ function evaluate(code: string, options: EvaluateOptions = {}): any {
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...scope,
   }
-  return runJSX(code, bindings, false, name)
 }
 
-export { evaluate }
+// Evaluation returns the source's result unchanged, without performing layout.
+function evaluate(code: string, options: EvaluateOptions = {}): any {
+  return runJSX(code, evaluation_scope(options), false, options.name ?? 'gum.jsx')
+}
+
+/** Evaluate shared declarations once and return their bindings for later evaluations. */
+function evaluate_prelude(code: string, options: EvaluateOptions = {}): Record<string, unknown> {
+  return runPrelude(code, evaluation_scope(options), false, options.name ?? 'prelude.jsx')
+}
+
+export { evaluate, evaluate_prelude }
 export type { EvaluateOptions }

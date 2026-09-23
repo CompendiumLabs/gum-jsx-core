@@ -234,6 +234,12 @@ existing Acorn parser; no old element or layout engine is used. Extra scope valu
 belong to this evaluation. This runs ordinary trusted JavaScript, with its normal
 access to the host runtime.
 
+`evaluate_prelude(code, { scope?, name?, seed? })` evaluates declarations and returns
+their top-level bindings. Pass them in `evaluate`'s `scope` to share data and JSX
+helpers across figures. Each call runs the prelude once; reuse the returned
+bindings to retain shared objects and closures. Prelude evaluation includes the
+same built-in helpers as `evaluate`.
+
 `Svg` accepts one content element and optional pixel width and height, written as
 `px(800)` or `"800px"`. Each
 omitted axis hugs the child's measured allocation, including any surrounding Boxes.
