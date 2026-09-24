@@ -221,7 +221,7 @@ Named constants are available both in evaluated JSX and as imports from
 `lightgray`, `darkgray`, `slate`, and `e`, `pi`, `tau`, `phi`, `r2d`, `d2r`.
 For example, `<Text font-family={sans} font-weight={bold} color={blue}>Hello</Text>`.
 Colors use the original Gum palette; see the
-[style reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Style.md) for their exact values.
+[style reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/style.md) for their exact values.
 
 JSX attribute names also accept dashes: `font-size` becomes `font_size`, and
 `stroke-dasharray` becomes `stroke_dasharray`. This applies to built-in elements
@@ -313,7 +313,7 @@ source data belongs in props, with no ordinary instance field initializers.
 `Element` is available inside JSX as well as through imports. `define_element(name,
 layout, defaults?, options?)` remains a convenience using the same machinery; its
 defaults are captured at the factory call. Both forms support normalization and
-data bounds; see [Custom elements](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/CustomElements.md).
+data bounds; see [Custom elements](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/custom_elements.md).
 The layout function receives readonly props and a frozen query:
 
 | Query field | Meaning |
@@ -345,7 +345,7 @@ content box, when provided, in dashed blue. The flag applies only to that elemen
 children can opt in separately. SVG output draws the boxes above the artwork,
 following placement transforms and bypassing content clips within the viewport.
 These diagnostics do not change layout, ink, or overflow and also appear in PNG
-and terminal output. See [Debugging layout](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Rendering.md#debugging-layout).
+and terminal output. See [Debugging layout](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/rendering.md#debugging-layout).
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
@@ -879,7 +879,7 @@ For exact spaces or blank lines, use an explicit string with `whitespace="pre"`,
 such as `<Text whitespace="pre">{'  Revenue  \n'}</Text>`. The whitespace prop
 controls layout after parsing; it does not disable source normalization. Element
 containers and text stacks ignore blank strings between children. See the
-[JSX reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/JSX.md#jsx-whitespace) for more examples.
+[JSX reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/jsx.md#jsx-whitespace) for more examples.
 
 Automatic hyphenation, emergency word splitting, and full paragraph bidi are
 not currently supported. Unknown families and missing glyphs produce errors
@@ -1006,7 +1006,7 @@ allowed: `<Line from={[px(12), 0.5]} to={[1, 0.5]} />`. `zip(xs, ys)` can be pas
 directly as `points`. Callbacks and generated geometry retain named `{x,y}` records.
 TypeScript exports `PointValue` for numeric inputs and `PositionValue` for lengths;
 `Point` and `Position` remain record types. See the
-[point values reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/PointValues.md) and its runnable example.
+[point values reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/point_values.md) and its runnable example.
 
 ```jsx
 <Path width={px(120)} height={px(60)} stroke-width={px(2)}
@@ -1041,11 +1041,11 @@ original public utility set is available alongside additional Math aliases,
 
 | Group | Reference and examples |
 |---|---|
-| Scalars, reductions, interpolation | [Math helpers](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/MathHelpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
-| Sequences and arrays | [Arrays](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
-| Vector and complex arithmetic | [Vectors](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
-| Color interpolation | [Colors](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Colors.md): interp, palette |
-| Reproducible samples | [Random](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Random.md): setSeed, random, uniform, normal, integer, RNG |
+| Scalars, reductions, interpolation | [Math helpers](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/math_helpers.md): sin/cos, log/exp, sum/mean, norm, clamp, rescale, sigmoid, rounder |
+| Sequences and arrays | [Arrays](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/arrays.md): range, linspace, zip, enumerate, repeat, meshgrid, lingrid, reshape, split, concat, slice |
+| Vector and complex arithmetic | [Vectors](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/vectors.md): polar/polard, add2/sub2/mul2/div2, N-dimensional equivalents, addc/subc/mulc/divc, conjc/normc/argc |
+| Color interpolation | [Colors](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/colors.md): interp, palette |
+| Reproducible samples | [Random](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/random.md): setSeed, random, uniform, normal, integer, RNG |
 
 `range` excludes its stop; `linspace` includes its endpoint by default and keeps
 the existing 101-sample default. Pass false as its fourth argument for periodic
@@ -1127,7 +1127,7 @@ defaults to 101. SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,
-and [coordinate helpers](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Coordinates.md) can also be
+and [coordinate helpers](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/coordinates.md) can also be
 used directly. `static normalize(input)` consumes raw input once before source
 defaults are merged; `Element<SourceProps, InputProps>` types the two separately.
 The same hook is available through define_element's fourth options argument.
@@ -1237,7 +1237,7 @@ prefix, followed by the remaining props, without mutating the input. The longest
 matching prefix wins; optional exact `keep` keys stay in the remaining props.
 Joining adds a prefix to each key. Values remain unmodified, including units and
 callbacks. `Prefixed<'label', TextOptions>` derives the corresponding TypeScript
-prop names and value types. See [Custom elements](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/CustomElements.md).
+prop names and value types. See [Custom elements](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/custom_elements.md).
 
 Scopes are constructor-input syntax. `static defaults` still contains canonical
 source props and merges after normalization; for example Arrow defaults use

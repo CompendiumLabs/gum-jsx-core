@@ -66,7 +66,7 @@ Text uses bundled IBM Plex Sans and Mono faces and is normally emitted as glyph
 paths. Bun loads font files on demand. In a browser, serve the bundled font
 assets, call `await fonts.load()` on a `Fonts` instance, and pass it to
 `render_element(element, { fonts })` before rendering text. See the
-[fonts guide](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/text/Fonts.md) for resource setup.
+[fonts guide](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/fonts.md) for resource setup.
 
 Emoji are measured with a bundled fallback face and emitted as live SVG text.
 Their appearance depends on the display host's emoji font; PDF export currently
