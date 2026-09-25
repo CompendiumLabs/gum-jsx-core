@@ -3,6 +3,8 @@ import { drawing_ink, copy_drawing } from './drawing'
 import type { Drawing } from './drawing'
 import { copy_math_metrics } from './math'
 import type { MathMetrics } from './math'
+import { copy_path, path_bounds } from './path'
+import type { PathCommand } from './path'
 import {
   make_size, make_point, make_rect, make_clip, make_insets, make_transform, read_point,
   union_rects, intersect_rects, transform_rect, bounds_overflow,
@@ -34,6 +36,8 @@ interface Fragment<Draw = Drawing> {
   readonly children: readonly Placement<Draw>[]
   readonly content?: Rect
   readonly clip?: Clip
+  // Local nonzero-winding path; intersects clip when both are present.
+  readonly clip_path?: readonly PathCommand[]
   readonly connection?: Connection
   // Nested networks keep their node identifiers local.
   readonly connection_scope?: boolean
@@ -60,6 +64,7 @@ type FragmentSpec = Readonly<{
   children?: readonly Placement[]
   content?: Rect
   clip?: Clip
+  clip_path?: readonly PathCommand[]
   connection?: Connection
   connection_scope?: boolean
 }>
@@ -124,11 +129,18 @@ function make_fragment(spec: FragmentSpec): Fragment {
     transform_rect(content_bounds(child.fragment), child.offset, child.transform)))
 
   const clip = spec.clip === undefined ? undefined : make_clip(spec.clip, spec.clip.radius)
+  const clip_path = spec.clip_path === undefined ? undefined : copy_path(spec.clip_path)
+  const path_clip_bounds = clip_path === undefined ? undefined : path_bounds(clip_path)
+  const clipped_bounds = (rect: Rect | null): Rect | null => {
+    if (path_clip_bounds === null) return null
+    if (clip !== undefined) rect = intersect_rects(rect, clip)
+    return path_clip_bounds === undefined ? rect : intersect_rects(rect, path_clip_bounds)
+  }
   // Only declared outsets propagate, and a clip hides whatever it cuts away.
   const reserved = union_rects(outset_bounds({ size, outset: make_insets(spec.outset) }), ...children.map(child => {
     if (!child.fragment.outset) return null
     const rect = transform_rect(outset_bounds(child.fragment), child.offset, child.transform)
-    return clip === undefined ? rect : intersect_rects(rect, clip)
+    return clipped_bounds(rect)
   }))
   const outset = bounds_overflow(size, reserved)
   const content = spec.content === undefined ? undefined
@@ -145,12 +157,13 @@ function make_fragment(spec: FragmentSpec): Fragment {
     ...(spec.debug === true ? { debug: true } : {}),
     size, guides: Object.freeze(guides),
     ...(spec.math === undefined ? {} : { math: copy_math_metrics(spec.math) }),
-    ink: clip === undefined ? ink : intersect_rects(ink, clip),
+    ink: clipped_bounds(ink),
     overflow: bounds_overflow(size, bounds),
     ...(Object.values(outset).some(Boolean) ? { outset } : {}),
     draw: Object.freeze(draw), children: Object.freeze(children),
     ...(content === undefined ? {} : { content }),
     ...(clip === undefined ? {} : { clip }),
+    ...(clip_path === undefined ? {} : { clip_path }),
     ...(connection === undefined ? {} : { connection }),
     ...(spec.connection_scope === true ? { connection_scope: true } : {}),
   }

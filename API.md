@@ -188,6 +188,7 @@ The [fragment schema](./src/engine/fragment.ts) contains only the result for one
 - `draw`: resolved rectangle, ellipse, and path drawing records, including glyph outlines.
 - `children`: child fragments with local offsets and optional affine transforms.
 - `clip`: an optional local rectangle with optional rounded corners, clipping the fragment and its descendants.
+- `clip_path`: optional local pixel path commands using nonzero winding, clipping the fragment and its descendants. Intersects `clip` when both are present; an empty path hides all paint.
 - `name`: an optional inspection label, assigned from the element type by the pass.
 - `label`: optional accessible content; Text retains its normalized logical string here.
 
@@ -199,7 +200,7 @@ mutable source element or layout-pass state.
 `make_fragment` owns and freezes drawing and placement data. It aggregates local
 ink and child ink, transforms child bounds, and retains both layout and paint
 overflow before clipping. Its `ink` is the visible result after its own clip.
-Rounded clips render their actual curves; their reported ink uses a conservative
+Rounded and path clips render their actual curves; their reported ink uses a conservative
 intersection with the clip's bounding rectangle. Singular transforms paint nothing.
 `place_fragment` preserves an owned fragment's identity; external records are
 normalized first. `PixelRect` names the public geometry type, leaving `Rect` for
@@ -1313,7 +1314,7 @@ from 0 to 100, or to `'full'` for JavaScript's unrounded number strings. Formatt
 omits trailing zeroes and changes only serialized output, not layout or fragment geometry.
 For example, `precision: 3` formats `123.45678` as `123.457`; `precision: 0` rounds to whole numbers.
 It emits escaped SVG, resolved drawing geometry, explicit placement transforms,
-and rectangular clip definitions. Identity placements and attribute-free fragment
+and rectangular or path clip definitions. Identity placements and attribute-free fragment
 groups are omitted; transforms, clipping, and accessible labels retain their groups.
 The fragment tree remains intact for layout and inspection. Rendering performs no
 layout or font work. Definition

@@ -31,8 +31,9 @@ function inspect_fragment(fragment: Fragment, options: InspectOptions = {}): str
     const content = node.content
     const box = content ? ` content=${number(content.x)},${number(content.y)},${number(content.width)},${number(content.height)}` : ''
     const connection = node.connection ? ` connection=${record(node.connection)}` : ''
+    const clipped = node.clip !== undefined || node.clip_path !== undefined
     lines.push(`${'  '.repeat(depth)}${name} ${number(width)}×${number(height)} ${location}${matrix}`
-      + ` ink=${ink}${insets_text('overflow', number, node.overflow)}${insets_text('outset', number, node.outset)}${guides}${math}${box}${connection}${node.clip ? ' clipped' : ''}`)
+      + ` ink=${ink}${insets_text('overflow', number, node.overflow)}${insets_text('outset', number, node.outset)}${guides}${math}${box}${connection}${clipped ? ' clipped' : ''}`)
     for (const child of node.children) {
       const transform = child.transform ? ` matrix(${child.transform.map(number).join(',')})` : ''
       visit(child.fragment, depth + 1, child.offset, transform)

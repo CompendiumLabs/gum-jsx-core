@@ -90,6 +90,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   }
   const definitions: string[] = []
   const clips = new Map<Fragment, string>()
+  const path_clips = new Map<Fragment, string>()
   const debug: string[] = []
 
   // Shared fragments reuse their local clip definition across placements.
@@ -110,6 +111,16 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       }
       clip = ` clip-path="url(#${id})"`
     }
+    let path_clip = ''
+    if (node.clip_path !== undefined) {
+      let id = path_clips.get(node)
+      if (!id) {
+        id = `${id_prefix}-path-clip-${path_clips.size}`
+        path_clips.set(node, id)
+        definitions.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path d="${path_data(node.clip_path, number)}"/></clipPath>`)
+      }
+      path_clip = ` clip-path="url(#${id})"`
+    }
     const draw = node.draw.map(item => render_drawing(item, number))
     const children = node.children.map(child => {
       const { x, y } = child.offset
@@ -125,7 +136,8 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
 
     // Layout hierarchy needs no matching SVG group unless it carries semantics.
     const label = node.label === undefined ? '' : ` role="img" aria-label="${escape_xml(node.label)}"`
-    const body = [...draw, ...children].join('')
+    let body = [...draw, ...children].join('')
+    if (path_clip) body = `<g${path_clip}>${body}</g>`
     return clip || label ? `<g${clip}${label}>${body}</g>` : body
   }
 
