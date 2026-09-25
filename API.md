@@ -241,6 +241,46 @@ helpers across figures. Each call runs the prelude once; reuse the returned
 bindings to retain shared objects and closures. Prelude evaluation includes the
 same built-in helpers as `evaluate`.
 
+`new Evaluator({ scope?, name?, seed? })` configures reusable bindings and defaults.
+Its `evaluate(code, options?)` and `evaluate_prelude(code, options?)` methods accept
+the same `EvaluateOptions` as the standalone functions. Core bindings are always
+included; constructor scope overrides core bindings, and per-call scope overrides
+constructor scope. A binding explicitly set to `undefined` still overrides an
+earlier value. Local declarations can shadow any supplied binding.
+
+```ts
+import { Evaluator } from '@gum-jsx/core'
+import * as math from '@gum-jsx/math'
+
+const evaluator = new Evaluator({ scope: math })
+const shared = evaluator.evaluate_prelude(`
+  function Formula({ expression }) {
+    return <Latex>{expression}</Latex>
+  }
+`, { name: 'prelude.jsx' })
+const source = evaluator.evaluate('<Formula expression={expression} />', {
+  name: 'figure.jsx',
+  scope: { ...shared, expression: 'a+b=c' },
+})
+```
+
+The readonly `scope`, `name`, and `seed` properties expose the configured values.
+The constructor makes a shallow, frozen copy of the binding map. Replacing a
+binding in the original map does not change the evaluator, but supplied objects
+and closures are shared by reference. Evaluation does not persist local bindings
+or automatically install prelude declarations.
+
+Each call starts an independent random stream. Omitted or `undefined` per-call
+`seed` and `name` use the constructor defaults. Without a configured seed, the
+seed is 42; without a configured name, evaluation uses `gum.jsx` and prelude
+evaluation uses `prelude.jsx`. Calling `setSeed` inside evaluated code affects
+that call's stream only. A closure returned from a prelude can retain that
+prelude's stream, just as it retains other local state.
+
+Standalone evaluation functions delegate to a private, core-only evaluator.
+Creating an evaluator or importing an extension package does not change their
+bindings. Evaluators perform no font loading, layout, or rendering.
+
 `Svg` accepts one content element and optional pixel width and height, written as
 `px(800)` or `"800px"`. Each
 omitted axis hugs the child's measured allocation, including any surrounding Boxes.

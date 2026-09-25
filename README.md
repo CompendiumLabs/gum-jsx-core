@@ -35,6 +35,34 @@ produce a `{ kind: 'value', value }` result instead.
 Evaluation executes JavaScript in the host environment. Use trusted source or
 provide a separate isolation boundary in your application.
 
+## Reusable evaluators
+
+Configure an `Evaluator` once to include package exports, custom components, or
+shared data in every evaluation:
+
+```ts
+import { Evaluator } from '@gum-jsx/core'
+import * as math from '@gum-jsx/math'
+
+const evaluator = new Evaluator({ scope: math, seed: 7 })
+const formula = evaluator.evaluate('<Latex>{expression}</Latex>', {
+  name: 'formula.jsx',
+  scope: { expression: 'a+b=c' },
+})
+```
+
+Core bindings are always included. Per-call scope overrides the evaluator's
+bindings, which override core bindings. The constructor copies the binding map;
+objects and functions in it retain their identities. Each call starts fresh
+locals and a random stream using the configured seed (42 by default).
+`name` and `seed` can also be overridden per call.
+
+`evaluator.evaluate_prelude(code)` uses the same environment and returns declared
+bindings for explicit reuse through a later call's `scope`. It does not add them
+to the evaluator. The standalone `evaluate` and `evaluate_prelude` functions
+remain available with core bindings and per-call options. Font loading and layout
+are configured separately from evaluation.
+
 ## Direct construction and layout
 
 JSX is optional. Element exports are constructors with the same props:

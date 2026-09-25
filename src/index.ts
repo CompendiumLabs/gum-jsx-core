@@ -84,7 +84,7 @@ export type {
 } from './render'
 export { inspect_fragment } from './inspect'
 export type { InspectOptions } from './inspect'
-export { evaluate, evaluate_prelude } from './eval'
+export { Evaluator, evaluate, evaluate_prelude } from './eval'
 export type { EvaluateOptions } from './eval'
 export { Graph } from './elems/graph'
 export type { GraphProps } from './elems/graph'
