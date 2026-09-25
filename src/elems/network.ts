@@ -31,7 +31,7 @@ type EdgeProps = Omit<ArrowProps, 'from' | 'to'> & Readonly<{
   gap?: Length
 }>
 type EdgeData = Omit<EdgeProps, 'start' | 'end'> & Readonly<{ start: string; end: string }>
-type NetworkProps = GraphProps
+type NetworkProps = Omit<GraphProps, 'projection'>
 // Components adopt a source type's layout function, preserving this capability
 // even when the resulting element has a different name or prototype.
 const edge_layouts = new WeakSet<Element['type']['layout']>()

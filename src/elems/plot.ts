@@ -44,7 +44,7 @@ type LegendProps = BoxProps & Prefixed<'label', TextOptions> & Readonly<{
   gap?: Length; badge_width?: Length; label_style?: TextOptions
 }>
 type LegendOptions = Omit<LegendProps, 'children'>
-type PlotProps = GraphProps & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
+type PlotProps = Omit<GraphProps, 'projection'> & Prefixed<'axis' | 'xaxis' | 'yaxis', AxisProps>
   & Prefixed<'tick', StyleSpec> & Prefixed<'label' | 'title' | 'xlabel' | 'ylabel', TextOptions>
   & Prefixed<'grid' | 'xgrid' | 'ygrid', MeshProps> & Prefixed<'legend', LegendOptions> & Readonly<{
   axis?: boolean; xaxis?: boolean | AxisProps; yaxis?: boolean | AxisProps

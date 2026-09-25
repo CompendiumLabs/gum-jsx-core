@@ -24,7 +24,7 @@ import * as arrays from './lib/arrays'
 import * as vectors from './lib/vectors'
 import { interp, palette } from './lib/colors'
 import { RNG } from './lib/random'
-import { Graph } from './elems/graph'
+import { Graph, graph_children } from './elems/graph'
 import { Node, Edge, Network } from './elems/network'
 import { Overlay, TransformBox, Rotate, Attach, Anchor } from './elems/placement'
 import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './elems/marks'
@@ -37,7 +37,8 @@ import { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from
 import { sample_curve, sample_points } from './lib/sampling'
 import { linear_ticks, format_tick } from './lib/ticks'
 import { spline1d, spline2d } from './lib/curves'
-import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point } from './engine/coordinates'
+import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point } from './engine/coordinates'
+import { Projection } from './engine/projection'
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>
 
@@ -59,7 +60,8 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
     em, px, Element, define_element, define_component, element_children, prefix_split, prefix_join,
-    infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point,
+    infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point,
+    Projection, graph_children,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...defaults.scope, ...scope,

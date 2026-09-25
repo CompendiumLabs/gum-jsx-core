@@ -60,15 +60,16 @@ function bar_corners(bar: BarDatum, direction = 'vertical') {
 function bars_layout(props: BarsData, query: LayoutQuery) {
   const { size, point } = mark_context(props, query)
   const shared_radius = resolve_rect_radius(props.border_radius ?? 0, size, query.measure)
-  const draw = props.bars.map(bar => {
+  const draw = props.bars.flatMap(bar => {
     const [a, b] = bar_corners(bar, props.direction).map(point)
+    if (!a || !b) return []
     const rect = make_rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y))
     const style = resolve_style(bar.style, query.style, query.measure)
     const paint = resolve_paint(style, size, query.measure)
     // Radius is geometry, so it must be consumed separately from inherited paint.
     const radius = bar.style.border_radius === undefined ? shared_radius
       : resolve_rect_radius(bar.style.border_radius, size, make_measure(query.measure, { font_size: style.font_size }))
-    return draw_rect(rect, paint, radius)
+    return [draw_rect(rect, paint, radius)]
   })
   return make_fragment({ size, draw })
 }

@@ -1,5 +1,7 @@
 import { nonnegative } from '../lib/checks'
 import { DEFAULTS } from '../engine/defaults'
+import { coordinate_point, point_bounds } from '../engine/coordinates'
+import type { GeometrySpace } from '../engine/coordinates'
 import { draw_rect, draw_ellipse, draw_path } from '../engine/drawing'
 import { Element, define_component, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -22,9 +24,9 @@ type RectRadius = Radius | RadiusSides
 type RectProps = ElementProps & Readonly<{ border_radius?: RectRadius }>
 type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>
 type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>
-type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue }>
-type PolylineProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>
-type PolygonProps = PolylineProps
+type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue; space?: GeometrySpace }>
+type PolygonProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>
+type PolylineProps = PolygonProps & Readonly<{ space?: GeometrySpace }>
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>
 
 // Only shapes with an intrinsic ratio supply a default aspect. Geometry references
@@ -43,6 +45,23 @@ function resolve_position(value: PositionValue, size: Size, measure: LengthConte
     resolve_length(point.x, measure, size.width, `${path}.x`),
     resolve_length(point.y, measure, size.height, `${path}.y`),
   )
+}
+
+// These shapes keep their local default and explicitly opt into pairwise data mapping.
+function line_point(query: LayoutQuery, size: Size, space: GeometrySpace = 'local') {
+  if (!['local', 'data'].includes(space)) throw new TypeError('Unknown geometry space')
+  if (space === 'data' && !query.coordinates) throw new TypeError('Data geometry needs a coordinate context such as Graph or Plot')
+  return (value: PositionValue, path: string) => space === 'local'
+    ? resolve_position(value, size, query.measure, path)
+    : coordinate_point(read_point(value, `${query.measure.path}.${path}`), size, query.measure, query.coordinates)
+}
+
+function line_bounds(space: GeometrySpace | undefined, points: readonly PositionValue[]) {
+  if (space !== 'data') return null
+  return point_bounds(points.map(value => {
+    const point = read_point(value)
+    return typeof point.x === 'number' && typeof point.y === 'number' ? point as Point : null
+  }))
 }
 
 // Unit records are scalar lengths; coordinate records and tuples are pairs.
@@ -141,28 +160,42 @@ class Ellipse extends Element<EllipseProps> {
 }
 
 class Line extends Element<LineProps> {
+  static data_bounds(props: LineProps) {
+    return line_bounds(props.space, [props.from ?? [0, 0], props.to ?? [1, 1]])
+  }
   static layout(props: LineProps, query: LayoutQuery) {
     const { size, paint } = shape_context(props, query)
-    const from = resolve_position(props.from ?? { x: 0, y: 0 }, size, query.measure, 'from')
-    const to = resolve_position(props.to ?? { x: 1, y: 1 }, size, query.measure, 'to')
-    const commands: PathCommand[] = [{ kind: 'M', ...from }, { kind: 'L', ...to }]
+    const point = line_point(query, size, props.space)
+    const from = point(props.from ?? { x: 0, y: 0 }, 'from')
+    const to = point(props.to ?? { x: 1, y: 1 }, 'to')
+    const commands: PathCommand[] = from && to ? [{ kind: 'M', ...from }, { kind: 'L', ...to }] : []
     return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] })
   }
 }
 
 // Closing is a path command, so the same point handling serves both primitives.
-function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false) {
+function poly_layout(props: PolygonProps, query: LayoutQuery, closed = false, space: GeometrySpace = 'local') {
   const { size, paint } = shape_context(props, query)
-  const commands: PathCommand[] = (props.points ?? []).map((point, index) => ({
-    kind: index === 0 ? 'M' : 'L',
-    ...resolve_position(point, size, query.measure, `points[${index}]`),
-  }))
+  const point = line_point(query, size, space)
+  const commands: PathCommand[] = []
+  let started = false
+  for (const [index, value] of (props.points ?? []).entries()) {
+    const projected = point(value, `points[${index}]`)
+    if (!projected) { started = false; continue; }
+    commands.push({ kind: started ? 'L' : 'M', ...projected })
+    started = true
+  }
   if (closed && commands.length > 1) commands.push({ kind: 'Z' })
   return make_fragment({ size, draw: [draw_path(commands, paint)] })
 }
 
 class Polyline extends Element<PolylineProps> {
-  static layout = poly_layout
+  static data_bounds(props: PolylineProps) {
+    return line_bounds(props.space, props.points ?? [])
+  }
+  static layout(props: PolylineProps, query: LayoutQuery) {
+    return poly_layout(props, query, false, props.space)
+  }
 }
 
 class Polygon extends Element<PolygonProps> {

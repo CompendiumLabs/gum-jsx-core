@@ -7,6 +7,7 @@ import type { Alignment } from '../lib/composition'
 import type { LayoutQuery } from './pass'
 import type { StyleSpec } from './style'
 import type { DataBounds } from './coordinates'
+import { Projection } from './projection'
 
 type Child = Element | string | number | boolean | null | undefined | readonly Child[]
 type ElementProps = SizeSpec & FitSpec & StyleSpec & FlexSpec & PositionSpec & Readonly<{
@@ -33,9 +34,9 @@ type ElementOptions<Props, Input> = Readonly<{
   data_bounds?: (props: Readonly<Props>) => DataBounds | null
 }>
 
-// Snapshot source data while preserving immutable element identities in the DAG.
+// Snapshot source data while preserving immutable element and projection identities.
 function copy_data<T>(value: T, active = new Set<object>()): T {
-  if (value instanceof Element) return value
+  if (value instanceof Element || value instanceof Projection) return value
   if (typeof value === 'function') {
     throw new TypeError('Define behavior on the element type; source data cannot contain functions')
   }

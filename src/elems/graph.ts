@@ -1,5 +1,5 @@
 import { resolve_alignment } from '../lib/composition'
-import { coordinate_length, infer_coordinates } from '../engine/coordinates'
+import { coordinate_length, coordinate_point, infer_coordinates } from '../engine/coordinates'
 import type { Coordinates, CoordinateSpec } from '../engine/coordinates'
 import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -9,8 +9,14 @@ import type { Size } from '../engine/geometry'
 import { available, make_request, shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { child_measure } from '../engine/pass'
+import { Projection } from '../engine/projection'
+import type { ProjectionFunction } from '../engine/projection'
+import { px } from '../engine/units'
 
-type GraphProps = ElementProps & CoordinateSpec & Readonly<{ clip?: boolean }>
+type GraphProps = ElementProps & CoordinateSpec & Readonly<{
+  clip?: boolean; projection?: Projection | ProjectionFunction
+}>
+type GraphData = Omit<GraphProps, 'projection'> & Readonly<{ projection?: Projection }>
 
 // Graphs have a useful natural size, occupy offers, and derive an unoffered axis
 // from aspect. Explicit exact dimensions still override that preferred ratio.
@@ -33,25 +39,40 @@ function graph_children(elements: readonly Element[], query: LayoutQuery, size: 
 function graph_child(element: Element, query: LayoutQuery, size: Size,
   coordinates: Coordinates, index: number) {
   const request = make_request({ width: available(size.width), height: available(size.height) })
-  const fragment = query.child(element, request, size, index, { coordinates })
   const { x, y, anchor = 'start' } = element.props
   const measure = child_measure(element, query, index, size)
   const { path } = measure
   const align = resolve_alignment(anchor, `${path}.anchor`)
   if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
-  const left = x === undefined ? 0 : coordinate_length(x, 'x', size, measure, coordinates)
-  const top = y === undefined ? 0 : coordinate_length(y, 'y', size, measure, coordinates)
+  const position = coordinates.projection && (x !== undefined || y !== undefined)
+    ? coordinate_point([x ?? (typeof y === 'number' ? 0 : px(0)),
+      y ?? (typeof x === 'number' ? 0 : px(0))], size, measure, coordinates)
+    : make_point(x === undefined ? 0 : coordinate_length(x, 'x', size, measure, coordinates),
+      y === undefined ? 0 : coordinate_length(y, 'y', size, measure, coordinates))
+  if (!position) return place_fragment(make_fragment({ size: { width: 0, height: 0 } }))
+  const fragment = query.child(element, request, size, index, { coordinates })
+  const { x: left, y: top } = position
   return place_fragment(fragment,
     make_point(left - align.x * fragment.size.width, top - align.y * fragment.size.height))
 }
 
-class Graph extends Element<GraphProps> {
+class Graph extends Element<GraphData, GraphProps> {
+  static normalize({ projection, ...props }: GraphProps): GraphData {
+    if (projection !== undefined && !props.coord && (!props.xlim || !props.ylim)) {
+      throw new TypeError('Graph projection needs explicit xlim and ylim (or coord) in projected space')
+    }
+    return { ...props, ...(projection === undefined ? {} : {
+      projection: projection instanceof Projection ? projection : new Projection(projection),
+    }) }
+  }
   static data_bounds() {
     return null
   }
-  static layout(props: GraphProps, query: LayoutQuery) {
+  static layout(props: GraphData, query: LayoutQuery) {
     const size = graph_size(query)
-    const coordinates = query.prepare('coordinates', () => infer_coordinates(props.children, props))
+    const coordinates = query.prepare('coordinates', () => ({
+      ...infer_coordinates(props.children, props), ...(props.projection ? { projection: props.projection } : {}),
+    }))
     const children = graph_children(element_children(props.children), query, size, coordinates)
     const area = make_rect(0, 0, size.width, size.height)
     return make_fragment({ size, children, content: area, clip: props.clip ? area : undefined })

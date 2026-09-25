@@ -1125,9 +1125,30 @@ measure 480×320, and derive a missing axis from a 1.5 default aspect.
 
 New marks interpret numeric geometry as data inside Graph/Plot and as fractions
 outside. `space="local"` opts out; `space="data"` requires a graph. Existing
-Line/Polyline/Path retain local geometry; use CoordLine for a graph path. px/em
+Line and Polyline default to local geometry and accept `space="data"` to opt
+into pairwise coordinate mapping, including GeoMap projections. In data space
+their numeric points contribute to Graph/Plot limit inference. A hidden endpoint
+omits a Line; hidden vertices split a Polyline into separate runs. They project
+only supplied points. Path retains local geometry. px/em
 positions stay local. Graph directly positions annotations by data x/y and
 ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
+
+Graph also accepts `projection={([x, y]) => [u, v]}` or a core `Projection`
+instance. It projects numeric pairs before applying limits and flips. Supply
+explicit xlim/ylim (or coord) in output space. This supports polar coordinates
+without changing the marks. The optional `Coordinates.projection` travels through
+LayoutContext and participates in cache identity. `map_point` and
+`coordinate_point` return local `{x, y}` or null for an omitted point; the latter
+also accepts paired local lengths. Mixing data numbers and local lengths in one
+projected pair is an error. `coordinate_length` cannot project a single axis.
+
+Projection callbacks are pure, stable behavior retained by identity, and run
+during layout. Construct a new Projection when its behavior changes. The source
+snapshot preserves Projection objects alongside Element identities; arbitrary
+functions in source props remain prohibited. Projections map supplied points
+only, with no inverse or automatic path sampling. `unmap_point` rejects custom
+projections. Plot and Network retain Cartesian coordinate policies. See the
+[projections guide](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/projections.md).
 
 | Capability | Elements / reference |
 |---|---|

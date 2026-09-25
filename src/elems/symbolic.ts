@@ -95,6 +95,7 @@ class Field extends Element<FieldData, FieldProps> {
     let head: ReturnType<typeof resolve_arrow_head> | undefined
     for (const [index, vector] of props.vectors.entries()) {
       const a = point(vector.from), b = point(vector.to)
+      if (!a || !b) continue
       if (vector.shape) {
         const width = Math.hypot(b.x - a.x, b.y - a.y), height = length(props.shape_height ?? px(8))
         const fragment = query.child(vector.shape, make_request({ width: exact(width), height: exact(height) }),

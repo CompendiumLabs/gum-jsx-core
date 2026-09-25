@@ -12,6 +12,7 @@ import { make_measure, resolve_font_size, UnresolvedLengthError } from './units'
 import type { LengthContext, ReferenceBox } from './units'
 import { copy_coordinates } from './coordinates'
 import type { Coordinates } from './coordinates'
+import { projection_key } from './projection'
 import { copy_math_context } from './math'
 import type { MathContext } from './math'
 import { fitting_mode, fitting_requests, fit_fragment } from './fitting'
@@ -57,7 +58,8 @@ function query_key(
   request: LayoutRequest, style: Style, measure: LengthContext, epoch: number,
   coordinates?: Coordinates, math?: MathContext,
 ): string {
-  return JSON.stringify([request, style, measure.reference.width, measure.reference.height, epoch, coordinates, math])
+  return JSON.stringify([request, style, measure.reference.width, measure.reference.height, epoch,
+    coordinates, projection_key(coordinates?.projection), math])
 }
 
 class LayoutError extends Error {

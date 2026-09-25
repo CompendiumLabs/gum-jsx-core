@@ -5,10 +5,13 @@ import { make_point, read_point, read_insets } from './geometry'
 import type { Point, PointValue, Size, InsetSpec } from './geometry'
 import { resolve_length } from './units'
 import type { Length, LengthContext } from './units'
+import { Projection } from './projection'
 
 type Limit = readonly [number, number]
 type DataBounds = Readonly<{ xlim?: Limit; ylim?: Limit }>
-type Coordinates = Readonly<{ xlim: Limit; ylim: Limit; flip_x: boolean; flip_y: boolean }>
+type Coordinates = Readonly<{
+  xlim: Limit; ylim: Limit; flip_x: boolean; flip_y: boolean; projection?: Projection
+}>
 type CoordinateSpec = Readonly<{
   coord?: readonly [number, number, number, number]
   xlim?: Limit
@@ -29,8 +32,12 @@ function copy_limit(limit: Limit, name = 'limit', allow_equal = false): Limit {
 }
 
 function copy_coordinates(coord: Coordinates): Coordinates {
+  if (coord.projection !== undefined && !(coord.projection instanceof Projection)) {
+    throw new TypeError('Coordinates projection must be a Projection')
+  }
   return Object.freeze({ xlim: copy_limit(coord.xlim, 'xlim'), ylim: copy_limit(coord.ylim, 'ylim'),
-    flip_x: Boolean(coord.flip_x), flip_y: Boolean(coord.flip_y) })
+    flip_x: Boolean(coord.flip_x), flip_y: Boolean(coord.flip_y),
+    ...(coord.projection ? { projection: coord.projection } : {}) })
 }
 
 // Missing and nonfinite samples never contaminate limits. Singleton data gets a
@@ -106,13 +113,19 @@ function map_axis(value: number, limit: Limit, extent: number, flip = false): nu
   return (flip ? 1 - fraction : fraction) * extent
 }
 
-function map_point(value: PointValue, coord: Coordinates, size: Size): Point {
-  const point = read_point(value)
+function map_point(value: PointValue, coord: Coordinates, size: Size): Point | null {
+  let point = read_point(value)
+  if (coord.projection) {
+    const projected = coord.projection.project([point.x, point.y])
+    if (projected === null) return null
+    point = read_point(projected)
+  }
   return make_point(map_axis(point.x, coord.xlim, size.width, coord.flip_x),
     map_axis(point.y, coord.ylim, size.height, coord.flip_y))
 }
 
 function unmap_point(value: PointValue, coord: Coordinates, size: Size): Point {
+  if (coord.projection) throw new TypeError('Custom projections do not provide an inverse')
   const point = read_point(value)
   if (!size.width || !size.height) throw new RangeError('Cannot invert a zero-sized coordinate frame')
   const x = point.x / size.width, y = point.y / size.height
@@ -125,12 +138,27 @@ function coordinate_length(value: Length, axis: 'x' | 'y', size: Size, measure: 
   coord?: Coordinates, property: string = axis): number {
   const extent = axis === 'x' ? size.width : size.height
   if (coord && typeof value === 'number') {
+    if (coord.projection) throw new TypeError('A projection needs a coordinate pair; use coordinate_point')
     return map_axis(value, axis === 'x' ? coord.xlim : coord.ylim, extent,
       axis === 'x' ? coord.flip_x : coord.flip_y)
   }
   return resolve_length(value, measure, extent, property)
 }
 
+// Data mapping consumes the pair together. Local lengths bypass it; mixing one
+// data component with a local length is ambiguous for a nonseparable projection.
+function coordinate_point(value: PointValue<Length>, size: Size, measure: LengthContext,
+  coord?: Coordinates): Point | null {
+  const point = read_point(value)
+  const numeric_x = typeof point.x === 'number', numeric_y = typeof point.y === 'number'
+  if (coord && numeric_x && numeric_y) return map_point(point as Point, coord, size)
+  if (coord?.projection && (numeric_x || numeric_y)) {
+    throw new TypeError('Projected points need two data numbers or two local lengths')
+  }
+  return make_point(coordinate_length(point.x, 'x', size, measure, coord),
+    coordinate_length(point.y, 'y', size, measure, coord))
+}
+
 export { copy_limit, copy_coordinates, point_bounds, merge_bounds, data_bounds,
-  infer_coordinates, map_axis, map_point, unmap_point, coordinate_length }
+  infer_coordinates, map_axis, map_point, unmap_point, coordinate_length, coordinate_point }
 export type { Limit, DataBounds, Coordinates, CoordinateSpec, GeometrySpace }
