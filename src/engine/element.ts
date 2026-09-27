@@ -164,11 +164,6 @@ class Element<Props extends ElementProps = ElementProps, Input extends ElementPr
       const source = definition.normalize ? definition.normalize(input) : input
       this.props = copy_data({ ...definition.defaults, ...source } as Props)
     }
-    // Components may consume x/y in normalization, but stored element props
-    // must use pos so legacy placements cannot silently disappear.
-    if ('x' in this.props || 'y' in this.props) {
-      throw new TypeError(`${this.type.name}: x/y placement props were removed; use pos={[x, y]} or pos={{x, y}}`)
-    }
     const { id } = this.props
     if (id !== undefined && (typeof id !== 'string' || !id.length)) {
       throw new TypeError('An element id must be a nonempty string')

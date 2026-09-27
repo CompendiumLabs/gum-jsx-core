@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import {
-  Element, Group, Overlay, Graph, Network, Node, Rect, LayoutPass, Projection,
-  define_component, define_element, make_fragment, shape_size, make_request,
+  Group, Overlay, Graph, Network, Node, Rect, LayoutPass, Projection,
+  define_element, make_fragment, shape_size, make_request,
   exact, px, em, evaluate, data_bounds,
 } from '../src/index'
-import type { ElementProps, CoordinatePosition } from '../src/index'
+import type { Element, ElementProps, CoordinatePosition } from '../src/index'
 
 const fixed = make_request({ width: exact(200), height: exact(100) })
 const limits = { xlim: [-1, 1], ylim: [-1, 1] } as const
@@ -104,27 +104,6 @@ const tests: Record<string, () => void> = {
       children: new Rect({ pos: [1, px(0)] }) })), /numeric data coordinates/)
     assert.throws(() => layout(new Group({ children: new Rect({ pos: { t: 1 } }) })), /require a projection/)
   },
-  'legacy placement props report migration errors in constructors and JSX spreads'() {
-    for (const props of [{ x: 1 }, { y: undefined }, { x: 1, y: 2, pos: [1, 2] }]) {
-      assert.throws(() => new Rect(props as never), /x\/y placement props were removed; use pos/)
-      assert.throws(() => new Element(new Rect().type, props as never), /use pos/)
-    }
-    assert.throws(() => evaluate('return <Rect x={0.5} y={0.5} />'), /use pos/)
-    assert.throws(() => evaluate('const old = {x: 1}; return <Rect {...old} />'), /use pos/)
-  },
-  'custom components may consume x and y before producing positioned elements'() {
-    type Input = ElementProps & { x: number; y: number }
-    const Component = define_component<Input>('LegacyInputs', ({ x, y, ...props }) =>
-      new Rect({ ...props, pos: [x, y] }))
-    const Normalized = define_element<ElementProps, Input>('NormalizedInputs', (_, query) =>
-      make_fragment({ size: shape_size(query.request, query.sizing) }), {}, {
-        normalize: ({ x, y, ...props }) => ({ ...props, pos: [x, y] }),
-      })
-    for (const child of [new Component({ x: 0.5, y: 0.25 }), new Normalized({ x: 0.5, y: 0.25 })]) {
-      assert.ok(!('x' in child.props) && !('y' in child.props))
-      assert.deepEqual(layout(new Group({ children: child })).children[0].offset, { x: 100, y: 25 })
-    }
-  },
 }
 
 for (const [name, test] of Object.entries(tests)) { test(); console.log(`ok - ${name}`); }
@@ -133,8 +112,6 @@ console.log(`${Object.keys(tests).length} position checks passed.`)
 function position_types() {
   new Rect({ pos: [px(1), em(2)] })
   new Rect({ pos: { theta: 1, r: 2 } })
-  // @ts-expect-error Placement now uses pos.
-  new Rect({ x: 1, y: 2 })
   // @ts-expect-error Local Cartesian positions require both components.
   new Rect({ pos: { x: px(1) } })
 }

@@ -826,9 +826,7 @@ Rect fills the canvas and paints behind the other children.
 | Child `width`, `height`, etc. | Ordinary sizing, resolved against the canvas. Use these to define a text region or shape size. |
 
 Supplied Cartesian positions require both components. A `pos` override replaces
-the whole value. Element source props containing legacy `x` or `y` report a
-migration error; custom components can consume those parameters in their build
-function or normalization and return `pos` in the resulting element props.
+the whole value.
 
 The canvas must have both axes supplied by dimensions or finite offers, or one
 axis plus an aspect. For example, `<Svg width={px(200)} height={px(100)}><Group>…`
