@@ -50,6 +50,11 @@ type Style = Readonly<{
   opacity: number
 }>
 
+const resolved_styles = new WeakSet<Style>()
+function is_resolved_style(style: Style): boolean {
+  return resolved_styles.has(style)
+}
+
 const DEFAULT_STYLE: Style = Object.freeze({
   theme: 'light',
   theme_paints: Object.freeze({ color: 'theme:foreground', stroke: 'theme:foreground' }),
@@ -116,7 +121,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
     nonnegative(length.value, location)
     return length
   }))
-  return Object.freeze({
+  const style: Style = Object.freeze({
     theme, theme_paints: Object.freeze(theme_paints),
     font_size, font_family, font_weight, font_style, line_height, color,
     fill, stroke, stroke_width,
@@ -125,6 +130,8 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
     stroke_miterlimit: spec.stroke_miterlimit ?? inherited.stroke_miterlimit,
     stroke_dasharray, opacity,
   })
+  resolved_styles.add(style)
+  return style
 }
 
 // Scalar shape paint lengths refer to the shorter side of its resolved rectangle.
@@ -141,5 +148,5 @@ function resolve_paint(style: Style, size: Size, context: Partial<LengthContext>
     stroke_dasharray, opacity: style.opacity }
 }
 
-export { resolve_style, resolve_paint }
+export { resolve_style, resolve_paint, is_resolved_style }
 export type { StyleSpec, Style, FontStyle, FontWeight, LineCap, LineJoin }

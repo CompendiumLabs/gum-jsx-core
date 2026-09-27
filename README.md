@@ -119,5 +119,9 @@ bun run probe hugging_box
 ```
 
 Runtime code lives in `src/`; tests and tools live in `test/` and `scripts/`.
+
+Run `bun run perf` for construction, layout, text, plots, JSX, and SVG benchmarks.
+Use `--list`, `--filter <regex>`, `--smoke`, or `--json` to narrow or save a run.
+See [performance workloads and methodology](test/perf/README.md).
 The [source map and contributor notes](./API.md#contributor-notes) describe where
 to make changes. Runnable examples live in `@gum-jsx/docs`.

@@ -1,12 +1,12 @@
 import { nonnegative } from '../lib/checks'
 import { Element } from './element'
 import { Fonts } from './fonts'
-import { make_fragment } from './fragment'
+import { fragment_metadata } from './fragment'
 import type { Fragment } from './fragment'
 import { make_rect } from './geometry'
 import { finish_size, make_request, prepare_request, resolve_sizing } from './layout'
 import type { LayoutRequest, Sizing } from './layout'
-import { resolve_style } from './style'
+import { resolve_style, is_resolved_style } from './style'
 import type { Style } from './style'
 import { make_measure, resolve_font_size, UnresolvedLengthError } from './units'
 import type { LengthContext, ReferenceBox } from './units'
@@ -55,11 +55,16 @@ function copy_reference(reference: ReferenceBox = {}, path = 'reference'): Refer
 
 // Cache exactly the inputs visible to geometry. Diagnostic paths are not geometry.
 function query_key(
-  request: LayoutRequest, style: Style, measure: LengthContext, epoch: number,
+  request: LayoutRequest, style: string, measure: LengthContext, epoch: number,
   coordinates?: Coordinates, math?: MathContext,
 ): string {
-  return JSON.stringify([request, style, measure.reference.width, measure.reference.height, epoch,
-    coordinates, projection_key(coordinates?.projection), math])
+  // Style is an already-serialized complete JSON object, so concatenating it
+  // after a complete JSON array is unambiguous without re-escaping its strings.
+  const { width, height } = request
+  return JSON.stringify([width.kind, width.kind === 'natural' ? null : width.value,
+    height.kind, height.kind === 'natural' ? null : height.value,
+    measure.reference.width, measure.reference.height, epoch,
+    coordinates, projection_key(coordinates?.projection), math]) + style
 }
 
 class LayoutError extends Error {
@@ -78,6 +83,8 @@ class LayoutPass {
   #prepared = new WeakMap<Element, Map<string, unknown>>()
   #active = new WeakMap<Element, Set<string>>()
   #resources = new Map<string, Resource>()
+  #styles = new WeakMap<Element, { inherited: Style | undefined; resolved: Style }>()
+  #style_keys = new WeakMap<Style, string>()
   #epoch = 0
   #queries = 0
   #layouts = 0
@@ -123,11 +130,21 @@ class LayoutPass {
       request = make_request(request)
       const reference = copy_reference(context.reference)
       const inherited = make_measure({ reference, path })
-      const style = resolve_style(element.props, context.style, inherited)
+      // Resolved styles depend on immutable source props and inherited style,
+      // not the offer or reference box. Caller-created styles may be mutable.
+      const reusable_style = context.style === undefined || is_resolved_style(context.style)
+      const previous_style = reusable_style ? this.#styles.get(element) : undefined
+      const style = previous_style && previous_style.inherited === context.style
+        ? previous_style.resolved : resolve_style(element.props, context.style, inherited)
+      if (reusable_style && style !== previous_style?.resolved) {
+        this.#styles.set(element, { inherited: context.style, resolved: style })
+      }
+      let style_key = this.#style_keys.get(style)
+      if (style_key === undefined) this.#style_keys.set(style, style_key = JSON.stringify(style))
       const measure = make_measure(inherited, { font_size: style.font_size })
       const coordinates = context.coordinates ? copy_coordinates(context.coordinates) : undefined
       const math = context.math ? copy_math_context(context.math) : undefined
-      const key = query_key(request, style, measure, this.#epoch, coordinates, math)
+      const key = query_key(request, style_key, measure, this.#epoch, coordinates, math)
       const cache = this.#cache.get(element) ?? new Map<string, Fragment>()
       this.#cache.set(element, cache)
       const cached = cache.get(key)
@@ -163,7 +180,7 @@ class LayoutPass {
           prepare: <T>(name: string, compute: () => T): T => {
             const cache = this.#prepared.get(element) ?? new Map<string, unknown>()
             this.#prepared.set(element, cache)
-            const key = JSON.stringify([name, style, this.#epoch, math])
+            const key = JSON.stringify([name, this.#epoch, math]) + style_key
             if (!cache.has(key)) cache.set(key, compute())
             return cache.get(key) as T
           },
@@ -172,7 +189,7 @@ class LayoutPass {
         // Resizing a fitted element can reuse its natural drawing. This key
         // includes every input visible to the source layout, but not the target.
         const intrinsic_key = fitting
-          ? `intrinsic:${query_key(prepared, style, measure, this.#epoch, coordinates, math)}` : undefined
+          ? `intrinsic:${query_key(prepared, style_key, measure, this.#epoch, coordinates, math)}` : undefined
         let result = intrinsic_key ? cache.get(intrinsic_key) : undefined
         if (result) this.#hits++
         else {
@@ -188,7 +205,7 @@ class LayoutPass {
           // Attach a leaf's fallback connection before scaling so its boundary
           // follows the visible source, not a potentially letterboxed target.
           if (element.props.id !== undefined && result.connection === undefined) {
-            result = make_fragment({ ...result,
+            result = fragment_metadata(result, {
               connection: { id: element.props.id, boundary: make_rect(0, 0, size.width, size.height) } })
           }
           result = fit_fragment(result, fitting.request, fitting.target, fit!, element.props.fit_align)
@@ -197,7 +214,7 @@ class LayoutPass {
         const { id } = element.props
         const connection = id === undefined ? result.connection
           : { id, boundary: result.connection?.boundary ?? make_rect(0, 0, result.size.width, result.size.height) }
-        const fragment = make_fragment({ ...result, name: element.type.name,
+        const fragment = fragment_metadata(result, { name: element.type.name,
           debug: element.props.debug ?? result.debug, connection })
         cache.set(key, fragment)
         return fragment

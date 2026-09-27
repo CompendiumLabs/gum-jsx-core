@@ -33,6 +33,12 @@ type TextDraw = Readonly<{
 type TextFont = Readonly<{ family: string; size: number }>
 type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw | TextDraw
 
+const owned_drawings = new WeakSet<Drawing>()
+function own_drawing<T extends Drawing>(draw: T): T {
+  owned_drawings.add(draw)
+  return Object.freeze(draw)
+}
+
 // Own paint records at the drawing boundary, including optional SVG stroke policy.
 function copy_paint(paint: Paint): Paint {
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
@@ -60,7 +66,7 @@ function copy_paint(paint: Paint): Paint {
 function draw_rect(rect: PixelRect, paint: Paint, radius: RectRadiiValue = make_point()): RectDraw {
   const { x, y, width, height } = rect
   const bounds = make_rect(x, y, width, height)
-  return Object.freeze({
+  return own_drawing({
     kind: 'rect', rect: bounds, radius: clamp_radii(radius, bounds),
     ...copy_paint(paint),
   })
@@ -69,7 +75,7 @@ function draw_rect(rect: PixelRect, paint: Paint, radius: RectRadiiValue = make_
 function draw_ellipse(center_value: PointValue, radius_value: PointValue, paint: Paint): EllipseDraw {
   const center = read_point(center_value, 'center'), radius = read_point(radius_value, 'radius')
   nonnegative(radius.x, 'radius.x'); nonnegative(radius.y, 'radius.y')
-  return Object.freeze({
+  return own_drawing({
     kind: 'ellipse', center: make_point(center.x, center.y),
     radius: make_point(radius.x, radius.y), ...copy_paint(paint),
   })
@@ -81,7 +87,7 @@ function draw_path(
 ): PathDraw {
   const path = copy_path(commands)
   const bounds = ink === undefined ? path_bounds(path) : ink
-  return Object.freeze({
+  return own_drawing({
     kind: 'path', commands: path, ...copy_paint(paint),
     bounds: bounds && make_rect(bounds.x, bounds.y, bounds.width, bounds.height),
   })
@@ -93,7 +99,7 @@ function draw_image(rect: PixelRect, data: string, opacity = 1): ImageDraw {
   }
   finite(opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
-  return Object.freeze({ kind: 'image', rect: make_rect(rect.x, rect.y, rect.width, rect.height), data, opacity })
+  return own_drawing({ kind: 'image', rect: make_rect(rect.x, rect.y, rect.width, rect.height), data, opacity })
 }
 
 // The origin is the baseline start of a measured advance. Hosts center the text
@@ -110,7 +116,7 @@ function draw_text(
   nonnegative(advance, 'advance'); nonnegative(font.size, 'font_size')
   finite(opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
-  return Object.freeze({
+  return own_drawing({
     kind: 'text', text, origin: make_point(origin.x, origin.y), advance,
     font_family: font.family, font_size: font.size, fill, opacity,
     bounds: bounds && make_rect(bounds.x, bounds.y, bounds.width, bounds.height),
@@ -118,6 +124,7 @@ function draw_text(
 }
 
 function copy_drawing(draw: Drawing): Drawing {
+  if (owned_drawings.has(draw)) return draw
   switch (draw.kind) {
     case 'rect': return draw_rect(draw.rect, draw, draw.radius)
     case 'ellipse': return draw_ellipse(draw.center, draw.radius, draw)
@@ -154,10 +161,15 @@ function drawing_ink(draw: Drawing): PixelRect | null {
   if (width === 0 && height === 0 && (draw.stroke_linecap ?? 'butt') === 'butt') return null
 
   let factor = 1
-  if (draw.kind === 'path') {
-    const segments = draw.commands.filter(command => command.kind !== 'M').length
-    if (segments > 1 && (draw.stroke_linejoin ?? 'miter') === 'miter') {
-      factor = draw.stroke_miterlimit ?? 4
+  if (stroke && draw.kind === 'path') {
+    if ((draw.stroke_linejoin ?? 'miter') === 'miter') {
+      let segments = 0
+      for (const command of draw.commands) {
+        if (command.kind !== 'M' && ++segments > 1) {
+          factor = draw.stroke_miterlimit ?? 4
+          break
+        }
+      }
     }
     if (draw.stroke_linecap === 'square') factor = Math.max(factor, Math.SQRT2)
   }

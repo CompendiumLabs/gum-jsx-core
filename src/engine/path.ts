@@ -1,6 +1,7 @@
 import { make_point, make_rect } from './geometry'
 import type { Point, Rect, Transform } from './geometry'
 import type { Length } from './units'
+import { finite } from '../lib/checks'
 
 // Source commands use lengths; drawing commands use resolved pixels.
 type PathCommand<T = number> = Readonly<
@@ -10,6 +11,10 @@ type PathCommand<T = number> = Readonly<
   | { kind: 'Z' }
 >
 type PathSegment = PathCommand<Length>
+
+// Only paths validated here can bypass another ownership copy. A caller's
+// frozen array may still contain mutable commands or invalid coordinates.
+const owned_paths = new WeakSet<readonly PathCommand[]>()
 
 // Absolute commands keep units explicit without introducing a second path parser.
 function move_to(x: Length, y: Length): PathSegment {
@@ -58,26 +63,43 @@ function map_path<T>(
 
 // Copying validates all coordinates without retaining a caller's mutable records.
 function copy_path(commands: readonly PathCommand[]): readonly PathCommand[] {
-  return map_path(commands, make_point)
+  if (owned_paths.has(commands)) return commands
+  const path = map_path(commands, make_point)
+  owned_paths.add(path)
+  return path
 }
 
 function transform_path(
   commands: readonly PathCommand[], transform: Transform,
 ): readonly PathCommand[] {
   const [a, b, c, d, e, f] = transform
-  return map_path(commands, (x, y) => make_point(a * x + c * y + e, b * x + d * y + f))
+  const path = map_path(commands, (x, y) => make_point(a * x + c * y + e, b * x + d * y + f))
+  owned_paths.add(path)
+  return path
 }
 
 // Bezier curves stay inside their control hull. This deliberately conservative
 // bound needs no curve solving; fonts can supply their more precise measured ink.
 function path_bounds(commands: readonly PathCommand[]): Rect | null {
   if (!commands.some(command => ['L', 'Q', 'C'].includes(command.kind))) return null
+  if (commands[0].kind !== 'M') throw new TypeError('A path must begin with move_to')
   let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
-  map_path(commands, (x, y) => {
+  const point = (x: number, y: number) => {
+    finite(x, 'x'); finite(y, 'y')
     left = Math.min(left, x); right = Math.max(right, x)
     top = Math.min(top, y); bottom = Math.max(bottom, y)
-    return make_point(x, y)
-  })
+  }
+  for (const command of commands) {
+    switch (command.kind) {
+      case 'Z': break
+      case 'M': case 'L': point(command.x, command.y); break
+      case 'Q': point(command.x1, command.y1); point(command.x, command.y); break
+      case 'C':
+        point(command.x1, command.y1); point(command.x2, command.y2); point(command.x, command.y)
+        break
+      default: throw new TypeError(`Unknown path command: ${(command as PathCommand).kind}`)
+    }
+  }
   return make_rect(left, top, right - left, bottom - top)
 }
 

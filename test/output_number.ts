@@ -22,6 +22,25 @@ for (const precision of [-1, 101, 1.5, NaN, Infinity]) {
   assert.throws(() => output_number_formatter(precision), /precision/)
 }
 
+// Preserve exact serialization at rounding boundaries and across the bounded
+// cache, including more distinct fractional values than the cache retains.
+const values = [-0, 0, Number.MIN_VALUE, -Number.MIN_VALUE, Number.MAX_VALUE,
+  Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 0.1 + 0.2, 1.005, -1.005,
+  ...Array.from({ length: 633 }, (_, i) => Math.sin(i * 32.91) * 10 ** (i - 324)),
+  ...Array.from({ length: 5000 }, (_, i) => (i + 0.1) / 7),
+]
+for (const precision of [0, 1, 3, 10, 20, 100, 'full'] as const) {
+  const reference = (value: number) => precision === 'full' ? String(value) : String(Number(value.toFixed(precision)))
+  for (const repeated_start of [false, true]) {
+    const format = output_number_formatter(precision)
+    // Exercise both continued caching and the cutoff for mostly unique values.
+    if (repeated_start) for (let i = 0; i < 512; i++) assert.equal(format(1 / 3), reference(1 / 3))
+    for (const value of values) assert.equal(format(value), reference(value))
+    for (const value of values.toReversed()) assert.equal(format(value), reference(value))
+    for (const value of [NaN, Infinity, -Infinity]) assert.throws(() => format(value), /finite/)
+  }
+}
+
 const fragment = make_fragment({ size: { width: 0.1 + 0.2, height: 1 / 3 },
   draw: [draw_path([{ kind: 'M', x: 0.1 + 0.2, y: 0 },
     { kind: 'L', x: 1 / 3, y: 1e-16 }],

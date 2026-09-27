@@ -16,7 +16,7 @@ type Guides = Readonly<Partial<Record<string, number>>>
 // A connection follows an identified element's frame, independently of ink.
 // Parents discover these records through placements, including their transforms.
 type Connection = Readonly<{ id: string; boundary: Clip }>
-const OWNED = Symbol('next.fragment')
+const owned_fragments = new WeakSet<Fragment>()
 
 // All geometry is local to this fragment. A renderer never performs layout.
 interface Fragment<Draw = Drawing> {
@@ -74,7 +74,7 @@ function place_fragment(
   fragment: Fragment, offset: PointValue = make_point(), transform?: Transform,
 ): Placement {
   // Normalize external records once; results made here keep their shared identity.
-  const owned = (fragment as Fragment & { [OWNED]?: true })[OWNED]
+  const owned = owned_fragments.has(fragment)
   const point = read_point(offset, 'offset')
   return Object.freeze({
     fragment: owned ? fragment : make_fragment(fragment),
@@ -167,8 +167,25 @@ function make_fragment(spec: FragmentSpec): Fragment {
     ...(connection === undefined ? {} : { connection }),
     ...(spec.connection_scope === true ? { connection_scope: true } : {}),
   }
-  Object.defineProperty(fragment, OWNED, { value: true })
+  owned_fragments.add(fragment)
   return Object.freeze(fragment)
+}
+
+// Layout metadata does not change geometry. Normalize external results, while
+// preserving an owned fragment's drawing, placement, and bounds calculations.
+function fragment_metadata(fragment: Fragment, metadata: Pick<FragmentSpec, 'name' | 'debug' | 'connection'>): Fragment {
+  if (!owned_fragments.has(fragment)) return make_fragment({ ...fragment, ...metadata })
+  const result = { ...fragment, ...metadata }
+  if (result.name === undefined) delete result.name
+  if (result.debug !== true) delete result.debug
+  if (result.connection === undefined) delete result.connection
+  else if (result.connection !== fragment.connection) {
+    const { id, boundary } = result.connection
+    if (typeof id !== 'string' || !id.length) throw new TypeError('A connection needs a nonempty string id')
+    result.connection = Object.freeze({ id, boundary: make_clip(boundary, boundary.radius) })
+  }
+  owned_fragments.add(result)
+  return Object.freeze(result)
 }
 
 // Framed elements publish their visible outline when identified. LayoutPass
@@ -181,4 +198,5 @@ function frame_connection(id: string | undefined, boundary: Clip): Pick<Fragment
 // painted bounds after clipping; overflow records excess content before clipping.
 // An explicit transform acts in child coordinates, before the placement offset.
 export { make_fragment, place_fragment, content_bounds, outset_bounds, transform_guides, frame_connection }
+export { fragment_metadata }
 export type { Transform, Guides, Connection, Fragment, Placement, FragmentSpec }
