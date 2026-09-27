@@ -27,7 +27,7 @@ const tests: Record<string, () => void> = {
 
   'fractional positions and child regions use the whole canvas and anchors use allocated bounds'() {
     const root = new LayoutPass().layout(evaluate(`<Group width={px(200)} height={px(100)}>
-      <Rect pos={[0.25, 0.25]} width={0.5} height={0.5} stroke="none"/>
+      <Rect pos={[0.25, 0.25]} anchor="start" width={0.5} height={0.5} stroke="none"/>
       <Circle pos={[0.75, 0.5]} anchor="center" width={px(20)} stroke="none"/>
       <Rect pos={[1, 1]} anchor="end" width={px(30)} height={px(10)} stroke="none"/>
     </Group>`))
@@ -75,11 +75,11 @@ const tests: Record<string, () => void> = {
   },
 
   'nested canvases establish local references and reuse a source at different positions'() {
-    const leaf = new Rect({ pos: { x: 0.5, y: 0.25 }, width: 0.5, height: 0.5, fill: 'teal', stroke: 'none' })
+    const leaf = new Rect({ pos: { x: 0.5, y: 0.25 }, anchor: 'start', width: 0.5, height: 0.5, fill: 'teal', stroke: 'none' })
     const pass = new LayoutPass()
     const root = pass.layout(new Group({ width: px(200), height: px(100), children: [
       new Group({ width: 0.5, height: 1, children: leaf }),
-      new Group({ pos: { x: 0.5, y: px(0) }, width: 0.5, height: 1, children: leaf }),
+      new Group({ pos: { x: 0.5, y: px(0) }, anchor: 'start', width: 0.5, height: 1, children: leaf }),
     ] }))
     const [a, b] = root.children
     assert.deepEqual(a.offset, { x: 0, y: 0 })
@@ -104,7 +104,7 @@ const tests: Record<string, () => void> = {
       new Probe({ pos: { x: px(-20), y: px(0) } }), new Probe({ pos: { x: px(250), y: px(150) }, anchor: 'end' }),
     ] }))
     assert.equal(calls, 2)
-    assert.deepEqual(group.children.map(child => child.offset), [{ x: -20, y: 0 }, { x: 226, y: 138 }])
+    assert.deepEqual(group.children.map(child => child.offset), [{ x: -32, y: -6 }, { x: 226, y: 138 }])
     const box = pass.layout(new Box({ width: px(100), height: px(100), children:
       new Rect({ pos: { x: 0.5, y: 0.5 }, anchor: 'center', width: px(20), height: px(10) }) }))
     assert.deepEqual(box.children[0].offset, { x: 0, y: 0 })
@@ -139,7 +139,7 @@ const tests: Record<string, () => void> = {
 
   'canvas clipping hides ink but retains positioned overflow and source paint order'() {
     const pass = new LayoutPass()
-    const leaf = new Rect({ pos: { x: px(-10), y: px(90) }, width: px(20), height: px(20),
+    const leaf = new Rect({ pos: { x: px(-10), y: px(90) }, anchor: 'start', width: px(20), height: px(20),
       fill: 'teal', stroke: 'none' })
     const props = { width: px(100), height: px(100), children: leaf }
     const a = pass.layout(new Group(props)), b = pass.layout(new Group({ ...props, clip: true }))

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Group, Overlay, Graph, Network, Node, Rect, LayoutPass, Projection,
+  Group, Overlay, Graph, Plot, Network, Node, Rect, LayoutPass, Projection,
   define_element, make_fragment, shape_size, make_request,
   exact, px, em, evaluate, data_bounds,
 } from '../src/index'
@@ -12,6 +12,35 @@ const box = { width: px(20), height: px(10), anchor: 'center' } as const
 const layout = (element: Element) => new LayoutPass().layout(element, fixed)
 
 const tests: Record<string, () => void> = {
+  'positioned children default to center and unpositioned children retain the origin'() {
+    const parents = [
+      (child: Element) => new Group({ children: child }),
+      (child: Element) => new Overlay({ children: [new Rect(), child] }),
+      (child: Element) => new Graph({ ...limits, children: child }),
+      (child: Element) => new Plot({ ...limits, children: child }),
+      (child: Element) => new Network({ ...limits, children: child }),
+    ]
+    const size = { width: px(20), height: px(10) }
+    const positions: CoordinatePosition[] = [[0.5, 0.5], { x: em(2), y: '50%' }, [0, 0], [px(0), px(0)]]
+    for (const parent of parents) {
+      for (const pos of positions) {
+        assert.deepEqual(layout(parent(new Rect({ ...size, pos }))),
+          layout(parent(new Rect({ ...size, pos, anchor: 'center' }))))
+      }
+      for (const props of [{}, { pos: undefined }]) {
+        assert.deepEqual(layout(parent(new Rect({ ...size, ...props }))),
+          layout(parent(new Rect({ ...size, ...props, anchor: 'start' }))))
+      }
+    }
+    const offsets = (props: ElementProps) => layout(new Group({ children: new Rect({ ...size, ...props }) }))
+      .children[0].offset
+    assert.deepEqual(offsets({ pos: [0.5, 0.5] }), { x: 90, y: 45 })
+    assert.deepEqual(offsets({ pos: [0.5, 0.5], anchor: 'start' }), { x: 100, y: 50 })
+    assert.deepEqual(offsets({ pos: [0.5, 0.5], anchor: 0 }), { x: 100, y: 50 })
+    assert.deepEqual(offsets({ pos: [0.5, 0.5], anchor: 'end' }), { x: 80, y: 40 })
+    assert.deepEqual(offsets({ pos: [0.5, 0.5], anchor: { y: 'center' } }), { x: 100, y: 45 })
+    assert.deepEqual(offsets({ anchor: 'center' }), { x: -10, y: -5 })
+  },
   'tuple and record positions resolve local lengths and child fonts in Group and Overlay'() {
     const a = new Rect({ ...box, font_size: px(10), pos: [em(2), '50%'] })
     const b = new Rect({ ...box, font_size: px(10), pos: { x: em(2), y: '50%' } })
@@ -24,14 +53,15 @@ const tests: Record<string, () => void> = {
     }
   },
   'Graph distinguishes omitted positions from data zero and local zero'() {
+    const size = { width: px(20), height: px(10) }
     const result = layout(new Graph({ ...limits, children: [
-      new Rect(), new Rect({ pos: undefined }), new Rect({ pos: [0, 0] }),
-      new Rect({ pos: { x: 0, y: 0 } }), new Rect({ pos: [px(0), px(0)] }),
-      new Rect({ pos: [0, px(0)] }),
+      new Rect(size), new Rect({ ...size, pos: undefined }), new Rect({ ...size, pos: [0, 0] }),
+      new Rect({ ...size, pos: { x: 0, y: 0 } }), new Rect({ ...size, pos: [px(0), px(0)] }),
+      new Rect({ ...size, pos: [0, px(0)] }),
     ] }))
     assert.deepEqual(result.children.map(child => child.offset), [
-      { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 100, y: 50 },
-      { x: 100, y: 50 }, { x: 0, y: 0 }, { x: 100, y: 0 },
+      { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 90, y: 45 },
+      { x: 90, y: 45 }, { x: -10, y: -5 }, { x: 90, y: -5 },
     ])
   },
   'named annotations project whole positions and hidden annotations are not measured'() {
@@ -73,7 +103,7 @@ const tests: Record<string, () => void> = {
       new Rect({ pos: [2, 4], width: px(10), height: px(10) }),
       new Rect({ pos: { x: 8, y: 6 }, width: px(10), height: px(10) }),
     ] }))
-    assert.deepEqual(result.children.map(child => child.offset), [{ x: 0, y: 100 }, { x: 200, y: 0 }])
+    assert.deepEqual(result.children.map(child => child.offset), [{ x: -5, y: 95 }, { x: 195, y: -5 }])
     assert.throws(() => layout(new Network({ children: new Rect({ pos: { theta: 0, r: 1 } }) })), /Cartesian x and y/)
   },
   'pos is an immutable source value and overrides defaults atomically'() {
@@ -90,7 +120,7 @@ const tests: Record<string, () => void> = {
       const defaults = {pos: [0.25, 0.25], width: px(20), height: px(10)}
       return <Group><Rect {...defaults} pos={{x: 0.5, y: 0.75}} /></Group>
     `)
-    assert.deepEqual(layout(jsx).children[0].offset, { x: 100, y: 75 })
+    assert.deepEqual(layout(jsx).children[0].offset, { x: 90, y: 70 })
   },
   'malformed Cartesian positions fail consistently instead of filling missing axes'() {
     for (const pos of [null, [], [1], [1, 2, 3], { x: 1 }, { x: px(1), y: undefined }]) {

@@ -69,7 +69,7 @@ export type { StackProps, StackAlign, StackJustify } from './elems/stack'
 export { Grid } from './elems/grid'
 export type { GridProps, GridTrack } from './elems/grid'
 export { Group } from './elems/group'
-export type { GroupProps, PositionSpec, AnchorValue } from './elems/group'
+export type { GroupProps, PositionSpec, Anchor, Anchor as AnchorSpec, AnchorValue } from './elems/group'
 export { distribute_flex } from './lib/flex'
 export type { FlexSpec, FlexItem } from './lib/flex'
 export { resolve_alignment, align_offset, definite_reference, layout_content, fit_scale } from './lib/composition'
@@ -100,7 +100,7 @@ export type { ProjectionFunction } from './engine/projection'
 export { isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
 export type { Point3, OrthographicProjectionOptions, PerspectiveProjectionOptions } from './lib/projections'
 export { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
-export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, AnchorProps } from './elems/placement'
+export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps } from './elems/placement'
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points } from './elems/marks'
 export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
@@ -123,13 +123,9 @@ export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from
 export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
   VectorSample, VectorSampleValue, FieldProps, SymFieldProps } from './elems/symbolic'
 import { Axis as AxisElement } from './elems/axis'
-import { Anchor as AnchorElement } from './elems/placement'
 import type { Axis as LayoutAxis } from './engine/layout'
-import type { Anchor as AnchorSpec } from './elems/group'
 
-// Preserve the existing metadata type names alongside the new element values.
+// Preserve the axis metadata type alongside the element value.
 export const Axis = AxisElement
-export const Anchor = AnchorElement
 export type Axis = LayoutAxis
-export type Anchor = AnchorSpec
-export type { LayoutAxis, AnchorSpec }
+export type { LayoutAxis }

@@ -38,7 +38,7 @@ function graph_children(elements: readonly Element[], query: LayoutQuery, size: 
 function graph_child(element: Element, query: LayoutQuery, size: Size,
   coordinates: Coordinates, index: number) {
   const request = make_request({ width: available(size.width), height: available(size.height) })
-  const { pos, anchor = 'start' } = element.props
+  const { pos, anchor = pos === undefined ? 'start' : 'center' } = element.props
   const measure = child_measure(element, query, index, size)
   const { path } = measure
   const align = resolve_alignment(anchor, `${path}.anchor`)

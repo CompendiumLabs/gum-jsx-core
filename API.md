@@ -822,11 +822,14 @@ Rect fills the canvas and paints behind the other children.
 | Group `aspect` | Optional preferred width/height ratio, using the same sizing rules as shapes. |
 | Group `clip` | Clip painted ink to the canvas rectangle, default false; overflow is retained. |
 | Child `pos` | Position as `[x, y]` or `{x, y}` lengths, default `[0, 0]`. Fractions reference the corresponding full canvas axis; negatives and values outside the canvas are allowed. |
-| Child `anchor` | The point of the child's allocated box placed at `pos`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` / `[x,y]` with these values. |
+| Child `anchor` | The point of the child's allocated box placed at `pos`. Default `"center"` when `pos` is supplied, or `"start"` (top-left) when absent. Accepts `"start"`, `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` / `[x,y]` with these values. |
 | Child `width`, `height`, etc. | Ordinary sizing, resolved against the canvas. Use these to define a text region or shape size. |
 
 Supplied Cartesian positions require both components. A `pos` override replaces
-the whole value.
+the whole value. `pos={undefined}` uses the same start anchor at the local origin
+as an omitted position. An explicit `anchor` always takes precedence, and missing
+axes in an anchor object still default to start. Graph, Plot, Network, GeoMap, and
+Overlay decorations follow the same anchor defaults.
 
 The canvas must have both axes supplied by dimensions or finite offers, or one
 axis plus an aspect. For example, `<Svg width={px(200)} height={px(100)}><Group>…`
@@ -848,7 +851,7 @@ lengths. Anchors are dimensionless fractions of the allocated child rectangle, n
 its painted ink. `anchor="center"` subtracts half the child's width and height;
 `anchor={[1, 0]}` or `anchor={{x: "end", y: "start"}}` places its top-right corner
 at the position. Tuple entries can mix fractions and keywords, for example
-`anchor={['end', 0.5]}`. Per-axis Box/Anchor alignment, fitting alignment, and Rotate origins also
+`anchor={['end', 0.5]}`. Per-axis Box alignment, fitting alignment, and Rotate origins also
 accept tuples. Stack alignment stays a single-axis value.
 Anchors accept neither fill nor stretch; width and height control sizing.
 
@@ -1217,7 +1220,7 @@ projections. Plot and Network retain Cartesian coordinate policies. See the
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
 | Sampling | [SymLine](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/SymLine.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
-| Composition | Overlay, Anchor, Attach, Rotate, TransformBox |
+| Composition | Overlay, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextGrid, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
 `Attach` uses `at` to select a point along the content edge and `child_anchor`

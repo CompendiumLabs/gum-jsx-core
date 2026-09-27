@@ -26,7 +26,7 @@ import { interp, palette } from './lib/colors'
 import { RNG } from './lib/random'
 import { Graph, graph_children } from './elems/graph'
 import { Node, Edge, Network } from './elems/network'
-import { Overlay, TransformBox, Rotate, Attach, Anchor } from './elems/placement'
+import { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
 import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './elems/marks'
 import { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
@@ -53,7 +53,7 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Grid, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Line, Polyline, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
-    Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Anchor, Node, Edge, Network,
+    Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Node, Edge, Network,
     CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { Text, Span, TextBox, TextFigure, TitleBox, Bullets, Box, Rect, Anchor,
+import { Text, Span, TextBox, TextFigure, TitleBox, Bullets, Box, Rect,
   Element, LayoutPass, Fonts, px, em, make_request, exact, available, make_fragment,
   shape_size, draw_rect, make_rect, resolve_style, render_svg } from '../src'
 import type { ElementProps, LayoutQuery, FontProvider, Fragment } from '../src'
@@ -73,12 +73,13 @@ const tests = {
 
   'inline ink overhang remains overflow and placements keep source painting order'() {
     const pass = new LayoutPass()
-    const item = new Anchor({ children: new Rect({ width: px(40), height: px(80), fill: 'red' }) })
+    const item = new Box({ width: 0, height: 0, align: 'center',
+      children: new Rect({ width: px(40), height: px(80), fill: 'red' }) })
     const source = new Text({ children: ['a', item, 'b'] })
     const natural = pass.layout(source)
     near(natural.size.height, 19.2)
     assert.ok(natural.overflow.top > 0 && natural.overflow.bottom > 0)
-    assert.deepEqual(natural.children[0].fragment.children.map(c => c.fragment.name), ['Run', 'Anchor', 'Run'])
+    assert.deepEqual(natural.children[0].fragment.children.map(c => c.fragment.name), ['Run', 'Box', 'Run'])
     const tiny = pass.layout(source, make_request({ width: exact(0), height: exact(0) }))
     assert.equal(tiny.size.width, 0); assert.equal(tiny.size.height, 0)
     assert.ok(tiny.overflow.right > 0 && tiny.overflow.bottom > 0)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Overlay, Attach, Anchor, Rotate, TransformBox, Box, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
+  Overlay, Attach, Rotate, TransformBox, Box, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
   TextFrame, Bullets, Slide, Graph, Points, Arc, Arrow, Spline, RoundedLine, HFill,
   Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d, evaluate,
 } from '../src/index'
@@ -52,16 +52,13 @@ const tests: Record<string, () => void> = {
     near(marker.offset.y + ink.y + ink.height / 2, 50)
   },
 
-  'attachments and zero-size anchors position naturally measured children'() {
+  'attachments position naturally measured children'() {
     const child = new Rect({ width: px(100), height: px(50), stroke: 'none' })
     const decoration = new Rect({ width: px(20), height: px(10), fill: 'red', stroke: 'none' })
     const pass = new LayoutPass(), attached = pass.layout(new Attach({ children: child,
       attachment: decoration, side: 'left', offset: px(5), at: 1, child_anchor: 1 }))
     assert.deepEqual(attached.size, { width: 100, height: 50 })
     assert.deepEqual(attached.children[1].offset, { x: -25, y: 40 })
-    const anchor = pass.layout(new Anchor({ children: decoration }))
-    assert.deepEqual(anchor.size, { width: 0, height: 0 })
-    assert.deepEqual(anchor.children[0].offset, { x: -10, y: -5 })
   },
 
   'tuple anchors preserve parent placement and independent content alignment across resizing'() {
@@ -100,10 +97,8 @@ const tests: Record<string, () => void> = {
     ]
     const pass = new LayoutPass()
     for (const [tuple, record] of pairs) {
-      for (const Wrapper of [Box, Anchor]) {
-        assert.deepEqual(pass.layout(new Wrapper({ align: tuple, children: child }), fixed),
-          pass.layout(new Wrapper({ align: record, children: child }), fixed))
-      }
+      assert.deepEqual(pass.layout(new Box({ align: tuple, children: child }), fixed),
+        pass.layout(new Box({ align: record, children: child }), fixed))
       assert.deepEqual(pass.layout(new Box({ fit: 'contain', fit_align: tuple, children: child }), fixed),
         pass.layout(new Box({ fit: 'contain', fit_align: record, children: child }), fixed))
       assert.deepEqual(pass.layout(new Rotate({ origin: tuple, angle: 45, resize: false, children: child })),

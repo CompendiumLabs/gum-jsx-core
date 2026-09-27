@@ -1,5 +1,5 @@
 import { finite } from '../lib/checks'
-import { align_offset, layout_content, resolve_alignment } from '../lib/composition'
+import { layout_content, resolve_alignment } from '../lib/composition'
 import type { Alignment } from '../lib/composition'
 import { Element, element_children, content_child } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -20,7 +20,6 @@ type TransformBoxProps = ElementProps & Readonly<{ matrix?: Transform; resize?: 
 type AttachProps = ElementProps & Readonly<{
   attachment?: Element; side?: Side; offset?: Length; at?: number; child_anchor?: number
 }>
-type AnchorProps = ElementProps & Readonly<{ align?: Alignment }>
 
 // The first child sizes an overlay. Decorations see that established box and
 // contribute ink/overflow but never enlarge the allocation.
@@ -33,11 +32,12 @@ class Overlay extends Element<OverlayProps> {
     decorations.forEach((element, index) => {
       const fragment = query.child(element, request, size, index + 1)
       const measure = child_measure(element, query, index + 1, size)
-      const align = resolve_alignment(element.props.anchor ?? 'start')
+      const { pos, anchor = pos === undefined ? 'start' : 'center' } = element.props
+      const align = resolve_alignment(anchor)
       if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
       // Anchor locates the child's own reference point, just as in Group.
-      const { pos = [0, 0] } = element.props
-      const { x, y } = coordinate_point(pos, size, measure, undefined, 'pos')!
+      const { x, y } = pos === undefined ? make_point()
+        : coordinate_point(pos, size, measure, undefined, 'pos')!
       children.push(place_fragment(fragment,
         make_point(x - fragment.size.width * align.x, y - fragment.size.height * align.y)))
     })
@@ -114,18 +114,5 @@ class Attach extends Element<AttachProps> {
   }
 }
 
-// A point or line allocation can anchor content without changing its dimensions.
-class Anchor extends Element<AnchorProps> {
-  static layout(props: AnchorProps, query: LayoutQuery) {
-    const child = content_child(props.children)
-    const fragment = child ? query.child(child, make_request(), query.measure.reference) : undefined
-    const size = finish_size(make_size(), query.request, query.sizing)
-    const alignment = resolve_alignment(props.align ?? 'center')
-    const offset = align_offset(size, fragment?.size ?? make_size(), alignment)
-    return make_fragment({ size, children: fragment ? [place_fragment(fragment, offset)] : [],
-      guides: transform_guides(fragment?.guides ?? {}, offset.y) })
-  }
-}
-
-export { Overlay, TransformBox, Rotate, Attach, Anchor }
-export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, AnchorProps }
+export { Overlay, TransformBox, Rotate, Attach }
+export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps }

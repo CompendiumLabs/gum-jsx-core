@@ -33,13 +33,14 @@ class Group extends Element<GroupProps> {
     const size = group_size(query)
     const request = make_request({ width: available(size.width), height: available(size.height) })
     const children = element_children(props.children).map((element, index) => {
-      const { pos = [0, 0], anchor = 'start' } = element.props
+      const { pos, anchor = pos === undefined ? 'start' : 'center' } = element.props
       const measure = child_measure(element, query, index, size)
       const { path } = measure
 
       // Position lengths use the child's local font and the whole group rectangle.
       // Moving the origin or anchor never changes the child's available-space offer.
-      const point = coordinate_point(pos, size, measure, undefined, 'pos')!
+      const point = pos === undefined ? make_point()
+        : coordinate_point(pos, size, measure, undefined, 'pos')!
       const align = resolve_alignment(anchor, `${path}.anchor`)
       if (typeof align.x !== 'number' || typeof align.y !== 'number') {
         throw new TypeError(`${path}.anchor selects a point; use width and height to size the child`)

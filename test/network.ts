@@ -149,7 +149,7 @@ const tests: Record<string, () => void> = {
     }))
     const result = layout([new Edge({ start: 'custom', end: 'b', start_side: 'right', ...plain }),
       new Custom({ pos: { x: px(40), y: px(60) } }), node('b', 0.8, 0.5)])
-    near_point(ends(result.children[0].fragment)[0], { x: 110, y: 90 })
+    near_point(ends(result.children[0].fragment)[0], { x: 20, y: 40 })
   },
 
   'any identified element is a node and framed shapes supply their visible outline'() {
@@ -277,7 +277,9 @@ const tests: Record<string, () => void> = {
       children: [new Edge({ start: 'a', end: 'a' }), node('a', 0.5, 0.5)] })
     const result = layout([new Edge({ start: 'a', end: 'b', ...plain }), node('a', 0.2, 0.5),
       node('b', 0.8, 0.5), inner, new Text({ children: 'Annotation', pos: { x: 0.5, y: 0.8 } })])
-    near_point(result.children[4].offset, { x: 300, y: 60 })
+    const annotation = result.children[4]
+    near_point({ x: annotation.offset.x + annotation.fragment.size.width / 2,
+      y: annotation.offset.y + annotation.fragment.size.height / 2 }, { x: 300, y: 60 })
     assert.throws(() => layout([new Edge({ start: 'a', end: 'inner' }), node('a', 0.2, 0.5),
       new Network({ children: node('inner', 0, 0) })]), /Unknown node id: inner/)
     const clipped = layout([node('a', -0.2, 0.5)], { clip: true })

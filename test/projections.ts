@@ -62,7 +62,8 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(b.offset, { x: 115, y: 157 })
     assert.deepEqual(a.fragment.size, b.fragment.size)
     assert.deepEqual(pass.layout(graph(new Rect()), fixed).children[0].offset, { x: 0, y: 0 })
-    assert.deepEqual(pass.layout(graph(new Rect({ pos: { x: px(7), y: px(0) } })), fixed).children[0].offset, { x: 7, y: 0 })
+    assert.deepEqual(pass.layout(graph(new Rect({ pos: { x: px(7), y: px(0) }, width: px(10), height: px(6) })),
+      fixed).children[0].offset, { x: 2, y: -3 })
   },
   'local geometry and tagged pairs bypass projection; mixed pairs are rejected'() {
     const pass = new LayoutPass()
