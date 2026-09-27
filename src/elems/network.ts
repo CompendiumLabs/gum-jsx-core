@@ -3,6 +3,7 @@ import { collect_connections, connection_center, connection_port, connection_sid
 import type { PlacedConnection } from '../lib/connections'
 import { coordinate_length, infer_coordinates, point_bounds } from '../engine/coordinates'
 import type { DataBounds } from '../engine/coordinates'
+import { read_coordinate } from '../engine/coordinate'
 import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
@@ -22,11 +23,13 @@ import { graph_child, graph_size } from './graph'
 import type { GraphProps } from './graph'
 import { arrow_draw, arrow_head_options, head_scope, resolve_arrow_head } from './marks'
 import type { ArrowProps } from './marks'
+import type { PositionValue } from './shapes'
 import type { Side } from './placement'
 
 type NodeProps = TextBoxProps
-type EdgeProps = Omit<ArrowProps, 'from' | 'to'> & Readonly<{
+type EdgeProps = Omit<ArrowProps, 'from' | 'to' | 'points'> & Readonly<{
   start: string | Element; end: string | Element
+  points?: readonly PositionValue[]
   start_side?: Side; end_side?: Side; start_loc?: number; end_loc?: number
   gap?: Length
 }>
@@ -41,8 +44,14 @@ function node_id(id: unknown): string {
   return id
 }
 
-// Numeric x/y locate a child in data space, whatever kind of element it is.
-function position_bounds({ x, y }: ElementProps): DataBounds {
+// Numeric Cartesian pos components locate nodes and annotations in data space.
+function position_bounds({ pos }: ElementProps): DataBounds {
+  if (pos === undefined) return {}
+  const point = read_coordinate<Length>(pos, 'Network pos')
+  if (!Object.hasOwn(point, 'x') || !Object.hasOwn(point, 'y')) {
+    throw new TypeError('Network pos needs Cartesian x and y')
+  }
+  const { x, y } = point
   return { ...(typeof x === 'number' ? { xlim: [x, x] as const } : {}),
     ...(typeof y === 'number' ? { ylim: [y, y] as const } : {}) }
 }
@@ -51,7 +60,7 @@ function position_bounds({ x, y }: ElementProps): DataBounds {
 // framed label whose connection boundary comes from its box like any other.
 class Node extends Element<BoxProps, NodeProps> {
   static defaults: Partial<BoxProps> = {
-    x: 0, y: 0, anchor: 'center', align: 'center',
+    pos: [0, 0], anchor: 'center', align: 'center',
     padding: em(0.6), border_width: px(1), border_radius: em(0.3),
   }
   static normalize = TextBox.normalize

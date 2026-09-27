@@ -27,9 +27,9 @@ const tests: Record<string, () => void> = {
 
   'fractional positions and child regions use the whole canvas and anchors use allocated bounds'() {
     const root = new LayoutPass().layout(evaluate(`<Group width={px(200)} height={px(100)}>
-      <Rect x={0.25} y={0.25} width={0.5} height={0.5} stroke="none"/>
-      <Circle x={0.75} y={0.5} anchor="center" width={px(20)} stroke="none"/>
-      <Rect x={1} y={1} anchor="end" width={px(30)} height={px(10)} stroke="none"/>
+      <Rect pos={[0.25, 0.25]} width={0.5} height={0.5} stroke="none"/>
+      <Circle pos={[0.75, 0.5]} anchor="center" width={px(20)} stroke="none"/>
+      <Rect pos={[1, 1]} anchor="end" width={px(30)} height={px(10)} stroke="none"/>
     </Group>`))
     const [rect, circle, corner] = root.children
     assert.deepEqual(rect.offset, { x: 50, y: 25 })
@@ -41,8 +41,8 @@ const tests: Record<string, () => void> = {
 
   'canvas aspect derives one axis while exact dimensions win and pixel strokes stay fixed'() {
     const source = evaluate(`<Svg width={px(400)}><Group aspect={2}>
-      <Circle x={0.25} y={0.5} anchor="center" width={em(2)} stroke_width={px(2)}/>
-      <Rect x={0.5} y={0.25} width={0.5} height={0.5} stroke_width={px(2)}/>
+      <Circle pos={[0.25, 0.5]} anchor="center" width={em(2)} stroke_width={px(2)}/>
+      <Rect pos={[0.5, 0.25]} width={0.5} height={0.5} stroke_width={px(2)}/>
     </Group></Svg>`)
     const before = JSON.stringify(source), pass = new LayoutPass()
     const first = pass.layout(source)
@@ -66,7 +66,7 @@ const tests: Record<string, () => void> = {
 
   'em positions use each child font independently of the group and numeric anchors are dimensionless'() {
     const group = new LayoutPass().layout(new Group({ width: px(200), height: px(100), font_size: px(10),
-      children: new Rect({ x: em(1), y: em(2), anchor: { x: 'end', y: 0.25 }, font_size: em(2),
+      children: new Rect({ pos: { x: em(1), y: em(2) }, anchor: { x: 'end', y: 0.25 }, font_size: em(2),
         width: em(2), height: em(1), stroke_width: em(0.1) }) }))
     const child = group.children[0]
     assert.deepEqual(child.fragment.size, { width: 40, height: 20 })
@@ -75,11 +75,11 @@ const tests: Record<string, () => void> = {
   },
 
   'nested canvases establish local references and reuse a source at different positions'() {
-    const leaf = new Rect({ x: 0.5, y: 0.25, width: 0.5, height: 0.5, fill: 'teal', stroke: 'none' })
+    const leaf = new Rect({ pos: { x: 0.5, y: 0.25 }, width: 0.5, height: 0.5, fill: 'teal', stroke: 'none' })
     const pass = new LayoutPass()
     const root = pass.layout(new Group({ width: px(200), height: px(100), children: [
       new Group({ width: 0.5, height: 1, children: leaf }),
-      new Group({ x: 0.5, width: 0.5, height: 1, children: leaf }),
+      new Group({ pos: { x: 0.5, y: px(0) }, width: 0.5, height: 1, children: leaf }),
     ] }))
     const [a, b] = root.children
     assert.deepEqual(a.offset, { x: 0, y: 0 })
@@ -101,12 +101,12 @@ const tests: Record<string, () => void> = {
     })
     const pass = new LayoutPass()
     const group = pass.layout(new Group({ width: px(200), height: px(100), children: [
-      new Probe({ x: px(-20) }), new Probe({ x: px(250), y: px(150), anchor: 'end' }),
+      new Probe({ pos: { x: px(-20), y: px(0) } }), new Probe({ pos: { x: px(250), y: px(150) }, anchor: 'end' }),
     ] }))
     assert.equal(calls, 2)
     assert.deepEqual(group.children.map(child => child.offset), [{ x: -20, y: 0 }, { x: 226, y: 138 }])
     const box = pass.layout(new Box({ width: px(100), height: px(100), children:
-      new Rect({ x: 0.5, y: 0.5, anchor: 'center', width: px(20), height: px(10) }) }))
+      new Rect({ pos: { x: 0.5, y: 0.5 }, anchor: 'center', width: px(20), height: px(10) }) }))
     assert.deepEqual(box.children[0].offset, { x: 0, y: 0 })
   },
 
@@ -119,7 +119,7 @@ const tests: Record<string, () => void> = {
     } }
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
     const source = new Group({ width: px(400), height: px(300), children: new Text({
-      x: 0.5, y: 0.5, anchor: 'center', width: 0.5, font_size: px(18),
+      pos: { x: 0.5, y: 0.5 }, anchor: 'center', width: 0.5, font_size: px(18),
       children: 'A paragraph lives in a positioned region. Its words reflow when that region changes width.',
     }) })
     const wide = pass.layout(source), count = shapes
@@ -139,7 +139,7 @@ const tests: Record<string, () => void> = {
 
   'canvas clipping hides ink but retains positioned overflow and source paint order'() {
     const pass = new LayoutPass()
-    const leaf = new Rect({ x: px(-10), y: px(90), width: px(20), height: px(20),
+    const leaf = new Rect({ pos: { x: px(-10), y: px(90) }, width: px(20), height: px(20),
       fill: 'teal', stroke: 'none' })
     const props = { width: px(100), height: px(100), children: leaf }
     const a = pass.layout(new Group(props)), b = pass.layout(new Group({ ...props, clip: true }))
@@ -150,7 +150,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(b.overflow, a.overflow)
     assert.match(render_svg(b), /clip-path="url\(#/)
     const layers = pass.layout(evaluate(`<Group width={px(100)} height={px(100)}>
-      <Rect fill="red" stroke="none"/>{false}<><Rect x={0.25} width={0.5} fill="blue" stroke="none"/></>
+      <Rect fill="red" stroke="none"/>{false}<><Rect pos={[0.25, px(0)]} width={0.5} fill="blue" stroke="none"/></>
     </Group>`))
     const svg = render_svg(layers)
     assert.ok(svg.indexOf('fill="red"') < svg.indexOf('fill="blue"'))
@@ -170,13 +170,13 @@ const tests: Record<string, () => void> = {
     assert.equal(calls, 0)
     assert.throws(() => pass.layout(new Group()), /Group needs a finite width and height/)
     const zero = pass.layout(new Group({ width: px(0), height: px(0), children:
-      new Rect({ x: 0.5, y: 0.5, anchor: 'center', width: 0.5, height: 0.5 }) }))
+      new Rect({ pos: { x: 0.5, y: 0.5 }, anchor: 'center', width: 0.5, height: 0.5 }) }))
     assert.deepEqual(zero.size, make_size())
     assert.deepEqual(zero.children[0].fragment.size, make_size())
     assert.deepEqual(zero.children[0].offset, { x: 0, y: 0 })
     assert.equal(zero.ink, null)
     assert.throws(() => pass.layout(new Group({ width: px(100), height: px(100), children:
-      new Rect({ x: NaN }) })), /Group\/Rect\[0\].x/)
+      new Rect({ pos: { x: NaN, y: px(0) } }) })), /Group\/Rect\[0\].pos.x/)
     assert.throws(() => pass.layout(new Group({ width: px(100), height: px(100), children:
       new Rect({ anchor: { y: NaN } }) })), /Group\/Rect\[0\].anchor/)
     assert.throws(() => pass.layout(evaluate(`<Group width={px(100)} height={px(100)}>

@@ -1,7 +1,9 @@
 import { nonnegative } from '../lib/checks'
 import { DEFAULTS } from '../engine/defaults'
-import { coordinate_point, point_bounds } from '../engine/coordinates'
+import { coordinate_point, position_bounds } from '../engine/coordinates'
 import type { GeometrySpace } from '../engine/coordinates'
+import { finite_position } from '../engine/coordinate'
+import type { CoordinatePosition } from '../engine/coordinate'
 import { draw_rect, draw_ellipse, draw_path } from '../engine/drawing'
 import { Element, define_component, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -24,9 +26,9 @@ type RectRadius = Radius | RadiusSides
 type RectProps = ElementProps & Readonly<{ border_radius?: RectRadius }>
 type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>
 type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>
-type LineProps = ElementProps & Readonly<{ from?: PositionValue; to?: PositionValue; space?: GeometrySpace }>
+type LineProps = ElementProps & Readonly<{ from?: CoordinatePosition; to?: CoordinatePosition; space?: GeometrySpace }>
 type PolygonProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>
-type PolylineProps = PolygonProps & Readonly<{ space?: GeometrySpace }>
+type PolylineProps = ElementProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; space?: GeometrySpace }>
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>
 
 // Only shapes with an intrinsic ratio supply a default aspect. Geometry references
@@ -47,21 +49,19 @@ function resolve_position(value: PositionValue, size: Size, measure: LengthConte
   )
 }
 
-// These shapes keep their local default and explicitly opt into pairwise data mapping.
+// These shapes keep their local default and explicitly opt into data mapping.
 function line_point(query: LayoutQuery, size: Size, space: GeometrySpace = 'local') {
   if (!['local', 'data'].includes(space)) throw new TypeError('Unknown geometry space')
   if (space === 'data' && !query.coordinates) throw new TypeError('Data geometry needs a coordinate context such as Graph or Plot')
-  return (value: PositionValue, path: string) => space === 'local'
-    ? resolve_position(value, size, query.measure, path)
-    : coordinate_point(read_point(value, `${query.measure.path}.${path}`), size, query.measure, query.coordinates)
+  return (value: CoordinatePosition | null, path: string) => {
+    const source = finite_position(value, `${query.measure.path}.${path}`)
+    return source && coordinate_point(source, size, query.measure,
+      space === 'data' ? query.coordinates : undefined, path)
+  }
 }
 
-function line_bounds(space: GeometrySpace | undefined, points: readonly PositionValue[]) {
-  if (space !== 'data') return null
-  return point_bounds(points.map(value => {
-    const point = read_point(value)
-    return typeof point.x === 'number' && typeof point.y === 'number' ? point as Point : null
-  }))
+function line_bounds(space: GeometrySpace | undefined, points: readonly (CoordinatePosition | null)[]) {
+  return space === 'data' ? position_bounds(points) : null
 }
 
 // Unit records are scalar lengths; coordinate records and tuples are pairs.
@@ -174,13 +174,14 @@ class Line extends Element<LineProps> {
 }
 
 // Closing is a path command, so the same point handling serves both primitives.
-function poly_layout(props: PolygonProps, query: LayoutQuery, closed = false, space: GeometrySpace = 'local') {
+function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false, space: GeometrySpace = 'local') {
   const { size, paint } = shape_context(props, query)
   const point = line_point(query, size, space)
   const commands: PathCommand[] = []
   let started = false
   for (const [index, value] of (props.points ?? []).entries()) {
-    const projected = point(value, `points[${index}]`)
+    const projected = closed ? resolve_position(value as PositionValue, size, query.measure, `points[${index}]`)
+      : point(value, `points[${index}]`)
     if (!projected) { started = false; continue; }
     commands.push({ kind: started ? 'L' : 'M', ...projected })
     started = true

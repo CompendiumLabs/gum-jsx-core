@@ -2,18 +2,20 @@ import { count_limit } from './checks'
 import { linspace } from './arrays'
 import { copy_limit } from '../engine/coordinates'
 import type { Limit } from '../engine/coordinates'
-import { make_point, read_point } from '../engine/geometry'
+import { make_point } from '../engine/geometry'
 import type { Point, PointValue } from '../engine/geometry'
+import { read_cartesian, read_coordinate } from '../engine/coordinate'
+import type { Coordinate, CoordinateValue } from '../engine/coordinate'
 
 type ScalarFunction = number | ((value: number) => number)
 type SampleProps = Readonly<{
-  f?: (value: number) => PointValue | null
+  f?: (value: number) => CoordinateValue | null
   fx?: ScalarFunction; fy?: ScalarFunction
   xlim?: Limit; ylim?: Limit; tlim?: Limit
   xvals?: readonly number[]; yvals?: readonly number[]; tvals?: readonly number[]
   samples?: number
 }>
-type Sample = Readonly<{ t: number; point: Point | null }>
+type Sample = Readonly<{ t: number; point: Coordinate | null }>
 
 function sample_count(count: number, max = 100000): number {
   return count_limit(count, 'samples', max)
@@ -21,8 +23,18 @@ function sample_count(count: number, max = 100000): number {
 
 function finite_point(value: PointValue | null): Point | null {
   if (value === null) return null
-  const { x, y } = read_point(value, 'sample')
+  const { x, y } = read_cartesian(value, 'sample')
+  if (typeof x !== 'number' || typeof y !== 'number') throw new TypeError('Cartesian samples need numeric x and y')
   return Number.isFinite(x) && Number.isFinite(y) ? make_point(x, y) : null
+}
+
+function finite_sample(value: CoordinateValue | null): Coordinate | null {
+  if (value === null) return null
+  const point = read_coordinate(value, 'sample')
+  for (const [key, component] of Object.entries(point)) {
+    if (typeof component !== 'number') throw new TypeError(`sample.${key} must be a number`)
+  }
+  return Object.values(point).every(Number.isFinite) ? point : null
 }
 
 function scalar_value(fn: ScalarFunction, value: number): number {
@@ -54,7 +66,7 @@ function sample_curve(props: SampleProps = {}): readonly Sample[] {
   }
   return Object.freeze(ts.map((t, index) => {
     if (!Number.isFinite(t)) return Object.freeze({ t, point: null })
-    let point: PointValue | null
+    let point: CoordinateValue | null
     try {
       if (f) point = f(t)
       else if (fx !== undefined && fy !== undefined) point = { x: scalar_value(fx, t), y: scalar_value(fy, t) }
@@ -65,14 +77,14 @@ function sample_curve(props: SampleProps = {}): readonly Sample[] {
         const y = yvals ? yvals[index] : tvals || props.tlim ? t : ys[index]
         point = { x: scalar_value(fx, y), y }
       } else point = { x: xs[index], y: ys[index] }
-      return Object.freeze({ t, point: finite_point(point) })
+      return Object.freeze({ t, point: finite_sample(point) })
     } catch (cause) {
       throw new Error(`Sample ${index} at t=${t} failed`, { cause })
     }
   }))
 }
 
-function sample_points(props: SampleProps = {}): readonly (Point | null)[] {
+function sample_points(props: SampleProps = {}): readonly (Coordinate | null)[] {
   return Object.freeze(sample_curve(props).map(sample => sample.point))
 }
 

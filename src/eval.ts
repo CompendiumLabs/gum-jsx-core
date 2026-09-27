@@ -39,6 +39,7 @@ import { linear_ticks, format_tick } from './lib/ticks'
 import { spline1d, spline2d } from './lib/curves'
 import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point } from './engine/coordinates'
 import { Projection } from './engine/projection'
+import { read_coordinate, copy_coordinate } from './engine/coordinate'
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>
 
@@ -61,7 +62,7 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     move_to, line_to, quad_to, curve_to, close_path,
     em, px, Element, define_element, define_component, element_children, prefix_split, prefix_join,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point,
-    Projection, graph_children,
+    Projection, read_coordinate, copy_coordinate, graph_children,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...defaults.scope, ...scope,

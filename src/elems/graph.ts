@@ -1,5 +1,5 @@
 import { resolve_alignment } from '../lib/composition'
-import { coordinate_length, coordinate_point, infer_coordinates } from '../engine/coordinates'
+import { coordinate_point, infer_coordinates } from '../engine/coordinates'
 import type { Coordinates, CoordinateSpec } from '../engine/coordinates'
 import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
@@ -11,7 +11,6 @@ import type { LayoutQuery } from '../engine/pass'
 import { child_measure } from '../engine/pass'
 import { Projection } from '../engine/projection'
 import type { ProjectionFunction } from '../engine/projection'
-import { px } from '../engine/units'
 
 type GraphProps = ElementProps & CoordinateSpec & Readonly<{
   clip?: boolean; projection?: Projection | ProjectionFunction
@@ -28,8 +27,8 @@ function graph_size(query: LayoutQuery, aspect = 1.5): Size {
   return shape_size(request, { ...query.sizing, aspect: ratio })
 }
 
-// Both graph marks and annotations get ordinary layout requests. Numeric x/y
-// metadata locates annotations in data space; omitted positions stay at the origin.
+// Both graph marks and annotations get ordinary layout requests. Numeric pos
+// locates annotations in data space; omitted positions stay at the local origin.
 function graph_children(elements: readonly Element[], query: LayoutQuery, size: Size,
   coordinates: Coordinates) {
   return elements.map((element, index) => graph_child(element, query, size, coordinates, index))
@@ -39,16 +38,13 @@ function graph_children(elements: readonly Element[], query: LayoutQuery, size: 
 function graph_child(element: Element, query: LayoutQuery, size: Size,
   coordinates: Coordinates, index: number) {
   const request = make_request({ width: available(size.width), height: available(size.height) })
-  const { x, y, anchor = 'start' } = element.props
+  const { pos, anchor = 'start' } = element.props
   const measure = child_measure(element, query, index, size)
   const { path } = measure
   const align = resolve_alignment(anchor, `${path}.anchor`)
   if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
-  const position = coordinates.projection && (x !== undefined || y !== undefined)
-    ? coordinate_point([x ?? (typeof y === 'number' ? 0 : px(0)),
-      y ?? (typeof x === 'number' ? 0 : px(0))], size, measure, coordinates)
-    : make_point(x === undefined ? 0 : coordinate_length(x, 'x', size, measure, coordinates),
-      y === undefined ? 0 : coordinate_length(y, 'y', size, measure, coordinates))
+  const position = pos === undefined ? make_point()
+    : coordinate_point(pos, size, measure, coordinates, 'pos')
   if (!position) return place_fragment(make_fragment({ size: { width: 0, height: 0 } }))
   const fragment = query.child(element, request, size, index, { coordinates })
   const { x: left, y: top } = position

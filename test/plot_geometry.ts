@@ -12,7 +12,7 @@ const fixed = make_request({ width: exact(200), height: exact(100) })
 const tests: Record<string, () => void> = {
   'overlays hug the base while anchored decorations retain clipped overflow'() {
     const base = new Rect({ width: px(100), height: px(50), fill: 'blue', stroke: 'none' })
-    const mark = new Rect({ x: 1, y: 0.5, anchor: 'center', width: px(30), height: px(20), fill: 'red', stroke: 'none' })
+    const mark = new Rect({ pos: { x: 1, y: 0.5 }, anchor: 'center', width: px(30), height: px(20), fill: 'red', stroke: 'none' })
     const pass = new LayoutPass(), a = pass.layout(new Overlay({ children: [base, mark] }))
     const b = pass.layout(new Overlay({ children: [base, mark], clip: true }))
     assert.deepEqual(a.size, { width: 100, height: 50 })
@@ -66,7 +66,7 @@ const tests: Record<string, () => void> = {
 
   'tuple anchors preserve parent placement and independent content alignment across resizing'() {
     const anchor: [number, number] = [1, 0.25]
-    const props = { x: 0.75, y: 0.25, width: px(40), height: px(20),
+    const props = { pos: { x: 0.75, y: 0.25 }, width: px(40), height: px(20),
       align: { x: 'center', y: 'end' } as const,
       children: new Rect({ width: px(10), height: px(4), fill: 'blue', stroke: 'none' }) }
     const tuple = new Box({ ...props, anchor })

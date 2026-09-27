@@ -18,7 +18,7 @@ function ends(fragment: Fragment) {
   return [commands[0] as Point, commands.at(-1) as Point]
 }
 function node(id: string, x: number, y: number, props = {}) {
-  return new Node({ id, x, y, width: px(80), height: px(40), border_radius: 0, children: id, ...props })
+  return new Node({ id, pos: { x: x, y: y }, width: px(80), height: px(40), border_radius: 0, children: id, ...props })
 }
 function layout(children: readonly Element[], props = {}) {
   return new LayoutPass().layout(new Network({ ...limits, ...props, children }), fixed)
@@ -72,8 +72,8 @@ const tests: Record<string, () => void> = {
 
   'edges bind after text reflow and keep source paint order across cached layouts'() {
     const edge = new Edge({ start: 'a', end: 'b', ...plain })
-    const a = new Node({ id: 'a', x: 0.2, y: 0.5, children: 'A' })
-    const b = new Node({ id: 'b', x: 0.8, y: 0.5, width: 0.2,
+    const a = new Node({ id: 'a', pos: { x: 0.2, y: 0.5 }, children: 'A' })
+    const b = new Node({ id: 'b', pos: { x: 0.8, y: 0.5 }, width: 0.2,
       children: 'A label that wraps into several lines' })
     const source = new Network({ ...limits, children: [edge, a, b] })
     const before = JSON.stringify(source), pass = new LayoutPass()
@@ -95,9 +95,9 @@ const tests: Record<string, () => void> = {
   'connections follow fitted and padded node frames instead of wrapper allocations'() {
     const a = new Node({ id: 'a', width: px(60), height: px(30), border_radius: 0, children: 'A' })
     const wrappers: readonly [Element, Point][] = [
-      [new Box({ fit: 'contain', x: 0.3, y: 0.5, anchor: 'center', max_width: px(180), max_height: px(100), children: a }),
+      [new Box({ fit: 'contain', pos: { x: 0.3, y: 0.5 }, anchor: 'center', max_width: px(180), max_height: px(100), children: a }),
         { x: 135, y: 195 }],
-      [new Box({ x: 0.3, y: 0.5, anchor: 'center', width: px(180), height: px(100),
+      [new Box({ pos: { x: 0.3, y: 0.5 }, anchor: 'center', width: px(180), height: px(100),
         padding: px(10), align: 'center', children: a }), { x: 165, y: 165 }],
     ]
     for (const [wrapper, expected] of wrappers) {
@@ -113,9 +113,9 @@ const tests: Record<string, () => void> = {
   'rotated and sheared connections transform the boundary and its outward normals'() {
     const a = node('a', 0, 0)
     const wrappers: readonly [Element, Point, Point][] = [
-      [new Rotate({ x: 0.3, y: 0.5, anchor: 'center', angle: 90, children: a }),
+      [new Rotate({ pos: { x: 0.3, y: 0.5 }, anchor: 'center', angle: 90, children: a }),
         { x: 180, y: 190 }, { x: 0, y: 1 }],
-      [new TransformBox({ x: 0.3, y: 0.5, anchor: 'center', matrix: [1, 0.5, 0.2, 1, 10, -5],
+      [new TransformBox({ pos: { x: 0.3, y: 0.5 }, anchor: 'center', matrix: [1, 0.5, 0.2, 1, 10, -5],
         resize: false, children: a }), { x: 234, y: 185 }, { x: 1, y: -0.2 }],
     ]
     for (const [wrapper, expected, normal] of wrappers) {
@@ -148,13 +148,13 @@ const tests: Record<string, () => void> = {
       size: make_size(180, 100), connection: { id: 'custom', boundary: make_rect(30, 20, 40, 20) },
     }))
     const result = layout([new Edge({ start: 'custom', end: 'b', start_side: 'right', ...plain }),
-      new Custom({ x: px(40), y: px(60) }), node('b', 0.8, 0.5)])
+      new Custom({ pos: { x: px(40), y: px(60) } }), node('b', 0.8, 0.5)])
     near_point(ends(result.children[0].fragment)[0], { x: 110, y: 90 })
   },
 
   'any identified element is a node and framed shapes supply their visible outline'() {
-    const circle = new Circle({ id: 'c', x: 0.25, y: 0.5, anchor: 'center', width: px(80), height: px(80) })
-    const rect = new Rect({ id: 'r', x: 0.75, y: 0.5, anchor: 'center', width: px(100), height: px(60),
+    const circle = new Circle({ id: 'c', pos: { x: 0.25, y: 0.5 }, anchor: 'center', width: px(80), height: px(80) })
+    const rect = new Rect({ id: 'r', pos: { x: 0.75, y: 0.5 }, anchor: 'center', width: px(100), height: px(60),
       border_radius: [px(30), px(20)] })
     const result = layout([new Edge({ start: circle, end: rect, start_side: 'top', start_loc: 0.25,
       end_side: 'top', end_loc: 0.1, ...plain }), circle, rect])
@@ -168,7 +168,7 @@ const tests: Record<string, () => void> = {
     assert.equal(pass.layout(new Circle({ width: px(80) })).connection, undefined)
 
     // Elements without a frame of their own connect at their allocation.
-    const label = new Text({ id: 't', children: 'Plain text', x: 0.5, y: 0.2, anchor: 'center' })
+    const label = new Text({ id: 't', children: 'Plain text', pos: { x: 0.5, y: 0.2 }, anchor: 'center' })
     const text = layout([new Edge({ start: 't', end: 'r', start_side: 'bottom', ...plain }), label, rect])
     const placed = text.children[1]
     assert.deepEqual(placed.fragment.connection!.boundary,
@@ -178,9 +178,9 @@ const tests: Record<string, () => void> = {
   },
 
   'identified containers stay transparent while nested networks are single nodes'() {
-    const group = new VStack({ id: 'group', x: 0.25, y: 0.5, anchor: 'center', width: px(100), gap: px(20),
+    const group = new VStack({ id: 'group', pos: { x: 0.25, y: 0.5 }, anchor: 'center', width: px(100), gap: px(20),
       children: [new Rect({ id: 'top', height: px(40) }), new Rect({ id: 'bottom', height: px(40) })] })
-    const inner = new Network({ ...limits, id: 'inner', x: 0.75, y: 0.5, anchor: 'center',
+    const inner = new Network({ ...limits, id: 'inner', pos: { x: 0.75, y: 0.5 }, anchor: 'center',
       width: px(120), height: px(80), children: node('hidden', 0.5, 0.5) })
     const result = layout([new Edge({ start: 'group', end: 'inner', ...plain }),
       new Edge({ start: 'bottom', end: 'inner', start_side: 'right', end_side: 'bottom', ...plain }),
@@ -194,7 +194,7 @@ const tests: Record<string, () => void> = {
   },
 
   'compound elements publish one connection however they compose their parts'() {
-    const titled = new TitleFrame({ id: 'titled', title: 'Title', x: 0.3, y: 0.5, anchor: 'center',
+    const titled = new TitleFrame({ id: 'titled', title: 'Title', pos: { x: 0.3, y: 0.5 }, anchor: 'center',
       width: px(160), border_radius: px(12), children: 'Body' })
     const result = layout([new Edge({ start: 'titled', end: 'b', start_side: 'top', ...plain }),
       new Edge({ start: 'titled', end: 'b', start_side: 'right', ...plain }), titled, node('b', 0.85, 0.5)])
@@ -217,7 +217,7 @@ const tests: Record<string, () => void> = {
       const Type = value as new (props: object) => Element
       for (const extra of variants) {
         let element: Element
-        try { element = new Type({ id: 'n', x: 0.5, y: 0.5, width: px(120), height: px(80), ...extra }) }
+        try { element = new Type({ id: 'n', pos: { x: 0.5, y: 0.5 }, width: px(120), height: px(80), ...extra }) }
         catch { continue }
         try { layout([new Edge({ start: 'n', end: 'b' }), element, node('b', 0.9, 0.9)]); connected++ }
         catch (error) { assert.doesNotMatch(String(error), /Duplicate node id/, name) }
@@ -273,10 +273,10 @@ const tests: Record<string, () => void> = {
   },
 
   'nested networks keep ids local and ordinary annotations keep graph placement'() {
-    const inner = new Network({ ...limits, width: px(100), height: px(80), x: 0.5, y: 0.2,
+    const inner = new Network({ ...limits, width: px(100), height: px(80), pos: { x: 0.5, y: 0.2 },
       children: [new Edge({ start: 'a', end: 'a' }), node('a', 0.5, 0.5)] })
     const result = layout([new Edge({ start: 'a', end: 'b', ...plain }), node('a', 0.2, 0.5),
-      node('b', 0.8, 0.5), inner, new Text({ children: 'Annotation', x: 0.5, y: 0.8 })])
+      node('b', 0.8, 0.5), inner, new Text({ children: 'Annotation', pos: { x: 0.5, y: 0.8 } })])
     near_point(result.children[4].offset, { x: 300, y: 60 })
     assert.throws(() => layout([new Edge({ start: 'a', end: 'inner' }), node('a', 0.2, 0.5),
       new Network({ children: node('inner', 0, 0) })]), /Unknown node id: inner/)
@@ -287,8 +287,8 @@ const tests: Record<string, () => void> = {
 
   'inference includes node centers and waypoints and JSX accepts node references'() {
     const result = new LayoutPass().layout(evaluate(`
-      const a = <Node id="a" x={2} y={0}>A</Node>
-      const b = <Node id="b" x={8} y={0}>B</Node>
+      const a = <Node id="a" pos={[2, 0]}>A</Node>
+      const b = <Node id="b" pos={[8, 0]}>B</Node>
       return <Network padding={0.5} width={px(600)} height={px(300)}>
         <Edge start={a} end={b} points={[[5, 1]]} />
         {a}
@@ -301,8 +301,8 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(new LayoutPass().layout(new Network()).size, { width: 480, height: 320 })
     const shapes = new LayoutPass().layout(evaluate(`
       return <Network padding={0.5} width={px(600)} height={px(300)}>
-        <Circle id="a" x={2} y={0} anchor="center" width={px(40)} />
-        <Square id="b" x={8} y={0} anchor="center" width={px(40)} />
+        <Circle id="a" pos={[2, 0]} anchor="center" width={px(40)} />
+        <Square id="b" pos={[8, 0]} anchor="center" width={px(40)} />
         <Edge start="a" end="b" />
       </Network>
     `))

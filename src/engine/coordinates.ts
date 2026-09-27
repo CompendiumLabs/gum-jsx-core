@@ -5,6 +5,8 @@ import { make_point, read_point, read_insets } from './geometry'
 import type { Point, PointValue, Size, InsetSpec } from './geometry'
 import { resolve_length } from './units'
 import type { Length, LengthContext } from './units'
+import { read_coordinate, copy_coordinate, finite_position } from './coordinate'
+import type { Coordinate, CoordinateValue, CoordinatePosition } from './coordinate'
 import { Projection } from './projection'
 
 type Limit = readonly [number, number]
@@ -54,6 +56,19 @@ function point_bounds(points: readonly (PointValue | null)[]): DataBounds | null
   return xmin === Infinity ? null : { xlim: [xmin, xmax], ylim: [ymin, ymax] }
 }
 
+// Inferred bounds belong to Cartesian source space. Explicit projected limits
+// bypass discovery; no bounds reader should interpret arbitrary dimension names.
+function position_bounds(points: readonly (CoordinatePosition | null)[]): DataBounds | null {
+  return point_bounds(points.map(value => {
+    const point = finite_position(value)
+    if (point === null) return null
+    if (!Object.hasOwn(point, 'x') || !Object.hasOwn(point, 'y')) {
+      throw new TypeError('Data coordinates need x and y; named coordinates require a projection with explicit limits')
+    }
+    return typeof point.x === 'number' && typeof point.y === 'number' ? { x: point.x, y: point.y } : null
+  }))
+}
+
 function merge_bounds(bounds: readonly (DataBounds | null)[]): DataBounds | null {
   const result: { xlim?: Limit; ylim?: Limit } = {}
   for (const axis of ['xlim', 'ylim'] as const) {
@@ -81,8 +96,11 @@ function data_bounds(element: Element): DataBounds | null {
 
 function infer_coordinates(children: Child, spec: CoordinateSpec = {},
   extra: readonly (DataBounds | null)[] = []): Coordinates {
-  const bounds = merge_bounds([...element_children(children).map(data_bounds), ...extra])
   if (spec.coord && spec.coord.length !== 4) throw new TypeError('coord needs [xmin, ymin, xmax, ymax]')
+  // Complete limits need no source-bound discovery. In particular, projected
+  // annotations may use dimension names that Cartesian bounds cannot interpret.
+  const bounds = spec.coord || (spec.xlim && spec.ylim) ? null
+    : merge_bounds([...element_children(children).map(data_bounds), ...extra])
   const raw = spec.padding ?? 0
   // Retain the original axis-object form as an alias for horizontal/vertical.
   const padding = read_insets(typeof raw === 'object' && !Array.isArray(raw) && ('x' in raw || 'y' in raw)
@@ -113,12 +131,14 @@ function map_axis(value: number, limit: Limit, extent: number, flip = false): nu
   return (flip ? 1 - fraction : fraction) * extent
 }
 
-function map_point(value: PointValue, coord: Coordinates, size: Size): Point | null {
-  let point = read_point(value)
-  if (coord.projection) {
-    const projected = coord.projection.project([point.x, point.y])
-    if (projected === null) return null
-    point = read_point(projected)
+function map_point(value: CoordinateValue, coord: Coordinates, size: Size): Point | null {
+  const source = read_coordinate(value)
+  const point = coord.projection ? coord.projection.project(source) : copy_coordinate(source)
+  if (point === null) return null
+  if (!Object.hasOwn(point, 'x') || !Object.hasOwn(point, 'y')) {
+    throw new TypeError(coord.projection
+      ? 'Projection output needs x and y for Cartesian mapping'
+      : 'Data coordinates need x and y; named coordinates require a projection')
   }
   return make_point(map_axis(point.x, coord.xlim, size.width, coord.flip_x),
     map_axis(point.y, coord.ylim, size.height, coord.flip_y))
@@ -138,27 +158,34 @@ function coordinate_length(value: Length, axis: 'x' | 'y', size: Size, measure: 
   coord?: Coordinates, property: string = axis): number {
   const extent = axis === 'x' ? size.width : size.height
   if (coord && typeof value === 'number') {
-    if (coord.projection) throw new TypeError('A projection needs a coordinate pair; use coordinate_point')
+    if (coord.projection) throw new TypeError('A projection needs a coordinate record; use coordinate_point')
     return map_axis(value, axis === 'x' ? coord.xlim : coord.ylim, extent,
       axis === 'x' ? coord.flip_x : coord.flip_y)
   }
   return resolve_length(value, measure, extent, property)
 }
 
-// Data mapping consumes the pair together. Local lengths bypass it; mixing one
-// data component with a local length is ambiguous for a nonseparable projection.
-function coordinate_point(value: PointValue<Length>, size: Size, measure: LengthContext,
-  coord?: Coordinates): Point | null {
-  const point = read_point(value)
-  const numeric_x = typeof point.x === 'number', numeric_y = typeof point.y === 'number'
-  if (coord && numeric_x && numeric_y) return map_point(point as Point, coord, size)
-  if (coord?.projection && (numeric_x || numeric_y)) {
-    throw new TypeError('Projected points need two data numbers or two local lengths')
+// Data mapping consumes the complete record. Only local Cartesian lengths can
+// bypass it; mixing data components and lengths is ambiguous under projection.
+function coordinate_point(value: CoordinatePosition, size: Size, measure: LengthContext,
+  coord?: Coordinates, property = 'position'): Point | null {
+  const path = measure.path ? `${measure.path}.${property}` : property
+  const point = read_coordinate<Length>(value, path)
+  if (coord && Object.values(point).every(component => typeof component === 'number')) {
+    return map_point(point as Coordinate, coord, size)
   }
-  return make_point(coordinate_length(point.x, 'x', size, measure, coord),
-    coordinate_length(point.y, 'y', size, measure, coord))
+  if (Object.keys(point).length !== 2 || !Object.hasOwn(point, 'x') || !Object.hasOwn(point, 'y')) {
+    throw new TypeError(`${path}: Local positions need exactly x and y; named data coordinates require a projection and numeric components`)
+  }
+  if (point.x == null || point.y == null) throw new TypeError(`${path} needs both x and y components`)
+  const numeric_x = typeof point.x === 'number', numeric_y = typeof point.y === 'number'
+  if (coord?.projection && (numeric_x || numeric_y)) {
+    throw new TypeError('Projected points need numeric data coordinates or two local lengths')
+  }
+  return make_point(coordinate_length(point.x, 'x', size, measure, coord, `${property}.x`),
+    coordinate_length(point.y, 'y', size, measure, coord, `${property}.y`))
 }
 
-export { copy_limit, copy_coordinates, point_bounds, merge_bounds, data_bounds,
+export { copy_limit, copy_coordinates, point_bounds, position_bounds, merge_bounds, data_bounds,
   infer_coordinates, map_axis, map_point, unmap_point, coordinate_length, coordinate_point }
 export type { Limit, DataBounds, Coordinates, CoordinateSpec, GeometrySpace }

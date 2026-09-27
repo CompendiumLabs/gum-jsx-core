@@ -4,16 +4,16 @@ import { Element, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point, make_rect } from '../engine/geometry'
+import { coordinate_point } from '../engine/coordinates'
+import type { CoordinatePosition } from '../engine/coordinate'
 import { available, make_request, shape_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { child_measure } from '../engine/pass'
-import { resolve_length } from '../engine/units'
-import type { Length } from '../engine/units'
 
 type AnchorValue = Exclude<AlignmentValue, 'stretch' | 'fill'>
 type Anchor = AnchorValue | Readonly<{ x?: AnchorValue; y?: AnchorValue }>
   | readonly [x: AnchorValue, y: AnchorValue]
-type PositionSpec = Readonly<{ x?: Length; y?: Length; anchor?: Anchor }>
+type PositionSpec = Readonly<{ pos?: CoordinatePosition; anchor?: Anchor }>
 type GroupProps = ElementProps & Readonly<{ clip?: boolean }>
 
 // A canvas selects its extent before measuring children. Finite offers are used
@@ -33,16 +33,13 @@ class Group extends Element<GroupProps> {
     const size = group_size(query)
     const request = make_request({ width: available(size.width), height: available(size.height) })
     const children = element_children(props.children).map((element, index) => {
-      const { x = 0, y = 0, anchor = 'start' } = element.props
+      const { pos = [0, 0], anchor = 'start' } = element.props
       const measure = child_measure(element, query, index, size)
       const { path } = measure
 
       // Position lengths use the child's local font and the whole group rectangle.
       // Moving the origin or anchor never changes the child's available-space offer.
-      const point = make_point(
-        resolve_length(x, measure, size.width, 'x'),
-        resolve_length(y, measure, size.height, 'y'),
-      )
+      const point = coordinate_point(pos, size, measure, undefined, 'pos')!
       const align = resolve_alignment(anchor, `${path}.anchor`)
       if (typeof align.x !== 'number' || typeof align.y !== 'number') {
         throw new TypeError(`${path}.anchor selects a point; use width and height to size the child`)

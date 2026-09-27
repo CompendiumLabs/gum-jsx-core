@@ -6,6 +6,7 @@ import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
 import { make_size, make_point, make_rect, transform_rect } from '../engine/geometry'
 import type { Transform, Size } from '../engine/geometry'
+import { coordinate_point } from '../engine/coordinates'
 import { available, make_request, finish_size } from '../engine/layout'
 import type { LayoutQuery } from '../engine/pass'
 import { child_measure } from '../engine/pass'
@@ -35,8 +36,8 @@ class Overlay extends Element<OverlayProps> {
       const align = resolve_alignment(element.props.anchor ?? 'start')
       if (typeof align.x !== 'number' || typeof align.y !== 'number') throw new TypeError('An anchor selects a point')
       // Anchor locates the child's own reference point, just as in Group.
-      const x = resolve_length(element.props.x ?? 0, measure, size.width, 'x')
-      const y = resolve_length(element.props.y ?? 0, measure, size.height, 'y')
+      const { pos = [0, 0] } = element.props
+      const { x, y } = coordinate_point(pos, size, measure, undefined, 'pos')!
       children.push(place_fragment(fragment,
         make_point(x - fragment.size.width * align.x, y - fragment.size.height * align.y)))
     })

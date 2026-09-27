@@ -9,7 +9,7 @@ import type { PathDraw, ProjectionFunction } from '../src/index'
 
 const fixed = make_request({ width: exact(200), height: exact(100) })
 const limits = { xlim: [0, 10], ylim: [0, 10] } as const
-const shear: ProjectionFunction = ([x, y]) => [x + y, y]
+const shear: ProjectionFunction = ({ x, y }) => ({ x: x + y, y })
 const graph = (child: Element, projection: ProjectionFunction = shear) =>
   new Graph({ ...limits, projection, children: child })
 const commands = (fragment: ReturnType<LayoutPass['layout']>) => (fragment.draw[0] as PathDraw).commands
@@ -17,7 +17,7 @@ function near(actual: number, expected: number) { assert.ok(Math.abs(actual - ex
 
 const tests: Record<string, () => void> = {
   'polar projection maps pairs before viewport limits and flips'() {
-    const polar: ProjectionFunction = ([theta, r]) => [r * Math.cos(theta), r * Math.sin(theta)]
+    const polar: ProjectionFunction = ({ x: theta, y: r }) => ({ x: r * Math.cos(theta), y: r * Math.sin(theta) })
     const fragment = new LayoutPass().layout(new Graph({ projection: polar,
       xlim: [-1, 1], ylim: [-1, 1], children: new CoordLine({ points: [[0, 1], [Math.PI / 2, 1]] }) }), fixed)
     const path = commands(fragment.children[0].fragment)
@@ -54,7 +54,7 @@ const tests: Record<string, () => void> = {
     }
   },
   'annotations project anchors while dimensions and unpositioned children remain local'() {
-    const child = new Rect({ x: 1, y: 2, width: px(10), height: px(6), anchor: 'center' })
+    const child = new Rect({ pos: { x: 1, y: 2 }, width: px(10), height: px(6), anchor: 'center' })
     const pass = new LayoutPass(), source = graph(child)
     const a = pass.layout(source, fixed).children[0]
     assert.deepEqual(a.offset, { x: 55, y: 77 })
@@ -62,7 +62,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(b.offset, { x: 115, y: 157 })
     assert.deepEqual(a.fragment.size, b.fragment.size)
     assert.deepEqual(pass.layout(graph(new Rect()), fixed).children[0].offset, { x: 0, y: 0 })
-    assert.deepEqual(pass.layout(graph(new Rect({ x: px(7) })), fixed).children[0].offset, { x: 7, y: 0 })
+    assert.deepEqual(pass.layout(graph(new Rect({ pos: { x: px(7), y: px(0) } })), fixed).children[0].offset, { x: 7, y: 0 })
   },
   'local geometry and tagged pairs bypass projection; mixed pairs are rejected'() {
     const pass = new LayoutPass()
@@ -73,11 +73,11 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(commands(pass.layout(graph(tagged), fixed).children[0].fragment), [
       { kind: 'M', x: 10, y: 20 }, { kind: 'L', x: 100, y: 25 },
     ])
-    assert.throws(() => pass.layout(graph(new Points({ points: [[1, px(2)]] })), fixed), /two data numbers/)
+    assert.throws(() => pass.layout(graph(new Points({ points: [[1, px(2)]] })), fixed), /numeric data coordinates/)
   },
   'projection identity participates in caching and survives source copies'() {
     const pass = new LayoutPass(), child = new CoordLine({ points: [[1, 2], [3, 4]] })
-    const a = graph(child), b = graph(child, ([x, y]) => [x - y, y])
+    const a = graph(child), b = graph(child, ({ x, y }) => ({ x: x - y, y }))
     const first = pass.layout(a, fixed).children[0].fragment
     assert.notDeepEqual(first, pass.layout(b, fixed).children[0].fragment)
     const copy = new Element(a.type, a.props)
@@ -91,7 +91,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(pass.layout(graph(inner), fixed).children[0].fragment, pass.layout(inner, fixed))
   },
   'null projection results hide markers and split paths without adding heads at cuts'() {
-    const project: ProjectionFunction = ([x, y]) => x === 2 ? null : [x, y]
+    const project: ProjectionFunction = ({ x, y }) => x === 2 ? null : { x, y }
     const points = [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]] as const
     const pass = new LayoutPass()
     const path = commands(pass.layout(graph(new CoordLine({ points }), project), fixed).children[0].fragment)
@@ -102,7 +102,7 @@ const tests: Record<string, () => void> = {
     assert.equal(cut_end.draw.length, 1)
     const markers = pass.layout(graph(new Points({ points }), project), fixed).children[0].fragment
     assert.equal(markers.children.length, 4)
-    const hidden = pass.layout(graph(new Rect({ x: 2, y: 0 }), project), fixed).children[0].fragment
+    const hidden = pass.layout(graph(new Rect({ pos: { x: 2, y: 0 } }), project), fixed).children[0].fragment
     assert.deepEqual(hidden.size, { width: 0, height: 0 })
     for (const child of [new Segments({ segments: [[points[1], points[2]]] }),
       new Bars({ values: [0], positions: [2], bar_width: 0 }),
@@ -120,21 +120,21 @@ const tests: Record<string, () => void> = {
     assert.throws(() => new Graph({ projection: shear }), /explicit xlim and ylim/)
     assert.throws(() => new Graph({ xlim: [0, 1], projection: shear }), /explicit xlim and ylim/)
     assert.doesNotThrow(() => new Graph({ coord: [0, 0, 1, 1], projection: shear }))
-    for (const value of [[1], [NaN, 0], [1, Infinity], undefined, { x: 1, y: 2 }]) {
+    for (const value of [[1], [1, 2], { x: NaN, y: 0 }, { x: 1, y: Infinity }, undefined]) {
       const invalid = new Projection((() => value) as unknown as ProjectionFunction)
-      assert.throws(() => invalid.project([0, 0]), /coordinate pair|finite/)
+      assert.throws(() => invalid.project({ x: 0, y: 0 }), /coordinate record|finite/)
     }
   },
   'evaluated JSX can reuse a core Projection as well as a callback'() {
     const source = evaluate(`
-      const projection = new Projection(([x, y]) => [x + y, y])
+      const projection = new Projection(({x, y}) => ({x: x + y, y}))
       return <Graph projection={projection} xlim={[0, 10]} ylim={[0, 10]}>
         <CoordLine points={[[1, 2], [3, 4]]} />
       </Graph>
     `)
     const pass = new LayoutPass()
     assert.deepEqual(pass.layout(source, fixed), pass.layout(graph(new CoordLine({ points: [[1, 2], [3, 4]] })), fixed))
-    assert.throws(() => source.props.projection.project([1, 2, 3]), /coordinate pair/)
+    assert.throws(() => source.props.projection.project([1, 2, 3]), /coordinate record/)
   },
   'Line and Polyline keep local defaults and require an explicit data context'() {
     const pass = new LayoutPass()
@@ -152,7 +152,7 @@ const tests: Record<string, () => void> = {
         { kind: 'M', x: 10, y: 20 }, { kind: 'L', x: 100, y: 25 },
       ])
       const mixed = new Shape({ space: 'data', from: [1, px(2)], points: [[1, px(2)]] })
-      assert.throws(() => pass.layout(graph(mixed), fixed), /two data numbers/)
+      assert.throws(() => pass.layout(graph(mixed), fixed), /numeric data coordinates/)
     }
   },
   'data Line and Polyline contribute bounds while local shapes do not'() {
@@ -167,7 +167,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(commands(fragment.children[0].fragment), [{ kind: 'M', x: 0, y: 100 }, { kind: 'L', x: 200, y: 0 }])
   },
   'projected lines handle invisible endpoints and break polylines at invisible vertices'() {
-    const project: ProjectionFunction = ([x, y]) => x === 2 ? null : [x, y]
+    const project: ProjectionFunction = ({ x, y }) => x === 2 ? null : { x, y }
     const pass = new LayoutPass()
     for (const endpoints of [[[1, 0], [2, 0]], [[2, 0], [1, 0]], [[2, 0], [2, 1]]] as const) {
       const line = new Line({ from: endpoints[0], to: endpoints[1], space: 'data' })

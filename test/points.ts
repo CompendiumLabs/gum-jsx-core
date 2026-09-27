@@ -196,17 +196,22 @@ const tests: Record<string, () => void> = {
     for (const bad of [[], [1], [1, 2, 3], Array(2), {}, { x: 1 }]) {
       const value = bad as unknown as PointValue
       const error = /exactly two coordinates/
-      assert.throws(() => pass.layout(new Line({ from: value })), error)
+      assert.throws(() => pass.layout(new Line({ from: value })), /coordinate record|Local positions need exactly x and y/)
       assert.throws(() => pass.layout(new Ellipse({ radius: value })), error)
-      assert.throws(() => data_bounds(new CoordLine({ points: [value] })), error)
+      assert.throws(() => data_bounds(new CoordLine({ points: [value] })), /coordinate record|named coordinates require a projection/)
       assert.throws(() => pass.layout(new Points({ points: [[0, 0]], point_size: value })), error)
-      assert.throws(() => new Field({ vectors: [{ point: [0, 0], vector: value }] }), error)
+      assert.throws(() => new Field({ vectors: [{ point: [0, 0], vector: value }] }), /coordinate record|exactly two coordinates/)
       assert.throws(() => spline2d([value]), error)
       assert.throws(() => add2(value, 1), error)
       assert.throws(() => lingrid([0, 1], [0, 1], value), error)
-      assert.throws(() => sample_points({ f: () => value, samples: 1 }),
-        (e: unknown) => e instanceof Error && /Sample 0/.test(e.message)
-          && e.cause instanceof TypeError && error.test(e.cause.message))
+      // A one-dimensional record is now a valid parametric sample.
+      if (Object.keys(bad).length === 1 && 'x' in bad) {
+        assert.deepEqual(sample_points({ f: () => value, samples: 1 }), [{ x: 1 }])
+      } else {
+        assert.throws(() => sample_points({ f: () => value, samples: 1 }),
+          (e: unknown) => e instanceof Error && /Sample 0/.test(e.message)
+            && e.cause instanceof TypeError && /coordinate record/.test(e.cause.message))
+      }
     }
     assert.throws(() => pass.layout(new Circle({ center: [1, NaN] })), /finite/)
     assert.throws(() => pass.layout(new Ellipse({ radius: [px(-1), px(1)] })), /nonnegative/)

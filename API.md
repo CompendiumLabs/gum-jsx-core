@@ -378,7 +378,7 @@ Element-specific properties are interpreted by the element's layout method.
 The direct stack parent interprets a child's `basis`, `grow`, and `shrink`.
 Stacks, grids, and single-content containers interpret `align_self`; these placement
 properties introduce no policy in the layout pass and do not inherit.
-Similarly, Group reads its direct children's `x`, `y`, and `anchor`. These properties
+Similarly, Group reads its direct children's `pos` and `anchor`. These properties
 do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
 Set `debug` on an element to outline its allocated box in solid red and its
@@ -802,9 +802,9 @@ axis or fit within two available axes; exact axes take precedence, as for shapes
 <Svg width={px(400)}>
   <Group aspect={2}>
     <Rect fill="#edf4f1" stroke="none" />
-    <Circle x={0.25} y={0.5} anchor="center" width={px(60)}
+    <Circle pos={[0.25, 0.5]} anchor="center" width={px(60)}
       fill="#317969" stroke="none" />
-    <Text x={0.5} y={0.5} anchor={{ y: 'center' }} width={0.4}>
+    <Text pos={[0.5, 0.5]} anchor={{ y: 'center' }} width={0.4}>
       A label in its own region.
     </Text>
   </Group>
@@ -821,9 +821,14 @@ Rect fills the canvas and paints behind the other children.
 | Group `width`, `height`, `min_width`, etc. | Shared sizing for the canvas; independent of child bounds. |
 | Group `aspect` | Optional preferred width/height ratio, using the same sizing rules as shapes. |
 | Group `clip` | Clip painted ink to the canvas rectangle, default false; overflow is retained. |
-| Child `x`, `y` | Position lengths, default zero. Fractions reference the corresponding full canvas axis; negatives and values outside the canvas are allowed. |
-| Child `anchor` | The point of the child's allocated box that meets `(x,y)`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` / `[x,y]` with these values. |
+| Child `pos` | Position as `[x, y]` or `{x, y}` lengths, default `[0, 0]`. Fractions reference the corresponding full canvas axis; negatives and values outside the canvas are allowed. |
+| Child `anchor` | The point of the child's allocated box placed at `pos`. Default `"start"` (top-left); also `"center"`, `"end"`, a number from 0 to 1, or `{x,y}` / `[x,y]` with these values. |
 | Child `width`, `height`, etc. | Ordinary sizing, resolved against the canvas. Use these to define a text region or shape size. |
+
+Supplied Cartesian positions require both components. A `pos` override replaces
+the whole value. Element source props containing legacy `x` or `y` report a
+migration error; custom components can consume those parameters in their build
+function or normalization and return `pos` in the resulting element props.
 
 The canvas must have both axes supplied by dimensions or finite offers, or one
 axis plus an aspect. For example, `<Svg width={px(200)} height={px(100)}><Group>…`
@@ -1127,21 +1132,52 @@ measure 480×320, and derive a missing axis from a 1.5 default aspect.
 New marks interpret numeric geometry as data inside Graph/Plot and as fractions
 outside. `space="local"` opts out; `space="data"` requires a graph. Existing
 Line and Polyline default to local geometry and accept `space="data"` to opt
-into pairwise coordinate mapping, including GeoMap projections. In data space
+into coordinate mapping, including GeoMap projections. In data space
 their numeric points contribute to Graph/Plot limit inference. A hidden endpoint
 omits a Line; hidden vertices split a Polyline into separate runs. They project
 only supplied points. Path retains local geometry. px/em
-positions stay local. Graph directly positions annotations by data x/y and
+positions stay local. Graph directly positions annotations by numeric `pos` and
 ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
 
-Graph also accepts `projection={([x, y]) => [u, v]}` or a core `Projection`
-instance. It projects numeric pairs before applying limits and flips. Supply
+Graph also accepts `projection={({x, y}) => ({x: x + y, y})}` or a core
+`Projection` instance. Numeric tuples expand to `{x, y}` records before the
+callback runs. It projects those records before applying limits and flips. Supply
 explicit xlim/ylim (or coord) in output space. This supports polar coordinates
 without changing the marks. The optional `Coordinates.projection` travels through
 LayoutContext and participates in cache identity. `map_point` and
 `coordinate_point` return local `{x, y}` or null for an omitted point; the latter
 also accepts paired local lengths. Mixing data numbers and local lengths in one
 projected pair is an error. `coordinate_length` cannot project a single axis.
+
+The core source-coordinate contract is `Coordinate = Readonly<Record<string,
+number>>`. `CoordinateValue` also accepts `[x, y]` shorthand, and
+`CoordinatePosition` accepts a numeric record or a Cartesian pair of lengths.
+`read_coordinate` copies and freezes a record, expanding tuples without losing
+named dimensions or rejecting nonfinite samples. `copy_coordinate` requires a
+nonempty record whose components are all finite numbers. Resolved `Point`
+geometry remains `{x, y}` in pixels.
+
+`ProjectionFunction` is `(point: Coordinate) => Coordinate | null`. Direct
+`Projection.project` calls require records on both sides. A projection may
+change dimension names and count; `map_point` and `coordinate_point` preserve
+every source dimension until projection and require `x` and `y` in the final
+result. For example, a custom element can map `{theta, r}` through
+`new Projection(({theta, r}) => ({x: r * cos(theta), y: r * sin(theta)}))`.
+Composition can call one Projection from another, propagating `null` explicitly.
+The `pos` placement prop accepts tuples and arbitrary named numeric records.
+Omitting it keeps the child at the local origin; an explicit `pos={[0, 0]}` maps
+data zero. Complete explicit limits bypass source bounds discovery, so Node
+annotations can also use named projected positions.
+
+Projected marks preserve arbitrary numeric records in `points`, `from`, `to`,
+`segments`, `tip`, `origin`, and Arc's `center`. This includes Line and Polyline
+with `space="data"`. A nonfinite value in any dimension creates a sample gap.
+Fill accepts named coordinates on both explicit boundary arrays and splits the
+region if either side has a gap or projects to null. A scalar Fill boundary
+requires exactly Cartesian `x` and `y`, because it replaces one source axis.
+Field and SymField likewise require Cartesian points and vectors for their
+arithmetic. Bars construct Cartesian corners before projection. Projected Arc
+radii and marker dimensions remain local Cartesian lengths.
 
 Projection callbacks are pure, stable behavior retained by identity, and run
 during layout. Construct a new Projection when its behavior changes. The source
@@ -1184,7 +1220,12 @@ Standalone axes/meshes require their own lim for tick generation.
 Sampling, marker-shape/size functions, bar styles, and tick formatters run once
 at construction and produce immutable descriptions. Resizing reuses samples and
 prepared glyph measurements. Null/nonfinite samples create path gaps. Use fy for
-y=f(x), fx for x=f(y), f(t) for parametric points, or explicit arrays. samples
+y=f(x), fx for x=f(y), f(t) for parametric points, or explicit arrays. Parametric
+`f(t)` may return any numeric coordinate record, `[x, y]`, or null. `sample_curve`
+and `sample_points` retain all dimensions. Points callbacks receive the complete
+frozen source record and original index; tuple inputs become `{x, y}`. In
+TypeScript, `Points` infers callback fields from its supplied points, and
+`SymPoints` callbacks receive numeric `Coordinate` records. `samples`
 defaults to 101. SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
@@ -1209,10 +1250,10 @@ examples, and current limits.
 <Svg width={px(480)} height={px(200)}>
   <Network>
     <Edge start="input" end="output" stroke={blue} />
-    <Node id="input" x={0} y={0}>
+    <Node id="input" pos={[0, 0]}>
       Input
     </Node>
-    <Node id="output" x={1} y={0}>
+    <Node id="output" pos={[1, 0]}>
       Output
     </Node>
   </Network>
@@ -1221,7 +1262,7 @@ examples, and current limits.
 
 Any element with an `id` is a node. Node is the conventional one: a compact
 TextFrame with a centered placement anchor. Network uses Graph sizing and coordinates, inferring limits
-from child x/y positions and edge waypoints with 0.2 default data padding. Explicit node
+from child `pos` components and edge waypoints with 0.2 default data padding. Explicit node
 widths wrap labels at their ordinary font size. Put edges first to paint them
 behind nodes; source order remains paint order independently of measurement order.
 `align` positions the label inside Node. `text_*` props pass to the generated

@@ -1,6 +1,8 @@
 import { finite, nonnegative } from '../lib/checks'
-import { coordinate_point, point_bounds } from '../engine/coordinates'
+import { coordinate_point, position_bounds } from '../engine/coordinates'
 import type { GeometrySpace } from '../engine/coordinates'
+import { finite_position, read_cartesian } from '../engine/coordinate'
+import type { CoordinatePosition } from '../engine/coordinate'
 import { arc_path, rounded_path, spline_path } from '../lib/curves'
 import { arrow_barb } from '../lib/arrows'
 import { draw_path } from '../engine/drawing'
@@ -17,7 +19,7 @@ import { transform_path } from '../engine/path'
 import { prefix_split, scope_props } from '../lib/props'
 import type { Prefixed } from '../lib/props'
 import { Circle, is_position } from './shapes'
-import type { Position, PositionValue, Radius } from './shapes'
+import type { PositionValue, Radius } from './shapes'
 import { Rotate, TransformBox } from './placement'
 import { resolve_paint, resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
@@ -25,14 +27,14 @@ import { make_measure, px, resolve_length } from '../engine/units'
 import type { Length, LengthContext } from '../engine/units'
 
 type MarkProps = ElementProps & Readonly<{ space?: GeometrySpace }>
-type CoordLineProps = MarkProps & Readonly<{ points?: readonly (PositionValue | null)[]; closed?: boolean }>
+type CoordLineProps = MarkProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; closed?: boolean }>
 type SplineProps = CoordLineProps & Readonly<{ tension?: number }>
 type RoundedLineProps = CoordLineProps & Readonly<{ radius?: Length }>
-type SegmentsProps = MarkProps & Readonly<{ segments?: readonly (readonly [PositionValue, PositionValue])[] }>
-type ArcProps = MarkProps & Readonly<{ center?: PositionValue; radius?: Radius; start?: number; end?: number }>
+type SegmentsProps = MarkProps & Readonly<{ segments?: readonly (readonly [CoordinatePosition, CoordinatePosition])[] }>
+type ArcProps = MarkProps & Readonly<{ center?: CoordinatePosition; radius?: Radius; start?: number; end?: number }>
 type FillProps = MarkProps & Readonly<{
-  points?: readonly (PositionValue | null)[]
-  boundary?: readonly (PositionValue | null)[] | number
+  points?: readonly (CoordinatePosition | null)[]
+  boundary?: readonly (CoordinatePosition | null)[] | number
   direction?: 'vertical' | 'horizontal'
 }>
 type ArrowBarbSide = 'both' | 'left' | 'right'
@@ -43,20 +45,22 @@ type ArrowHeadStyle = Omit<ArrowHeadOptions, 'head_size' | 'head_width'>
 type ArrowHeadScope = Pick<ArrowHeadOptions, 'head_size' | 'head_width'>
   & Prefixed<'head', ArrowHeadStyle> & Readonly<{ head_style?: ArrowHeadStyle }>
 type ArrowProps = MarkProps & ArrowHeadScope & Readonly<{
-  from?: PositionValue; to?: PositionValue; points?: readonly PositionValue[]
+  from?: CoordinatePosition; to?: CoordinatePosition; points?: readonly (CoordinatePosition | null)[]
   start_head?: boolean; end_head?: boolean; curve?: boolean; tension?: number; radius?: Length
 }>
 type ArrowHeadProps = MarkProps & ArrowHeadOptions & Readonly<{
-  tip?: PositionValue; angle?: number
+  tip?: CoordinatePosition; angle?: number
 }>
-type RayProps = MarkProps & Readonly<{ origin?: PositionValue; angle?: number; length?: Length }>
+type RayProps = MarkProps & Readonly<{ origin?: CoordinatePosition; angle?: number; length?: Length }>
 type PointSize = Length | PositionValue
-type PointsProps = MarkProps & Readonly<{
-  points?: readonly (PositionValue | null)[]
-  point_size?: PointSize | ((point: Position, index: number) => PointSize)
-  shape?: Element | ((point: Position, index: number) => Element)
+type MarkerPoint<P extends CoordinatePosition> = P extends readonly [Length, Length]
+  ? Readonly<{ x: P[0]; y: P[1] }> : Readonly<P>
+type PointsProps<P extends CoordinatePosition = CoordinatePosition> = MarkProps & Readonly<{
+  points?: readonly (P | null)[]
+  point_size?: PointSize | ((point: NoInfer<MarkerPoint<P>>, index: number) => PointSize)
+  shape?: Element | ((point: NoInfer<MarkerPoint<P>>, index: number) => Element)
 }>
-type Marker = Readonly<{ point: Position; size: PointSize; shape: Element }>
+type Marker = Readonly<{ point: MarkerPoint<CoordinatePosition>; size: PointSize; shape: Element }>
 type PointsData = MarkProps & Readonly<{ markers: readonly Marker[] }>
 
 const MARKER_TRANSFORMS = new Set([new Rotate().type.layout, new TransformBox().type.layout])
@@ -90,34 +94,20 @@ function mark_context(props: MarkProps, query: LayoutQuery) {
   if (props.space === 'data' && !query.coordinates) throw new TypeError('Data geometry needs a coordinate context such as Graph or Plot')
   const size = shape_size(query.request, query.sizing)
   const coord = props.space === 'local' ? undefined : query.coordinates
-  const point = (value: PositionValue) => coordinate_point(value, size, query.measure, coord)
+  const point = (value: CoordinatePosition | null) => {
+    const source = finite_position(value)
+    return source && coordinate_point(source, size, query.measure, coord)
+  }
   const length = (value: Length) => nonnegative(resolve_length(value,
     query.measure, Math.min(size.width, size.height), 'length'), 'length')
   return { size, point, length, coord, paint: resolve_paint(query.style, size, query.measure) }
 }
 
-function mark_bounds(props: MarkProps, points: readonly (PositionValue | null)[]) {
-  return props.space === 'local' ? null : point_bounds(points.map(value => {
-    if (value === null) return null
-    const p = read_point(value)
-    return typeof p.x === 'number' && typeof p.y === 'number' ? p as Point : null
-  }))
+function mark_bounds(props: MarkProps, points: readonly (CoordinatePosition | null)[]) {
+  return props.space === 'local' ? null : position_bounds(points)
 }
 
-// Nulls and nonfinite coordinates break paths instead of connecting across holes.
-function finite_runs(points: readonly (PositionValue | null)[]): Position[][] {
-  const runs: Position[][] = []
-  let run: Position[] = []
-  for (const value of points) {
-    const point = value === null ? null : read_point(value)
-    const valid = point && [point.x, point.y].every(v => typeof v !== 'number' || Number.isFinite(v))
-    if (valid) run.push(point)
-    else if (run.length) { runs.push(run); run = []; }
-  }
-  if (run.length) runs.push(run)
-  return runs
-}
-
+// Source gaps and null projection results break paths instead of joining holes.
 function split_runs<T>(points: readonly (T | null)[]): T[][] {
   const runs: T[][] = []
   let run: T[] = []
@@ -129,8 +119,8 @@ function split_runs<T>(points: readonly (T | null)[]): T[][] {
   return runs
 }
 
-function projected_runs(points: readonly (PositionValue | null)[], project: (point: PositionValue) => Point | null): Point[][] {
-  return finite_runs(points).flatMap(run => split_runs(run.map(project)))
+function projected_runs(points: readonly (CoordinatePosition | null)[], project: (point: CoordinatePosition | null) => Point | null): Point[][] {
+  return split_runs(points.map(project))
 }
 
 function line_path(points: readonly Point[], closed = false): PathCommand[] {
@@ -191,8 +181,11 @@ class Segments extends Element<SegmentsProps> {
 
 class Arc extends Element<ArcProps> {
   static data_bounds(props: ArcProps) {
-    const c = read_point(props.center ?? { x: 0.5, y: 0.5 }, 'center'), r = props.radius ?? 0.5
+    if (props.space === 'local') return null
+    const r = props.radius ?? 0.5
     const pair = is_position(r) ? read_point(r, 'radius') : { x: r, y: r }
+    if (typeof pair.x !== 'number' || typeof pair.y !== 'number') return null
+    const c = read_cartesian<Length>(props.center ?? { x: 0.5, y: 0.5 }, 'Arc source bounds')
     return typeof c.x === 'number' && typeof c.y === 'number'
       && typeof pair.x === 'number' && typeof pair.y === 'number' ? mark_bounds(props, [
         { x: c.x - pair.x, y: c.y - pair.y }, { x: c.x + pair.x, y: c.y + pair.y },
@@ -222,19 +215,21 @@ class Arc extends Element<ArcProps> {
 }
 
 // Both boundaries share indices. A gap in either splits the entire filled region.
-function fill_pairs(props: FillProps): readonly (readonly [Position, Position] | null)[] {
+function fill_pairs(props: FillProps): readonly (readonly [CoordinatePosition, CoordinatePosition] | null)[] {
   const { points = [], boundary = 0, direction = 'vertical' } = props
   if (!['vertical', 'horizontal'].includes(direction)) throw new TypeError('Unknown fill direction')
   if (typeof boundary !== 'number' && boundary.length !== points.length) {
     throw new RangeError('Fill boundaries need matching lengths')
   }
   return points.map((value, i) => {
-    const point = value === null ? null : read_point(value, `points[${i}]`)
-    const other = typeof boundary === 'number' && point
-      ? direction === 'vertical' ? { x: point.x, y: boundary } : { x: boundary, y: point.y }
-      : typeof boundary !== 'number' ? boundary[i] : null
-    const run = finite_runs([point, other])[0]
-    return run?.length === 2 ? [run[0], run[1]] as const : null
+    const source = typeof boundary === 'number' && value !== null
+      ? read_cartesian<Length>(value, `Fill points[${i}] with a scalar boundary`) : value
+    const point = finite_position(source, `points[${i}]`)
+    const other = typeof boundary === 'number'
+      ? point && (direction === 'vertical' ? { x: point.x, y: boundary } : { x: boundary, y: point.y })
+      : boundary[i]
+    const paired = finite_position(other, `boundary[${i}]`)
+    return point && paired ? [point, paired] as const : null
   })
 }
 
@@ -302,7 +297,7 @@ function arrow_head(tip: Point, angle: number, barb: ReturnType<typeof arrow_bar
   return path
 }
 
-function arrow_points(props: ArrowProps): readonly PositionValue[] {
+function arrow_points(props: ArrowProps): readonly (CoordinatePosition | null)[] {
   return props.points ?? [props.from ?? { x: 0, y: 0 }, props.to ?? { x: 1, y: 1 }]
 }
 
@@ -463,12 +458,12 @@ class Ray extends Element<RayProps> {
   }
 }
 
-class Points extends Element<PointsData, PointsProps> {
+class Points<P extends CoordinatePosition = CoordinatePosition> extends Element<PointsData, PointsProps<P>> {
   static defaults: Partial<PointsData> = { fill: 'theme:foreground', stroke: 'none' }
-  static normalize({ points = [], point_size = px(6), shape = new Circle(), ...props }: PointsProps): PointsData {
+  static normalize<P extends CoordinatePosition>({ points = [], point_size = px(6), shape = new Circle(), ...props }: PointsProps<P>): PointsData {
     return { ...props,
       markers: points.flatMap((value, index) => {
-        const point = finite_runs([value])[0]?.[0]
+        const point = finite_position(value, `points[${index}]`) as MarkerPoint<P> | null
         return point ? [{ point,
           size: typeof point_size === 'function' ? point_size(point, index) : point_size,
           shape: typeof shape === 'function' ? shape(point, index) : shape }] : []
@@ -500,7 +495,7 @@ class Points extends Element<PointsData, PointsProps> {
 }
 
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
-  Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, finite_runs, line_path, arrow_draw,
+  Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, line_path, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head }
 export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
   ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }

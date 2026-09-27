@@ -93,8 +93,10 @@ export type { NodeProps, EdgeProps, NetworkProps } from './elems/network'
 export { copy_limit, copy_coordinates, point_bounds, merge_bounds, data_bounds,
   infer_coordinates, map_axis, map_point, unmap_point, coordinate_length, coordinate_point } from './engine/coordinates'
 export type { Limit, DataBounds, Coordinates, CoordinateSpec, GeometrySpace } from './engine/coordinates'
+export { read_coordinate, copy_coordinate } from './engine/coordinate'
+export type { Coordinate, CoordinateValue, CoordinatePosition } from './engine/coordinate'
 export { Projection } from './engine/projection'
-export type { PointPair, ProjectionFunction } from './engine/projection'
+export type { ProjectionFunction } from './engine/projection'
 export { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
 export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, AnchorProps } from './elems/placement'
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,

@@ -1,7 +1,7 @@
-import { finite } from '../lib/checks'
+import { copy_coordinate } from './coordinate'
+import type { Coordinate } from './coordinate'
 
-type PointPair = readonly [number, number]
-type ProjectionFunction = (point: PointPair) => PointPair | null
+type ProjectionFunction = (point: Coordinate) => Coordinate | null
 
 // Projection behavior is retained by identity, like an element type. Callbacks
 // must be pure: changing captured state would invalidate layout-cache assumptions.
@@ -9,25 +9,15 @@ class Projection {
   #project: ProjectionFunction
 
   constructor(project: ProjectionFunction) {
-    if (typeof project !== 'function') throw new TypeError('Projection needs a point-pair function')
+    if (typeof project !== 'function') throw new TypeError('Projection needs a coordinate-record function')
     this.#project = project
     Object.freeze(this)
   }
 
-  project(point: PointPair): PointPair | null {
-    if (!Array.isArray(point) || point.length !== 2) {
-      throw new TypeError('Projection input must be a coordinate pair')
-    }
-    const result = this.#project(Object.freeze([
-      finite(point[0], 'projection input x'), finite(point[1], 'projection input y'),
-    ]))
+  project(point: Coordinate): Coordinate | null {
+    const result = this.#project(copy_coordinate(point, 'projection input'))
     if (result === null) return null
-    if (!Array.isArray(result) || result.length !== 2) {
-      throw new TypeError('Projection must return a coordinate pair or null')
-    }
-    return Object.freeze([
-      finite(result[0], 'projection output x'), finite(result[1], 'projection output y'),
-    ])
+    return copy_coordinate(result, 'projection output')
   }
 }
 
@@ -41,4 +31,4 @@ function projection_key(projection?: Projection): number | undefined {
 }
 
 export { Projection, projection_key }
-export type { PointPair, ProjectionFunction }
+export type { ProjectionFunction }

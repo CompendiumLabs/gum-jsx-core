@@ -5,6 +5,7 @@ import { Element, define_component } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point } from '../engine/geometry'
 import type { Point } from '../engine/geometry'
+import type { Coordinate } from '../engine/coordinate'
 import { exact, make_request } from '../engine/layout'
 import { CoordLine, Spline, Points, Fill, mark_context, mark_bounds, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head } from './marks'
@@ -17,7 +18,7 @@ import type { Limit } from '../engine/coordinates'
 
 type SymLineProps = Omit<CoordLineProps, 'points'> & SampleProps
 type SymSplineProps = Omit<SplineProps, 'points'> & SampleProps
-type SymPointsProps = Omit<PointsProps, 'points'> & SampleProps
+type SymPointsProps = Omit<PointsProps<Coordinate>, 'points'> & SampleProps
 type SymFillProps = Omit<FillProps, 'points' | 'boundary'> & Readonly<{
   upper?: ScalarFunction; lower?: ScalarFunction; xlim?: Limit; xvals?: readonly number[]; samples?: number
   ylim?: Limit; yvals?: readonly number[]

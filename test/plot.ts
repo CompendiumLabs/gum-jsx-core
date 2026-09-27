@@ -21,7 +21,7 @@ const fixed = make_request({ width: exact(200), height: exact(100) })
 const tests: Record<string, () => void> = {
   'graph limits infer data, expand constants, ignore annotations, and isolate nested graphs'() {
     const line = new CoordLine({ points: [{ x: 2, y: 4 }, { x: 8, y: 4 }, null, { x: NaN, y: 1 }] })
-    const coord = infer_coordinates([line, new Text({ children: ['A ', 'label'], x: 99 }),
+    const coord = infer_coordinates([line, new Text({ children: ['A ', 'label'], pos: { x: 99, y: px(0) } }),
       new Graph({ children: new CoordLine({ points: [{ x: -100, y: -100 }] }) })])
     assert.deepEqual(coord.xlim, [2, 8])
     assert.deepEqual(coord.ylim, [3.5, 4.5])
@@ -131,7 +131,7 @@ const tests: Record<string, () => void> = {
   'graph annotations use data positions and markers retain fixed geometry on resize'() {
     const graph = new Graph({ xlim: [0, 10], ylim: [0, 10], children: [
       new Points({ points: [{ x: 5, y: 5 }], point_size: px(8) }),
-      new Text({ children: 'middle', x: 5, y: 5, anchor: 'center', font_size: px(12) }),
+      new Text({ children: 'middle', pos: { x: 5, y: 5 }, anchor: 'center', font_size: px(12) }),
     ] })
     const pass = new LayoutPass(), a = pass.layout(graph, fixed)
     const b = pass.layout(graph, make_request({ width: exact(400), height: exact(200) }))
