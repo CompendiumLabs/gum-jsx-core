@@ -1167,6 +1167,31 @@ Omitting it keeps the child at the local origin; an explicit `pos={[0, 0]}` maps
 data zero. Complete explicit limits bypass source bounds discovery, so Node
 annotations can also use named projected positions.
 
+Three core factories provide standard 3D views and are also available in JSX:
+
+| Factory | Options and behavior |
+|---|---|
+| `isometric_projection()` | Equal unit scale on all three axes: `{x: (x - y) * sqrt(3) / 2, y: z - (x + y) / 2}`. |
+| `orthographic_projection({azimuth = 45, elevation = 30} = {})` | Direction of sight in degrees: azimuth from +x toward +y, elevation toward +z in `[-90, 90]`. The projection plane passes through the origin. |
+| `perspective_projection({eye, target, up, focal_length = 1, near = 0.01})` | Requires `eye`; target defaults to the origin and up defaults to +z. Perspective divides horizontal/vertical camera coordinates by depth, then multiplies by focal length. |
+
+Each factory returns a `Projection` requiring finite `{x, y, z}` inputs; extra
+numeric dimensions are allowed. Options use the public readonly `Point3`,
+`OrthographicProjectionOptions`, and `PerspectiveProjectionOptions` types.
+Camera positions and vectors are records, not tuples. Isometric projects unit
+axes to unit lengths; orthographic preserves lengths within its projection
+plane. At orthographic elevation `±90`, azimuth still determines orientation.
+For perspective, eye and target must differ, and up must be nonzero and not
+parallel to the viewing direction. Options are snapshotted at construction.
+
+Perspective `focal_length` and `near` are positive finite lengths in source
+coordinate units. Points at or behind the near plane (`depth <= near`) return
+null. Graph handles the resulting output through its explicit limits and flips;
+match its aspect to the ratio of the output limit spans to preserve proportions.
+Marker sizes and text remain local geometry. These helpers retain point-based
+visibility and child drawing order; they do not add segment clipping or depth
+sorting.
+
 Projected marks preserve arbitrary numeric records in `points`, `from`, `to`,
 `segments`, `tip`, `origin`, and Arc's `center`. This includes Line and Polyline
 with `space="data"`. A nonfinite value in any dimension creates a sample gap.

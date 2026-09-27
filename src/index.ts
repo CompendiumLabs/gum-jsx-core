@@ -97,6 +97,8 @@ export { read_coordinate, copy_coordinate } from './engine/coordinate'
 export type { Coordinate, CoordinateValue, CoordinatePosition } from './engine/coordinate'
 export { Projection } from './engine/projection'
 export type { ProjectionFunction } from './engine/projection'
+export { isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
+export type { Point3, OrthographicProjectionOptions, PerspectiveProjectionOptions } from './lib/projections'
 export { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
 export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps, AnchorProps } from './elems/placement'
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
