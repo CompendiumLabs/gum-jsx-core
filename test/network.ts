@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Network, Node, Edge, Box, Rotate, TransformBox, Text, Circle, Rect, VStack, TitleFrame, LayoutPass,
@@ -34,7 +35,7 @@ const tests: Record<string, () => void> = {
       radius: a.children.at(-1)!.fragment.clip!.radius })
     assert.ok(a.content!.x > 0 && a.content!.width < a.connection!.boundary.width)
     assert.equal(pass.layout(new Node({ children: 'Standalone' })).connection, undefined)
-    assert.ok(Object.isFrozen(a.connection) && Object.isFrozen(a.connection!.boundary.radius))
+    assert.ok((Object.isFrozen(a.connection) === FREEZE_ENABLED) && (Object.isFrozen(a.connection!.boundary.radius) === FREEZE_ENABLED))
   },
 
   'node alignment positions labels while text_justify controls generated lines'() {

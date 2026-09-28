@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { draw_path, draw_rect, make_fragment, make_rect, place_fragment } from '../src'
 import { copy_path, map_path, path_bounds, transform_path } from '../src/engine/path'
@@ -11,7 +12,7 @@ const path = copy_path(frozen_array)
 assert.notEqual(path, frozen_array)
 source[1].x = 100
 assert.equal(path[1].kind === 'L' && path[1].x, 3)
-assert.ok(Object.isFrozen(path) && path.every(Object.isFrozen))
+assert.ok((Object.isFrozen(path) === FREEZE_ENABLED) && path.every(value => Object.isFrozen(value) === FREEZE_ENABLED))
 assert.equal(copy_path(path), path)
 const transformed = transform_path(path, [2, 0, 0, 2, 1, 1])
 assert.equal(copy_path(transformed), transformed)

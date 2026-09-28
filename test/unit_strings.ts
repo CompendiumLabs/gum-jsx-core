@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Box, CoordLine, Graph, LayoutPass, Rect, Svg, UnresolvedLengthError,
@@ -16,7 +17,7 @@ const tests: Record<string, () => void> = {
     for (const [source, expected] of cases) {
       const normalized = normalize_length(source)
       assert.deepEqual(normalized, normalize_length(expected))
-      assert.ok(Object.isFrozen(normalized))
+      assert.equal(Object.isFrozen(normalized), FREEZE_ENABLED)
       assert.deepEqual(normalize_length(normalized), normalized)
     }
     assert.deepEqual(normalize_length(' \t-1.25e+2px\n' as LengthString), { value: -125, unit: 'px' })

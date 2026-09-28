@@ -1,3 +1,4 @@
+import { freeze_owned } from './immutable'
 import { finite, nonnegative } from './checks'
 import type { Length } from '../engine/units'
 
@@ -46,7 +47,7 @@ function distribute_flex(items: readonly FlexItem[], budget?: number): readonly 
   }
   const sizes = items.map(item => clamp(item.basis, item))
   const total = finite(sizes.reduce((sum, size) => sum + size, 0), 'flex total')
-  if (budget === undefined || budget === total) return Object.freeze(sizes)
+  if (budget === undefined || budget === total) return freeze_owned(sizes)
 
   const grow = budget > total
   let active = items.map((_, index) => index).filter(index => {
@@ -71,7 +72,7 @@ function distribute_flex(items: readonly FlexItem[], budget?: number): readonly 
     active = active.filter((_, index) => correction > 0
       ? violations[index] <= 0 : violations[index] >= 0)
   }
-  return Object.freeze(sizes)
+  return freeze_owned(sizes)
 }
 
 export { distribute_flex }

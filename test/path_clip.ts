@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { draw_rect, inspect_fragment, make_fragment, make_rect, make_size, place_fragment, render_svg } from '../src/index'
 import type { PathCommand } from '../src/index'
@@ -15,8 +16,8 @@ const clipped = make_fragment({ size: leaf.size, clip_path: path,
 assert.deepEqual(clipped.ink, make_rect(20, 10, 60, 80))
 assert.deepEqual(clipped.overflow, leaf.overflow)
 assert.equal(clipped.outset, undefined)
-assert.ok(Object.isFrozen(clipped.clip_path))
-assert.ok(Object.isFrozen(clipped.clip_path![0]))
+assert.equal(Object.isFrozen(clipped.clip_path), FREEZE_ENABLED)
+assert.equal(Object.isFrozen(clipped.clip_path![0]), FREEZE_ENABLED)
 path[0] = { kind: 'M', x: 0, y: 0 }
 assert.deepEqual(clipped.clip_path![0], { kind: 'M', x: 10, y: 10 })
 

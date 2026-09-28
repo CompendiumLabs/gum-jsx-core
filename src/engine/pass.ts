@@ -1,3 +1,5 @@
+import { own_reference } from './reference'
+import { freeze_owned } from '../lib/immutable'
 import { nonnegative } from '../lib/checks'
 import { Element } from './element'
 import { Fonts } from './fonts'
@@ -50,7 +52,7 @@ function copy_reference(reference: ReferenceBox = {}, path = 'reference'): Refer
     const value = reference[axis]
     if (value !== undefined) result[axis] = nonnegative(value, `${path}.${axis}`)
   }
-  return Object.freeze(result)
+  return own_reference(result)
 }
 
 // Cache exactly the inputs visible to geometry. Diagnostic paths are not geometry.
@@ -102,7 +104,7 @@ class LayoutPass {
   set_resource(name: string, value: unknown, version: string | number): void {
     const old = this.#resources.get(name)
     if (old && old.value === value && old.version === version) return
-    this.#resources.set(name, Object.freeze({ value, version }))
+    this.#resources.set(name, freeze_owned({ value, version }))
     this.#epoch++
     this.#cache = new WeakMap()
     this.#prepared = new WeakMap()
@@ -117,7 +119,7 @@ class LayoutPass {
 
   // Counters make repeated queries and reuse observable without changing results.
   get stats() {
-    return Object.freeze({ queries: this.#queries, layouts: this.#layouts, hits: this.#hits })
+    return freeze_owned({ queries: this.#queries, layouts: this.#layouts, hits: this.#hits })
   }
 
   // Natural queries and final allocations run the same element implementation.
@@ -169,7 +171,7 @@ class LayoutPass {
         const fitting = fit && fitting_requests(request, own_sizing)
         const sizing = fitting ? fitting.intrinsic : own_sizing
         const prepared = fitting ? fitting.natural : prepare_request(request, sizing)
-        const query: LayoutQuery = Object.freeze({
+        const query: LayoutQuery = freeze_owned({
           request: prepared, sizing, style, measure, coordinates, math,
           child: (child, offer, basis = {}, index = 0, context = {}) => this.layout(child, offer, {
             style, coordinates, math, ...context, reference: basis, path: `${path}/${child.type.name}[${index}]`,

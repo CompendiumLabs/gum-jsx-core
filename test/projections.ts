@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Arrow, ArrowHead, Arc, Bars, CoordLine, Element, Field, Fill, Graph, LayoutPass,
@@ -84,7 +85,7 @@ const tests: Record<string, () => void> = {
     const copy = new Element(a.type, a.props)
     assert.equal(pass.layout(copy, fixed).children[0].fragment, first)
     assert.equal(copy.props.projection, a.props.projection)
-    assert.ok(Object.isFrozen(a.props.projection))
+    assert.equal(Object.isFrozen(a.props.projection), FREEZE_ENABLED)
   },
   'nested graphs establish their own coordinate frame'() {
     const inner = new Graph({ ...limits, children: new CoordLine({ points: [[1, 2], [3, 4]] }) })

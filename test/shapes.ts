@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   LayoutPass, Svg, Box, Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
@@ -137,7 +138,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(draw.commands[2], { kind: 'C', x1: 50, y1: 50, x2: 100, y2: 50, x: 100, y: 25 })
     assert.deepEqual(draw.bounds, { x: 0, y: -16, width: 100, height: 66 })
     assert.deepEqual(fragment.ink, { x: -0.5, y: -16.5, width: 101, height: 67 })
-    assert.ok(Object.isFrozen(draw.commands[1]))
+    assert.equal(Object.isFrozen(draw.commands[1]), FREEZE_ENABLED)
     assert.match(render_svg(fragment), /Q5 -16 50 25C50 50 100 50 100 25/)
     assert.throws(() => pass.layout(new Path({ commands: [line_to(1, 1)] })), /begin with move_to/)
   },

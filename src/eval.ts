@@ -1,3 +1,4 @@
+import { freeze_owned } from './lib/immutable'
 // The existing parser depends only on Acorn and source-error helpers, not layout.
 import { runJSX, runPrelude } from './lib/parse'
 import { Element, define_element, define_component, element_children } from './engine/element'
@@ -79,7 +80,7 @@ class Evaluator {
 
   constructor({ scope = {}, name, seed }: EvaluateOptions = {}) {
     // Snapshot the bindings, retaining the identity of supplied objects and closures.
-    this.scope = Object.freeze({ ...scope })
+    this.scope = freeze_owned({ ...scope })
     this.name = name
     this.seed = seed
   }

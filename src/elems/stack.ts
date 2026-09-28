@@ -1,3 +1,4 @@
+import { own_reference } from '../engine/reference'
 import { nonnegative } from '../lib/checks'
 import { aligned_request, definite_reference, fills_axis, resolve_alignment } from '../lib/composition'
 import type { AlignmentValue } from '../lib/composition'
@@ -119,7 +120,7 @@ function stack_layout(props: StackProps, query: LayoutQuery, main: Axis,
   const elements = element_children(props.children)
   const gaps = Math.max(0, elements.length - 1) * gap
   const inner: ReferenceBox = reference[main] === undefined ? reference
-    : Object.freeze({ ...reference, [main]: Math.max(0, reference[main] - gaps) })
+    : own_reference({ ...reference, [main]: Math.max(0, reference[main] - gaps) })
   const items = elements.map((element, index) =>
     stack_item(element, index, main, query, inner, align))
   const fills = (item: Item) => item.align !== 'baseline' && fills_axis(item.align, item.sizing[cross])

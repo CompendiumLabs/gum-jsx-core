@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   LayoutPass, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Dot, Line, UnitLine, HLine, VLine,
@@ -111,7 +112,7 @@ const tests: Record<string, () => void> = {
     const marker = new Points({ points: [source, null, [1, NaN], { x: 0.75, y: 0.5 }],
       point_size: (point, index) => {
         calls.push(['size', index, point])
-        assert.ok(Object.isFrozen(point))
+        assert.equal(Object.isFrozen(point), FREEZE_ENABLED)
         return [point.x, px(8)]
       },
       shape: (point, index) => {
@@ -176,7 +177,7 @@ const tests: Record<string, () => void> = {
     const fragment = make_fragment({ size, draw: [ellipse] })
     assert.deepEqual(place_fragment(fragment, [3, -2]).offset, { x: 3, y: -2 })
     assert.deepEqual(transform_rect(rect, [3, -2]), { x: 3, y: -2, width: 20, height: 10 })
-    assert.ok(Object.isFrozen(ellipse.center))
+    assert.equal(Object.isFrozen(ellipse.center), FREEZE_ENABLED)
   },
 
   'tuple inputs are snapshotted by elements and spline samplers'() {
@@ -187,7 +188,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(spline(0), { x: 0, y: 1 })
     assert.deepEqual(spline(0.5), { x: 1, y: 3 })
     assert.deepEqual(spline(1), { x: 2, y: 2 })
-    assert.ok(Object.isFrozen(line.props.points![0]))
+    assert.equal(Object.isFrozen(line.props.points![0]), FREEZE_ENABLED)
     assert.deepEqual(sample_points({ f: spline, samples: 3 }), [{ x: 0, y: 1 }, { x: 1, y: 3 }, { x: 2, y: 2 }])
   },
 

@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   em, px, make_measure, normalize_length, measure_length, resolve_length, UnresolvedLengthError,
@@ -16,7 +17,7 @@ const tests: Record<string, () => void> = {
     const parent = make_measure({ font_size: 20, reference, path: 'Svg/Box[0]' })
     const child = make_measure(parent, { font_size: 10, path: 'Svg/Box[0]/Text[0]' })
     reference.width = 400
-    assert.ok(Object.isFrozen(parent) && Object.isFrozen(parent.reference))
+    assert.ok((Object.isFrozen(parent) === FREEZE_ENABLED) && (Object.isFrozen(parent.reference) === FREEZE_ENABLED))
     assert.ok(!Object.isFrozen(reference))
     assert.equal(resolve_length(em(2), parent), 40)
     assert.equal(resolve_length(em(2), child), 20)
@@ -57,7 +58,7 @@ const tests: Record<string, () => void> = {
     const budget: number | undefined = undefined
     assert.deepEqual(make_request({ width: budget && available(budget), height: available(20) }),
       make_request({ height: available(20) }))
-    assert.ok(Object.isFrozen(make_request({ width: null })))
+    assert.equal(Object.isFrozen(make_request({ width: null })), FREEZE_ENABLED)
   },
 
   'lengths retain units and normalize without mutating source values'() {
@@ -67,9 +68,9 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(length, { value: 2, unit: 'em' })
     assert.deepEqual(normalize_length(0.5), { value: 0.5, unit: 'fraction' })
     assert.deepEqual(normalize_length(length), length)
-    assert.ok(Object.isFrozen(length))
-    assert.ok(Object.isFrozen(em(2)))
-    assert.ok(Object.isFrozen(px(2)))
+    assert.equal(Object.isFrozen(length), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(em(2)), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(px(2)), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(source))
 
     const measure = { font_size: 16 }
@@ -200,7 +201,7 @@ const tests: Record<string, () => void> = {
     const spec: [Length, Length] = [length, px(4)]
     const object = { h: length, v: px(4) }
     const tuple_result = resolve_insets(spec), object_result = resolve_insets(object)
-    assert.ok(Object.isFrozen(tuple_result) && Object.isFrozen(object_result))
+    assert.ok((Object.isFrozen(tuple_result) === FREEZE_ENABLED) && (Object.isFrozen(object_result) === FREEZE_ENABLED))
     assert.ok(!Object.isFrozen(spec) && !Object.isFrozen(object) && !Object.isFrozen(length))
     length.value = 10
     spec[1] = px(20)
@@ -301,14 +302,14 @@ const tests: Record<string, () => void> = {
     const request = make_request({ width: axis })
     axis.value = 20
     assert.deepEqual(request.width, available(10))
-    assert.ok(Object.isFrozen(request))
-    assert.ok(Object.isFrozen(request.width))
+    assert.equal(Object.isFrozen(request), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(request.width), FREEZE_ENABLED)
     const spec = { width: px(30) }
     const sizing = resolve_sizing(spec)
     spec.width = px(40)
     assert.equal(sizing.width.preferred, 30)
-    assert.ok(Object.isFrozen(sizing))
-    assert.ok(Object.isFrozen(sizing.width))
+    assert.equal(Object.isFrozen(sizing), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(sizing.width), FREEZE_ENABLED)
   },
 
   'the contract gallery produces the agreed viewport, hugging, and overflow results'() {

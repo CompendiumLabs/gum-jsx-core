@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import type { LayoutQuery } from '../engine/pass'
 import type { ElementProps } from '../engine/element'
 import { finite } from '../lib/checks'
@@ -84,7 +85,7 @@ class Field extends Element<FieldData, FieldProps> {
       const to = finite_point({ x: from.x + vector.x * factor, y: from.y + vector.y * factor })
       if (!to) return []
       return [{ from, to, shape: typeof shape === 'function'
-        ? shape(Object.freeze({ point: from, vector }), index) : shape }]
+        ? shape(freeze_owned({ point: from, vector }), index) : shape }]
     }) }
   }
   static data_bounds(props: FieldData) {

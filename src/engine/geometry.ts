@@ -1,3 +1,5 @@
+import { own_reference } from './reference'
+import { freeze_owned } from '../lib/immutable'
 import { finite, nonnegative } from '../lib/checks'
 import { resolve_length } from './units'
 import type { Length, LengthContext } from './units'
@@ -31,32 +33,32 @@ function read_point<T>(value: PointValue<T>, name = 'point'): Readonly<{ x: T; y
   if (value !== null && typeof value === 'object') {
     if (Array.isArray(value)) {
       if (value.length === 2 && 0 in value && 1 in value) {
-        return Object.freeze({ x: value[0], y: value[1] })
+        return freeze_owned({ x: value[0], y: value[1] })
       }
     } else if ('x' in value && 'y' in value) {
-      return Object.freeze({ x: value.x, y: value.y })
+      return freeze_owned({ x: value.x, y: value.y })
     }
   }
   throw new TypeError(`${name} needs {x, y} or [x, y] with exactly two coordinates`)
 }
 
-// Constructors own and freeze their records; no layout dimension is infinite.
+// Constructors own their records; no layout dimension is infinite.
 function make_size(width = 0, height = 0): Size {
   nonnegative(width, 'width')
   nonnegative(height, 'height')
-  return Object.freeze({ width, height })
+  return own_reference({ width, height })
 }
 
 // An offset can lie outside the allocated box.
 function make_point(x = 0, y = 0): Point {
   finite(x, 'x')
   finite(y, 'y')
-  return Object.freeze({ x, y })
+  return freeze_owned({ x, y })
 }
 
 // Combine a local origin with a finite, nonnegative extent.
 function make_rect(x: number, y: number, width: number, height: number): Rect {
-  return Object.freeze({ ...make_point(x, y), ...make_size(width, height) })
+  return freeze_owned({ ...make_point(x, y), ...make_size(width, height) })
 }
 
 // Missing named sides contribute no space.
@@ -65,7 +67,7 @@ function make_insets(sides: Partial<Insets> = {}): Insets {
   for (const [side, value] of Object.entries({ left, top, right, bottom })) {
     nonnegative(value, side)
   }
-  return Object.freeze({ left, top, right, bottom })
+  return freeze_owned({ left, top, right, bottom })
 }
 
 // Combine independently resolved layers, such as border and padding.
@@ -77,7 +79,7 @@ function add_insets(a: Insets, b: Insets): Insets {
 }
 
 function map_corners<T, U>(corners: CornerRadii<T>, map: (value: T) => U): CornerRadii<U> {
-  return Object.freeze({ tl: map(corners.tl), tr: map(corners.tr), br: map(corners.br), bl: map(corners.bl) })
+  return freeze_owned({ tl: map(corners.tl), tr: map(corners.tr), br: map(corners.br), bl: map(corners.bl) })
 }
 
 // Preserve the compact pair representation for existing uniform rectangles.
@@ -99,7 +101,7 @@ function clamp_radii(radius: RectRadiiValue, size: Size): RectRadii {
 function make_clip(rect: Rect, radius?: RectRadiiValue): Clip {
   const bounds = make_rect(rect.x, rect.y, rect.width, rect.height)
   if (radius === undefined) return bounds
-  return Object.freeze({ ...bounds, radius: clamp_radii(radius, bounds) })
+  return freeze_owned({ ...bounds, radius: clamp_radii(radius, bounds) })
 }
 
 // Share shorthand expansion between layout lengths and numeric data padding.
@@ -205,7 +207,7 @@ function intersect_rects(a: Rect | null, b: Rect): Rect | null {
 function make_transform(values: Transform): Transform {
   if (values.length !== 6) throw new TypeError('An affine transform needs six values')
   values.forEach(value => finite(value, 'transform'))
-  return Object.freeze([...values]) as Transform
+  return freeze_owned([...values]) as Transform
 }
 
 // Transform in child coordinates, then add the parent's placement offset.

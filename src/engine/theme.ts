@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { white, black, blue, lightgray, darkgray, gray } from '../lib/constants'
 
 type ThemeName = 'light' | 'dark'
@@ -11,8 +12,8 @@ type ThemePalette = Readonly<{
   area: string
 }>
 
-const THEMES: Readonly<Record<ThemeName, ThemePalette>> = Object.freeze({
-  light: Object.freeze({
+const THEMES: Readonly<Record<ThemeName, ThemePalette>> = freeze_owned({
+  light: freeze_owned({
     foreground: black,
     text: black,
     border: black,
@@ -21,7 +22,7 @@ const THEMES: Readonly<Record<ThemeName, ThemePalette>> = Object.freeze({
     accent: blue,
     area: blue,
   }),
-  dark: Object.freeze({
+  dark: freeze_owned({
     foreground: white,
     text: white,
     border: white,

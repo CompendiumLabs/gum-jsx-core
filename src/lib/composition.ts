@@ -1,3 +1,5 @@
+import { own_reference } from '../engine/reference'
+import { freeze_owned } from './immutable'
 import { finite } from './checks'
 import type { Element } from '../engine/element'
 import { place_fragment, transform_guides } from '../engine/fragment'
@@ -43,7 +45,7 @@ function resolve_alignment(align: Alignment = 'start', path = 'alignment',
     if (fraction < 0 || fraction > 1) throw new RangeError(`${path} must be between 0 and 1`)
     return fraction
   }
-  return Object.freeze({ x: resolve(axes.x ?? fallback.x), y: resolve(axes.y ?? fallback.y) })
+  return freeze_owned({ x: resolve(axes.x ?? fallback.x), y: resolve(axes.y ?? fallback.y) })
 }
 
 // Oversized content can align outside the frame; keep the resulting negative offset.
@@ -79,7 +81,7 @@ function definite_reference(request: LayoutRequest, sizing: Sizing): ReferenceBo
     if (offer.kind === 'exact') result[axis] = offer.value
     else if (rule.min === rule.max) result[axis] = rule.min
   }
-  return Object.freeze(result)
+  return own_reference(result)
 }
 
 // One-child layout is deflate → query → inflate → align. The child's natural
@@ -97,7 +99,7 @@ function layout_content(
     : resolve_alignment(self, `${query.measure.path}.align_self`, parent_align)
   const inner = deflate_request(query.request, insets)
   const fixed = definite_reference(query.request, query.sizing)
-  const reference = Object.freeze({
+  const reference = own_reference({
     ...(fixed.width === undefined ? {} : {
       width: Math.max(0, fixed.width - insets.left - insets.right),
     }),

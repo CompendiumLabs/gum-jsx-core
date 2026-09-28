@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { make_rect } from './geometry'
 import type { Point, Rect, Transform } from './geometry'
 import type { Length } from './units'
@@ -18,21 +19,21 @@ const owned_paths = new WeakSet<readonly PathCommand[]>()
 
 // Absolute commands keep units explicit without introducing a second path parser.
 function move_to(x: Length, y: Length): PathSegment {
-  return Object.freeze({ kind: 'M', x, y })
+  return freeze_owned({ kind: 'M', x, y })
 }
 function line_to(x: Length, y: Length): PathSegment {
-  return Object.freeze({ kind: 'L', x, y })
+  return freeze_owned({ kind: 'L', x, y })
 }
 function quad_to(x1: Length, y1: Length, x: Length, y: Length): PathSegment {
-  return Object.freeze({ kind: 'Q', x1, y1, x, y })
+  return freeze_owned({ kind: 'Q', x1, y1, x, y })
 }
 function curve_to(
   x1: Length, y1: Length, x2: Length, y2: Length, x: Length, y: Length,
 ): PathSegment {
-  return Object.freeze({ kind: 'C', x1, y1, x2, y2, x, y })
+  return freeze_owned({ kind: 'C', x1, y1, x2, y2, x, y })
 }
 function close_path(): PathSegment {
-  return Object.freeze({ kind: 'Z' })
+  return freeze_owned({ kind: 'Z' })
 }
 
 // Resolve or transform every endpoint and control point through one mapping.
@@ -42,19 +43,19 @@ function map_path<T>(
   if (commands.length && commands[0].kind !== 'M') {
     throw new TypeError('A path must begin with move_to')
   }
-  return Object.freeze(commands.map(command => {
+  return freeze_owned(commands.map(command => {
     const { kind } = command
     switch (kind) {
-      case 'Z': return Object.freeze({ kind })
-      case 'M': case 'L': return Object.freeze({ kind, ...point(command.x, command.y) })
+      case 'Z': return freeze_owned({ kind })
+      case 'M': case 'L': return freeze_owned({ kind, ...point(command.x, command.y) })
       case 'Q': {
         const { x: x1, y: y1 } = point(command.x1, command.y1)
-        return Object.freeze({ kind, x1, y1, ...point(command.x, command.y) })
+        return freeze_owned({ kind, x1, y1, ...point(command.x, command.y) })
       }
       case 'C': {
         const { x: x1, y: y1 } = point(command.x1, command.y1)
         const { x: x2, y: y2 } = point(command.x2, command.y2)
-        return Object.freeze({ kind, x1, y1, x2, y2, ...point(command.x, command.y) })
+        return freeze_owned({ kind, x1, y1, x2, y2, ...point(command.x, command.y) })
       }
       default: throw new TypeError(`Unknown path command: ${kind}`)
     }
@@ -71,21 +72,21 @@ function map_coordinates(
   if (commands.length && commands[0].kind !== 'M') {
     throw new TypeError('A path must begin with move_to')
   }
-  const path = Object.freeze(commands.map(command => {
+  const path = freeze_owned(commands.map(command => {
     const { kind } = command
     switch (kind) {
-      case 'Z': return Object.freeze({ kind })
+      case 'Z': return freeze_owned({ kind })
       case 'M': case 'L': {
         const { x, y } = command
-        return Object.freeze({ kind, x: map_x(x, y), y: map_y(x, y) })
+        return freeze_owned({ kind, x: map_x(x, y), y: map_y(x, y) })
       }
       case 'Q': {
         const { x1, y1, x, y } = command
-        return Object.freeze({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1), x: map_x(x, y), y: map_y(x, y) })
+        return freeze_owned({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1), x: map_x(x, y), y: map_y(x, y) })
       }
       case 'C': {
         const { x1, y1, x2, y2, x, y } = command
-        return Object.freeze({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1),
+        return freeze_owned({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1),
           x2: map_x(x2, y2), y2: map_y(x2, y2), x: map_x(x, y), y: map_y(x, y) })
       }
       default: throw new TypeError(`Unknown path command: ${kind}`)

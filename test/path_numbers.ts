@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { make_point } from '../src/engine/geometry'
 import type { Transform } from '../src/engine/geometry'
@@ -48,10 +49,10 @@ for (let i = 0; i < commands.length; i++) {
   }
 }
 const copy = copy_path(commands)
-assert.ok(Object.isFrozen(copy) && copy.every(Object.isFrozen))
+assert.ok((Object.isFrozen(copy) === FREEZE_ENABLED) && copy.every(value => Object.isFrozen(value) === FREEZE_ENABLED))
 assert.equal(copy_path(copy), copy)
 const transformed = transform_path(commands, transforms[1])
-assert.ok(Object.isFrozen(transformed) && transformed.every(Object.isFrozen))
+assert.ok((Object.isFrozen(transformed) === FREEZE_ENABLED) && transformed.every(value => Object.isFrozen(value) === FREEZE_ENABLED))
 assert.equal(copy_path(transformed), transformed)
 assert.ok(!Object.isFrozen(commands) && commands.every(command => !Object.isFrozen(command)))
 

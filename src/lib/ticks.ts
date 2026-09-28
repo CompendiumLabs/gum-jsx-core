@@ -1,3 +1,4 @@
+import { freeze_owned } from './immutable'
 import { finite, nonnegative } from './checks'
 import { copy_limit } from '../engine/coordinates'
 import type { Limit } from '../engine/coordinates'
@@ -8,8 +9,8 @@ function linear_ticks(limit: Limit, count = 5, interval?: number): readonly numb
   const [a, b] = copy_limit(limit)
   nonnegative(count, 'tick count')
   if (!Number.isInteger(count) || count > 10000) throw new RangeError('Tick count must be an integer up to 10000')
-  if (!count) return Object.freeze([])
-  if (count === 1 && interval === undefined) return Object.freeze([a + (b - a) / 2])
+  if (!count) return freeze_owned([])
+  if (count === 1 && interval === undefined) return freeze_owned([a + (b - a) / 2])
   const low = Math.min(a, b), high = Math.max(a, b)
   let step = interval
   if (step === undefined) {
@@ -27,7 +28,7 @@ function linear_ticks(limit: Limit, count = 5, interval?: number): readonly numb
     const value = Number(((start + i) * step).toPrecision(14))
     return Object.is(value, -0) ? 0 : value
   })
-  return Object.freeze(a > b ? result.reverse() : result)
+  return freeze_owned(a > b ? result.reverse() : result)
 }
 
 function format_tick(value: number): string {

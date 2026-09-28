@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Element, define_element, element_children, Rect, Svg, evaluate,
@@ -24,8 +25,8 @@ const tests: Record<string, () => void> = {
     children.length = 0
     assert.equal(calls, 0)
     assert.deepEqual(leaf.props.data?.values, [1, 2])
-    assert.ok(Object.isFrozen(leaf))
-    assert.ok(Object.isFrozen(leaf.props.data?.values))
+    assert.equal(Object.isFrozen(leaf), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(leaf.props.data?.values), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(data.values))
     assert.equal(element_children(root.props.children)[0], leaf)
     new LayoutPass().layout(root)
@@ -54,7 +55,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(a.props, { grow: 1, data: { label: 'original' } })
     assert.equal(b.props.grow, 3)
     assert.equal(b.props.data?.label, 'original')
-    assert.ok(Object.isFrozen(a.props.data))
+    assert.equal(Object.isFrozen(a.props.data), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(defaults.data))
   },
 
@@ -255,15 +256,15 @@ const tests: Record<string, () => void> = {
     assert.ok(leaf.draw[0].kind === 'rect')
     assert.equal(leaf.draw[0].rect.width, 20)
     assert.equal(leaf.draw[0].fill, 'blue')
-    assert.ok(Object.isFrozen(leaf.draw[0].rect))
-    assert.ok(Object.isFrozen(leaf.children))
+    assert.equal(Object.isFrozen(leaf.draw[0].rect), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(leaf.children), FREEZE_ENABLED)
     const external = { ...leaf, size: { width: 20, height: 10 } }
     const parent = make_fragment({ size: make_size(40, 40), children: [{
       fragment: external, offset: make_point(),
     }] })
     external.size.width = 30
     assert.equal(parent.children[0].fragment.size.width, 20)
-    assert.ok(Object.isFrozen(parent.children[0].fragment))
+    assert.equal(Object.isFrozen(parent.children[0].fragment), FREEZE_ENABLED)
     assert.throws(() => make_fragment({ size: { width: Infinity, height: 0 } }), RangeError)
     assert.throws(() => make_fragment({ size: make_size(), guides: { baseline: NaN } }), RangeError)
     assert.throws(() => place_fragment(leaf, make_point(), [1, 0, 0, 1, NaN, 0]), RangeError)

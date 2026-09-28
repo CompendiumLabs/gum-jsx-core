@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Element, define_element, define_component, evaluate, LayoutPass,
@@ -14,7 +15,7 @@ const tests: Record<string, () => void> = {
       static defaults = { width: px(80), height: px(40), fill: 'blue' }
       static layout(props: Props, query: LayoutQuery) {
         calls++
-        assert(Object.isFrozen(props))
+        assert.equal(Object.isFrozen(props), FREEZE_ENABLED)
         const size = shape_size(query.request, query.sizing)
         return make_fragment({ size, draw: [draw_rect(make_rect(0, 0, size.width, size.height), {
           fill: query.style.fill, stroke: 'none', stroke_width: 0,
@@ -26,7 +27,7 @@ const tests: Record<string, () => void> = {
     data.values.push(3)
     assert.equal(calls, 0)
     assert(tile instanceof Tile && tile instanceof Element)
-    assert(Object.isFrozen(tile) && Object.isFrozen(tile.props.data?.values))
+    assert((Object.isFrozen(tile) === FREEZE_ENABLED) && (Object.isFrozen(tile.props.data?.values) === FREEZE_ENABLED))
     assert(!Object.isFrozen(data.values))
     assert.deepEqual(tile.props.data?.values, [1, 2])
     const pass = new LayoutPass()
@@ -63,7 +64,7 @@ const tests: Record<string, () => void> = {
     assert.equal(normalizations, 1)
     assert.equal(samples, 2)
     assert.deepEqual(new Sampled().props.values, [99])
-    assert(Object.isFrozen(sampled.props.values))
+    assert.equal(Object.isFrozen(sampled.props.values), FREEZE_ENABLED)
     // Constructor input and stored data remain separately typed.
     if (false) {
       // @ts-expect-error values belongs to the normalized source, not the input
@@ -167,7 +168,7 @@ const tests: Record<string, () => void> = {
     assert.equal(result.label, 'from JSX')
     assert.deepEqual(result.size, { width: 60, height: 10 })
     assert.deepEqual(tile.props.font_size, px(12))
-    assert(Object.isFrozen(tile))
+    assert.equal(Object.isFrozen(tile), FREEZE_ENABLED)
   },
 
   'explicit names, factory subclasses, and low-level descriptors remain usable'() {
@@ -181,7 +182,7 @@ const tests: Record<string, () => void> = {
     const instance = new Named(), adopted = new Element(instance.type, instance.props)
     const pass = new LayoutPass()
     assert.equal(render_svg(pass.layout(adopted)), render_svg(pass.layout(instance)))
-    assert(Object.isFrozen(adopted) && Object.isFrozen(adopted.type))
+    assert((Object.isFrozen(adopted) === FREEZE_ENABLED) && (Object.isFrozen(adopted.type) === FREEZE_ENABLED))
   },
 
   'class definitions report missing hooks and preserve source restrictions'() {
@@ -195,7 +196,8 @@ const tests: Record<string, () => void> = {
     assert.throws(() => new Missing(), /Missing must define static layout/)
     assert.throws(() => new Invalid(), /Invalid.layout must be a function/)
     assert.throws(() => new BadName(), /nonempty string/)
-    assert.throws(() => new Mutable(), TypeError)
+    if (FREEZE_ENABLED) assert.throws(() => new Mutable(), TypeError)
+    else assert.equal(new Mutable().counter, 0)
     assert.throws(() => new Data({ children: (() => 1) as never }), /source data cannot contain functions/)
     assert.throws(() => new Element(), /must define static layout/)
   },

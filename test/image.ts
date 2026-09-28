@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { LayoutPass, PngImage, Rect, px, make_request, exact, available, render_svg, evaluate,
   draw_image, make_rect, make_fragment } from '../src/index'
@@ -15,7 +16,7 @@ const square = pass.layout(new PngImage({ data, opacity: 0.5 }), make_request({
 }))
 assert.deepEqual(square.ink, { x: 0, y: 20, width: 80, height: 40 })
 assert.deepEqual(square.size, { width: 80, height: 80 })
-assert.ok(Object.isFrozen(square.draw[0]))
+assert.equal(Object.isFrozen(square.draw[0]), FREEZE_ENABLED)
 const svg = render_svg(square)
 assert.ok(svg.includes('xmlns:xlink="http://www.w3.org/1999/xlink"'))
 assert.ok(svg.includes('<image x="0" y="20" width="80" height="40"'))

@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { finite, nonnegative } from '../lib/checks'
 
 // Passive layout data. The math package interprets these records; core only
@@ -28,7 +29,7 @@ function copy_math_context(context: MathContext): MathContext {
   if (index !== undefined && (!Number.isInteger(index) || index < 1 || index > 11)) {
     throw new RangeError('Math font size index must be an integer from 1 to 11')
   }
-  return Object.freeze({ style: context.style, size, ...(index === undefined ? {} : { size_index: index }) })
+  return freeze_owned({ style: context.style, size, ...(index === undefined ? {} : { size_index: index }) })
 }
 
 function copy_math_metrics(metrics: MathMetrics): MathMetrics {
@@ -36,7 +37,7 @@ function copy_math_metrics(metrics: MathMetrics): MathMetrics {
   if (!classes.has(left) || !classes.has(right)) throw new TypeError('Unknown math atom class')
   if (nucleus !== undefined && nucleus !== 'character') throw new TypeError('Unknown math nucleus')
   if (limits !== undefined && !['auto', 'always', 'never'].includes(limits)) throw new TypeError('Unknown math limits policy')
-  return Object.freeze({
+  return freeze_owned({
     advance: finite(metrics.advance, 'math advance'), left, right,
     italic: nonnegative(metrics.italic, 'italic correction'), skew: finite(metrics.skew, 'accent skew'),
     ...(nucleus === undefined ? {} : { nucleus }), ...(limits === undefined ? {} : { limits }),

@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   sample_points, sample_curve, linspace, SymLine, SymFill, SymField, Field, Graph,
@@ -18,7 +19,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(sample_points(), [])
     assert.deepEqual(sample_points({ fy: 2, samples: 0 }), [])
     assert.deepEqual(linspace(3, 9, 1), [3])
-    assert.ok(Object.isFrozen(sample_curve({ fy: 1 })[0].point))
+    assert.equal(Object.isFrozen(sample_curve({ fy: 1 })[0].point), FREEZE_ENABLED)
   },
 
   'nonfinite and null samples retain path breaks and never reach drawing geometry'() {

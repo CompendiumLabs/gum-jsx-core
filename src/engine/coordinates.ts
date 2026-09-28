@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { finite, nonnegative } from '../lib/checks'
 import { Element, element_children } from './element'
 import type { Child } from './element'
@@ -30,14 +31,14 @@ function copy_limit(limit: Limit, name = 'limit', allow_equal = false): Limit {
   const a = finite(limit[0], `${name}[0]`), b = finite(limit[1], `${name}[1]`)
   if (!allow_equal && a === b) throw new RangeError(`${name} endpoints must differ`)
   finite(b - a, `${name} span`)
-  return Object.freeze([a, b])
+  return freeze_owned([a, b])
 }
 
 function copy_coordinates(coord: Coordinates): Coordinates {
   if (coord.projection !== undefined && !(coord.projection instanceof Projection)) {
     throw new TypeError('Coordinates projection must be a Projection')
   }
-  return Object.freeze({ xlim: copy_limit(coord.xlim, 'xlim'), ylim: copy_limit(coord.ylim, 'ylim'),
+  return freeze_owned({ xlim: copy_limit(coord.xlim, 'xlim'), ylim: copy_limit(coord.ylim, 'ylim'),
     flip_x: Boolean(coord.flip_x), flip_y: Boolean(coord.flip_y),
     ...(coord.projection ? { projection: coord.projection } : {}) })
 }
@@ -78,9 +79,9 @@ function merge_bounds(bounds: readonly (DataBounds | null)[]): DataBounds | null
       const [a, b] = copy_limit(item[axis], axis, true)
       low = Math.min(low, a, b); high = Math.max(high, a, b)
     }
-    if (low !== Infinity) result[axis] = Object.freeze([low, high])
+    if (low !== Infinity) result[axis] = freeze_owned([low, high])
   }
-  return Object.keys(result).length ? Object.freeze(result) : null
+  return Object.keys(result).length ? freeze_owned(result) : null
 }
 
 // An explicit capability is a boundary. Nested Graphs/Plots return null, while

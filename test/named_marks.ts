@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Arc, Arrow, ArrowHead, Bars, CoordLine, Field, Fill, Graph, LayoutPass, Line, Points,
@@ -60,7 +61,7 @@ const tests: Record<string, () => void> = {
       f: t => { sampled++; return samples[t] },
       point_size: ({ z }) => { sized++; return px(z + 4) },
       shape: (point, index) => {
-        shaped++; seen.push([index, point]); assert.ok(Object.isFrozen(point))
+        shaped++; seen.push([index, point]); assert.equal(Object.isFrozen(point), FREEZE_ENABLED)
         return new Rect({ fill: 'blue' })
       },
     })

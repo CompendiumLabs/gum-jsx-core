@@ -1,3 +1,5 @@
+import { own_reference, snapshot_reference } from './reference'
+import { freeze_owned } from '../lib/immutable'
 import { finite, nonnegative } from '../lib/checks'
 import { DEFAULTS } from './defaults'
 
@@ -17,13 +19,13 @@ type LengthContext = Readonly<{
   path: string
 }>
 
-const EMPTY_REFERENCE: ReferenceBox = Object.freeze({})
+const EMPTY_REFERENCE: ReferenceBox = own_reference({})
 
 // Derive local measurement state without mutating or freezing caller-owned boxes.
 function make_measure(context: Partial<LengthContext> = {}, patch: Partial<LengthContext> = {}): LengthContext {
   const { font_size, reference = EMPTY_REFERENCE, path = '' } = { ...context, ...patch }
-  return Object.freeze({ font_size, path,
-    reference: Object.isFrozen(reference) ? reference : Object.freeze({ ...reference }),
+  return freeze_owned({ font_size, path,
+    reference: snapshot_reference(reference),
   })
 }
 
@@ -33,19 +35,19 @@ function length_path(context: Partial<LengthContext>, property: string): string 
 
 // Keep source lengths tagged until the relevant reference is established.
 function em(value: number) {
-  return Object.freeze({ value: finite(value, 'em'), unit: 'em' })
+  return freeze_owned({ value: finite(value, 'em'), unit: 'em' })
 }
 
 // Pixel lengths are independent of both the font and the containing box.
 function px(value: number) {
-  return Object.freeze({ value: finite(value, 'px'), unit: 'px' })
+  return freeze_owned({ value: finite(value, 'px'), unit: 'px' })
 }
 
 // Copy the input so normalization never freezes a caller's own object.
 function normalize_length(length: Length | NormalizedLength, path = 'length'): NormalizedLength {
   if (typeof length === 'string') {
     const source = length.trim()
-    if (source === '0') return Object.freeze({ value: 0, unit: 'px' })
+    if (source === '0') return freeze_owned({ value: 0, unit: 'px' })
     const match = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)(px|em|%)$/.exec(source)
     if (!match) throw new TypeError(`${path}: expected a length with px, em, or %; received ${JSON.stringify(length)}`)
     const value = finite(Number(match[1]), path), unit = match[2] as UnitLength['unit'] | '%'
@@ -59,7 +61,7 @@ function normalize_length(length: Length | NormalizedLength, path = 'length'): N
   if (unit !== 'fraction' && unit !== 'em' && unit !== 'px') {
     throw new RangeError(`${path}: Unknown length unit: ${unit}`)
   }
-  return Object.freeze({ value, unit })
+  return freeze_owned({ value, unit })
 }
 
 // Intrinsic queries can retain the tagged dependency instead of guessing a size.

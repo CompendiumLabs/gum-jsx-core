@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Arrow, Axis, HAxis, Label, Plot, BarPlot, Legend, LegendItem,
@@ -43,7 +44,7 @@ const tests: Record<string, () => void> = {
     assert.equal(arrow.props.head_width, 1)
     assert.equal(arrow.props.head_style?.curve, 0.7)
     assert.ok(!Object.hasOwn(arrow.props, 'head_fill'))
-    assert.ok(Object.isFrozen(arrow.props.head_style))
+    assert.equal(Object.isFrozen(arrow.props.head_style), FREEZE_ENABLED)
     const dashed = evaluate('<Arrow curve head-curve={0.7} head-fill="blue" head-stroke-width={px(2)} head-size={px(20)} />')
     assert.equal(svg(dashed), svg(new Arrow({ curve: true, head_curve: 0.7,
       head_fill: 'blue', head_stroke_width: px(2), head_size: px(20) })))

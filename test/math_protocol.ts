@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { Element, LayoutPass, make_fragment, make_size, make_request, available, exact,
   copy_math_context, copy_math_metrics, inspect_fragment } from '../src'
@@ -20,7 +21,7 @@ assert.equal(preparations, 1)
 assert.equal(pass.layout(source, make_request(), { math: { ...input } }), a)
 assert.equal(a.math?.advance, -2)
 assert.equal(a.guides.math_axis, -5)
-assert.ok(Object.isFrozen(a.math))
+assert.equal(Object.isFrozen(a.math), FREEZE_ENABLED)
 assert.ok(inspect_fragment(a).includes('"advance":-2'))
 const c = pass.layout(source, make_request(), { math: { style: 'display', size: 1 } })
 assert.equal(c.math?.advance, -1)
@@ -40,7 +41,7 @@ class Parent extends Element {
   }
 }
 assert.equal(pass.layout(new Parent(), make_request(), { math: input }).math?.advance, -2)
-assert.ok(Object.isFrozen(copy_math_context(input)))
+assert.equal(Object.isFrozen(copy_math_context(input)), FREEZE_ENABLED)
 assert.throws(() => copy_math_context({ style: 'invalid', size: 1 } as any), /style/)
 assert.throws(() => copy_math_context({ style: 'text', size: 0 }), /positive/)
 assert.throws(() => copy_math_metrics({ ...a.math!, advance: Infinity }), /finite/)

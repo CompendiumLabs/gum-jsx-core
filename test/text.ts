@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { parse } from 'opentype.js'
@@ -261,7 +262,7 @@ const tests: Record<string, () => void> = {
     const text = '\u{1f600}\u{1f468}\u200d\u{1f469} 1\ufe0f\u20e3'
     assert.ok(font.has_glyphs(text))
     const shape = font.shape(text)
-    assert.equal(font.shape(text), shape); assert.ok(Object.isFrozen(shape.live!.clusters[0]))
+    assert.equal(font.shape(text), shape); assert.equal(Object.isFrozen(shape.live!.clusters[0]), FREEZE_ENABLED)
     assert.deepEqual(shape.live!.clusters.map(cluster => cluster.text),
       ['\u{1f600}', '\u{1f468}\u200d\u{1f469}', ' ', '1\ufe0f\u20e3'])
     near(shape.advance, 4.8); near(shape.live!.clusters[3].x, 3.6)
@@ -279,7 +280,7 @@ const tests: Record<string, () => void> = {
     const draw = drawings(fragment)
     assert.equal(draw.length, 2)
     const last = draw[1]
-    assert.ok(last.kind === 'text' && Object.isFrozen(last))
+    assert.ok(last.kind === 'text' && (Object.isFrozen(last) === FREEZE_ENABLED))
     assert.deepEqual([last.text, last.font_family, last.font_size, last.fill, last.opacity],
       ['\u{1f600}', "Joe's Emoji", 20, '#123', 0.5])
     near(last.origin.x, 48); near(last.origin.y, fragment.guides.baseline!); near(last.advance, 24)
@@ -367,7 +368,7 @@ const tests: Record<string, () => void> = {
     assert.match(svg, /aria-label="&lt;A &amp; &quot;B&quot;&gt;"/)
     assert.doesNotMatch(svg, /<text|font-family|@font-face/)
     assert.deepEqual(pass.stats, before)
-    assert.ok(Object.isFrozen(fragment.children[0].fragment.draw[0]))
+    assert.equal(Object.isFrozen(fragment.children[0].fragment.draw[0]), FREEZE_ENABLED)
   },
 }
 

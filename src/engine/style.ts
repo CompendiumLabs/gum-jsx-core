@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { DEFAULTS } from './defaults'
 import { resolve_theme, theme_color } from './theme'
 import type { ThemeName } from './theme'
@@ -9,7 +10,7 @@ import { em, make_measure, normalize_length, px, resolve_font_size, resolve_leng
 import type { Length, NormalizedLength, LengthContext } from './units'
 
 type FontStyle = 'normal' | 'italic'
-const FONT_WEIGHTS = Object.freeze({ light, regular, normal: regular, bold })
+const FONT_WEIGHTS = freeze_owned({ light, regular, normal: regular, bold })
 type FontWeight = number | keyof typeof FONT_WEIGHTS
 type LineCap = 'butt' | 'round' | 'square'
 type LineJoin = 'miter' | 'round' | 'bevel'
@@ -55,9 +56,9 @@ function is_resolved_style(style: Style): boolean {
   return resolved_styles.has(style)
 }
 
-const DEFAULT_STYLE: Style = Object.freeze({
+const DEFAULT_STYLE: Style = freeze_owned({
   theme: 'light',
-  theme_paints: Object.freeze({ color: 'theme:foreground', stroke: 'theme:foreground' }),
+  theme_paints: freeze_owned({ color: 'theme:foreground', stroke: 'theme:foreground' }),
   font_size: DEFAULTS.font_size,
   font_family: DEFAULTS.font_family,
   font_weight: DEFAULTS.font_weight,
@@ -70,7 +71,7 @@ const DEFAULT_STYLE: Style = Object.freeze({
   stroke_linecap: 'butt',
   stroke_linejoin: 'miter',
   stroke_miterlimit: DEFAULTS.stroke_miterlimit,
-  stroke_dasharray: Object.freeze([]), opacity: 1,
+  stroke_dasharray: freeze_owned([]), opacity: 1,
 })
 
 // Resolve inherited font size before sizing. Paint lengths await shape geometry.
@@ -115,14 +116,14 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
   const dashes = spec.stroke_dasharray ?? inherited.stroke_dasharray
   const dash_lengths = Array.isArray(dashes) ? dashes : [dashes, dashes]
-  const stroke_dasharray = Object.freeze(dash_lengths.map((value, index) => {
+  const stroke_dasharray = freeze_owned(dash_lengths.map((value, index) => {
     const location = `${path}.stroke_dasharray[${index}]`
     const length = normalize_length(value, location)
     nonnegative(length.value, location)
     return length
   }))
-  const style: Style = Object.freeze({
-    theme, theme_paints: Object.freeze(theme_paints),
+  const style: Style = freeze_owned({
+    theme, theme_paints: freeze_owned(theme_paints),
     font_size, font_family, font_weight, font_style, line_height, color,
     fill, stroke, stroke_width,
     stroke_linecap: spec.stroke_linecap ?? inherited.stroke_linecap,

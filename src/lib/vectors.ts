@@ -1,3 +1,4 @@
+import { freeze_owned } from './immutable'
 import { d2r } from './constants'
 import { read_point } from '../engine/geometry'
 import type { Point, PointValue } from '../engine/geometry'
@@ -13,7 +14,7 @@ function pair(value: number | Vector2): NumericPair {
 }
 function pair_op(a: number | Vector2, b: number | Vector2, op: (a: number, b: number) => number): Point {
   const [ax, ay] = pair(a), [bx, by] = pair(b)
-  return Object.freeze({ x: op(ax, bx), y: op(ay, by) })
+  return freeze_owned({ x: op(ax, bx), y: op(ay, by) })
 }
 const add2 = (a: number | Vector2, b: number | Vector2): Point => pair_op(a, b, (x, y) => x + y)
 const sub2 = (a: number | Vector2, b: number | Vector2): Point => pair_op(a, b, (x, y) => x - y)
@@ -22,7 +23,7 @@ const div2 = (a: number | Vector2, b: number | Vector2): Point => pair_op(a, b, 
 
 function vector_op(a: readonly number[], b: readonly number[], op: (a: number, b: number) => number): readonly number[] {
   if (a.length !== b.length) throw new RangeError('vector lengths must match')
-  return Object.freeze(a.map((value, i) => op(value, b[i])))
+  return freeze_owned(a.map((value, i) => op(value, b[i])))
 }
 const addn = (a: readonly number[], b: readonly number[]): readonly number[] => vector_op(a, b, (x, y) => x + y)
 const subn = (a: readonly number[], b: readonly number[]): readonly number[] => vector_op(a, b, (x, y) => x - y)
@@ -43,26 +44,26 @@ function complex(value: number | Complex): Complex {
 }
 function addc(a: number | Complex, b: number | Complex): Complex {
   const [x, y] = complex(a), [u, v] = complex(b)
-  return Object.freeze([x + u, y + v])
+  return freeze_owned([x + u, y + v])
 }
 function subc(a: number | Complex, b: number | Complex): Complex {
   const [x, y] = complex(a), [u, v] = complex(b)
-  return Object.freeze([x - u, y - v])
+  return freeze_owned([x - u, y - v])
 }
 function mulc(a: number | Complex, b: number | Complex): Complex {
   const [x, y] = complex(a), [u, v] = complex(b)
-  return Object.freeze([x * u - y * v, x * v + y * u])
+  return freeze_owned([x * u - y * v, x * v + y * u])
 }
 function divc(a: number | Complex, b: number | Complex): Complex {
   const [x, y] = complex(a), [u, v] = complex(b)
   const scale = Math.max(Math.abs(u), Math.abs(v)), c = u / scale, d = v / scale
   const denominator = c * c + d * d
-  return Object.freeze([(x / scale * c + y / scale * d) / denominator,
+  return freeze_owned([(x / scale * c + y / scale * d) / denominator,
     (y / scale * c - x / scale * d) / denominator])
 }
 function conjc(value: number | Complex): Complex {
   const [x, y] = complex(value)
-  return Object.freeze([x, -y])
+  return freeze_owned([x, -y])
 }
 function normc(value: number | Complex): number { return Math.hypot(...complex(value)); }
 function argc(value: number | Complex): number {

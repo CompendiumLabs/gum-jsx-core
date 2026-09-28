@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Box, Frame, Rect, RoundedRect, Square, Bars, VBars, HBars, Bar, VBar, HBar, Graph, BarPlot,
@@ -85,8 +86,8 @@ const tests: Record<string, () => void> = {
     tl.x = 0; radius.tr[0] = 0
     assert.deepEqual(draw.radius, expected)
     assert.deepEqual(clip.radius, expected)
-    assert.ok(Object.isFrozen(draw.radius))
-    assert.ok(Object.isFrozen((draw.radius as CornerRadii).tl))
+    assert.equal(Object.isFrozen(draw.radius), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen((draw.radius as CornerRadii).tl), FREEZE_ENABLED)
     const fragment = make_fragment({ size: { width: 24, height: 16 }, draw: [draw], clip })
     assert.deepEqual(radius_of(fragment), expected)
     assert.deepEqual(fragment.clip!.radius, expected)

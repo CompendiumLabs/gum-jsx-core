@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Graph, Plot, BarPlot, HBars, Svg, Box, Bars, CoordLine, Points, SymLine, HAxis, Text, Fonts,
@@ -86,7 +87,7 @@ const tests: Record<string, () => void> = {
     tuple[0] = 1
     assert.deepEqual(plot.props.coordinates, before)
     assert.deepEqual(plot.props.padding, [0.2, 0.4])
-    assert.ok(Object.isFrozen(plot.props.padding))
+    assert.equal(Object.isFrozen(plot.props.padding), FREEZE_ENABLED)
   },
 
   'coordinate mapping and inverse support directed limits, flips, and zero-frame diagnostics'() {

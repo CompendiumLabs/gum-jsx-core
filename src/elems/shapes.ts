@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { nonnegative } from '../lib/checks'
 import { DEFAULTS } from '../engine/defaults'
 import { coordinate_point, position_bounds } from '../engine/coordinates'
@@ -93,7 +94,7 @@ function resolve_rect_radius(radius: RectRadius, size: Size, measure: LengthCont
     const resolved = Object.fromEntries(Object.entries(sides).filter(([, value]) => value !== undefined)
       .map(([key, value]) => [key, resolve_radius(value!, size, measure, `border_radius.${key}`)]))
     const zero = make_point()
-    return Object.freeze({
+    return freeze_owned({
       tl: resolved.tl ?? resolved.t ?? resolved.l ?? zero,
       tr: resolved.tr ?? resolved.t ?? resolved.r ?? zero,
       br: resolved.br ?? resolved.b ?? resolved.r ?? zero,

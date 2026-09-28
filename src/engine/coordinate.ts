@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { finite } from '../lib/checks'
 import type { PointValue } from './geometry'
 import { normalize_length } from './units'
@@ -16,13 +17,13 @@ function read_coordinate<T>(value: CoordinateValue<T>, name = 'coordinate'): Coo
   if (value !== null && typeof value === 'object') {
     if (Array.isArray(value)) {
       if (value.length === 2 && Object.hasOwn(value, 0) && Object.hasOwn(value, 1)) {
-        return Object.freeze({ x: value[0], y: value[1] })
+        return freeze_owned({ x: value[0], y: value[1] })
       }
     } else {
       const proto = Object.getPrototypeOf(value)
       if ((proto === Object.prototype || proto === null) && Object.keys(value).length
         && !Object.getOwnPropertySymbols(value).length) {
-        return Object.freeze({ ...value as Coordinate<T> })
+        return freeze_owned({ ...value as Coordinate<T> })
       }
     }
   }
@@ -62,9 +63,9 @@ function read_position(value: CoordinatePosition, name = 'position'): PositionRe
       throw new TypeError(`${name}.${axis} must be a number or local length`)
     }
     normalize_length(value, `${name}.${axis}`)
-    return typeof value === 'object' ? Object.freeze({ ...value }) : value
+    return typeof value === 'object' ? freeze_owned({ ...value }) : value
   }
-  return Object.freeze({ x: component(pair.x, 'x'), y: component(pair.y, 'y') })
+  return freeze_owned({ x: component(pair.x, 'x'), y: component(pair.y, 'y') })
 }
 
 function finite_position(value: CoordinatePosition | null, name = 'point'): PositionRecord | null {

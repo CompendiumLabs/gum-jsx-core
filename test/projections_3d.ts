@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   CoordLine, Graph, LayoutPass, Points, Rect, SymLine, evaluate, exact, make_request, px,
@@ -107,7 +108,7 @@ const tests: Record<string, () => void> = {
     const before = projection.project(point)
     options.eye.y = -100; options.target.x = 100; options.up.x = 100; options.focal_length = 10; options.near = 100
     assert.deepEqual(projection.project(point), before)
-    assert.ok(Object.isFrozen(projection) && Object.isFrozen(before))
+    assert.ok((Object.isFrozen(projection) === FREEZE_ENABLED) && (Object.isFrozen(before) === FREEZE_ENABLED))
     assert.ok(!Object.isFrozen(options.eye) && !Object.isFrozen(point))
     const angles = { azimuth: 90, elevation: 0 }, ortho = orthographic_projection(angles)
     angles.azimuth = 0; angles.elevation = 90

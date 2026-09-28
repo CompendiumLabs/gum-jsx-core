@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Group, Overlay, Graph, Plot, Network, Node, Rect, LayoutPass, Projection,
@@ -109,7 +110,7 @@ const tests: Record<string, () => void> = {
   'pos is an immutable source value and overrides defaults atomically'() {
     const input = { x: 0.25, y: 0.5 }, child = new Rect({ ...box, pos: input })
     input.x = 1
-    assert.ok(Object.isFrozen(child.props.pos))
+    assert.equal(Object.isFrozen(child.props.pos), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(input))
     assert.deepEqual(layout(new Group({ children: child })).children[0].offset, { x: 40, y: 45 })
     const Mark = define_element<ElementProps>('PositionDefault', (_, query) =>

@@ -100,6 +100,34 @@ Emoji are measured with a bundled fallback face and emitted as live SVG text.
 Their appearance depends on the display host's emoji font; PDF export currently
 rejects live color-font text. Ordinary outlined text needs no viewer-side fonts.
 
+## Immutability and production performance
+
+Gum snapshots caller-owned source data and exposes readonly elements, geometry,
+and fragments. Runtime freezing is enabled by default in development and tests,
+and disabled when `NODE_ENV=production`. Set `GUM_FREEZE=1` to force enforcement
+or `GUM_FREEZE=0` to disable it, before importing Gum or starting the CLI:
+
+```sh
+NODE_ENV=production bun render.ts
+GUM_FREEZE=0 bun run perf
+GUM_FREEZE=1 bun run test
+```
+
+The setting is read once. Copying, validation, and cache behavior are the same in
+both modes; consumers must always treat returned values as readonly. With
+freezing disabled, mutating shared results can invalidate cached layout data.
+
+For browser bundles, define `__GUM_FREEZE__` as the boolean `false` for production
+or `true` for development. This build setting overrides the process environment.
+Browsers without an explicit setting or process environment default to freezing.
+Gum Studio and the MCP viewer builds configure this flag automatically and honor
+`GUM_FREEZE` when building.
+
+`FREEZE_ENABLED` exposes the selected policy. Custom elements can use
+`freeze_owned(value)` after constructing or copying a value they own. It retains
+`Object.freeze`'s readonly return types and shallow behavior, and returns the
+same object in either mode. See the [API details](API.md#immutability-policy).
+
 ## Reference
 
 The [core API reference](./API.md) covers units, sizing, layout contracts,

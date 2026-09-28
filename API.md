@@ -3,6 +3,7 @@
 Detailed layout and rendering contracts for `@gum-jsx/core`. For setup and a
 first example, see the [package README](./README.md).
 
+- [Immutability policy](#immutability-policy)
 - [Lengths and references](#lengths-and-references)
 - [Requests and size selection](#requests-and-size-selection)
 - [Insets and fragments](#insets-and-fragments)
@@ -19,6 +20,34 @@ first example, see the [package README](./README.md).
 - [Scoped component props](#scoped-component-props)
 - [Rendering and inspection](#rendering-and-inspection)
 - [Contributor notes](#contributor-notes)
+
+## Immutability policy
+
+All elements, source props, geometry, and layout results remain readonly by
+contract. Constructors snapshot caller-owned inputs and validate values in both
+modes. Runtime freezing is selected once when core loads:
+
+1. A bundler definition of `__GUM_FREEZE__` (`true` or `false`) takes precedence.
+2. Otherwise `GUM_FREEZE=1` or `GUM_FREEZE=0` in the process environment overrides
+   the default. Other supplied values throw.
+3. Otherwise freezing is disabled only when `NODE_ENV=production`. A browser
+   without a process environment or explicit build flag defaults to enforcement.
+
+Set the mode before importing any Gum module. Changing the environment after
+import does not change the policy or affect objects already constructed. Configure
+browser bundlers with a boolean replacement, for example
+`define: { __GUM_FREEZE__: 'false' }`. Studio and MCP viewer builds do this already.
+
+`FREEZE_ENABLED: boolean` reports the selected mode. `freeze_owned` has the same
+TypeScript overloads as `Object.freeze`: it shallow-freezes in the enforced mode
+and returns its argument unchanged in the disabled mode. It performs no copying
+or validation. Use it only after constructing or snapshotting data you own.
+Readonly return types apply in both modes.
+
+Gum reuses owned geometry and cached fragments. Consumers must not mutate those
+objects, including nested records, even when checks are disabled. Descriptions
+of frozen results below refer to the enforced mode. Snapshot isolation, numeric
+validation, and the global native `Object.freeze` are unaffected by this policy.
 
 ## Lengths and references
 
@@ -348,8 +377,9 @@ Instance props override them, including explicit `undefined`. Static hook refere
 are captured at the same time; configure classes before constructing instances.
 Use `static element_name` for an explicit diagnostic name, or preserve class names
 when minifying. Defaults become ordinary source data visible to parents; Spacer
-uses this for its flex defaults. The base constructor freezes the instance, so
-source data belongs in props, with no ordinary instance field initializers.
+uses this for its flex defaults. Source data belongs in props, with no ordinary
+instance field initializers. When runtime checks are enabled, the base
+constructor freezes the instance and field initialization after `super()` throws.
 
 `Element` is available inside JSX as well as through imports. `define_element(name,
 layout, defaults?, options?)` remains a convenience using the same machinery; its

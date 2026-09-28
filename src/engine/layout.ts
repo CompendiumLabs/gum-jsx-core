@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { nonnegative } from '../lib/checks'
 import { DEFAULTS } from './defaults'
 import { make_size } from './geometry'
@@ -18,7 +19,7 @@ type SizeSpec = Readonly<Partial<Record<Exclude<SizeKey, Axis>, Length>>
 type AxisSizing = Readonly<{ preferred?: number; mode?: SizeMode; min: number; max: number }>
 type Sizing = Readonly<Record<Axis, AxisSizing> & { aspect?: number }>
 
-const NATURAL = Object.freeze({ kind: 'natural' })
+const NATURAL = freeze_owned({ kind: 'natural' })
 
 // Requests are in pixels. Natural is distinct from an infinite numeric offer.
 function natural() {
@@ -27,12 +28,12 @@ function natural() {
 
 // An advisory offer can be exceeded by content that cannot fit.
 function available(value: number) {
-  return Object.freeze({ kind: 'available', value: nonnegative(value, 'available') })
+  return freeze_owned({ kind: 'available', value: nonnegative(value, 'available') })
 }
 
 // A hard allocation fixes the reported dimension, allowing separate overflow.
 function exact(value: number) {
-  return Object.freeze({ kind: 'exact', value: nonnegative(value, 'exact') })
+  return freeze_owned({ kind: 'exact', value: nonnegative(value, 'exact') })
 }
 
 // Copy both axes to own their values. Omitted, undefined, and null axes are
@@ -43,7 +44,7 @@ function make_request(axes: LayoutRequestInput = {}): LayoutRequest {
     if (axis == null || axis.kind === 'natural') return natural()
     return axis.kind === 'exact' ? exact(axis.value) : available(axis.value)
   }
-  return Object.freeze({
+  return freeze_owned({
     width: copy_axis(axes.width),
     height: copy_axis(axes.height),
   })
@@ -90,14 +91,14 @@ function resolve_sizing(spec: SizeSpec = {}, context: Partial<LengthContext> = {
     if (min > max) {
       throw new RangeError(`${path}: min_${axis} exceeds max_${axis}`)
     }
-    return Object.freeze({ preferred, ...(mode === undefined ? {} : { mode }), min, max })
+    return freeze_owned({ preferred, ...(mode === undefined ? {} : { mode }), min, max })
   }
 
   const { aspect } = spec
   if (aspect !== undefined && nonnegative(aspect, `${path}.aspect`) === 0) {
     throw new RangeError(`${path}.aspect must be positive`)
   }
-  return Object.freeze({
+  return freeze_owned({
     width: resolve_axis('width'),
     height: resolve_axis('height'),
     aspect,

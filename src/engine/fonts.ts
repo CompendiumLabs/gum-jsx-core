@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { create } from 'fontkit'
 import type { Font, PathCommand as FontCommand } from 'fontkit'
 import { nonnegative } from '../lib/checks'
@@ -87,7 +88,7 @@ function parse_font(data: FontData): Font {
 function fix_empty_glyphs(font: Font): void {
   const offsets = (font as Font & { loca?: { offsets: number[] } }).loca?.offsets
   if (!offsets) return
-  const bounds = Object.freeze({ minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 })
+  const bounds = freeze_owned({ minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 })
   for (let index = 0; index < font.numGlyphs; index++) {
     if (offsets[index] === offsets[index + 1]) {
       Object.defineProperty(font.getGlyph(index), '_getCBox', { value: () => bounds })
@@ -137,7 +138,7 @@ function measure_color(font: ColorFont, family: string): MeasuredFont {
   const missing = (cluster: string) => [...cluster].find((char, index) =>
     !font.hasGlyphForCodePoint(char.codePointAt(0)!) && (index === 0 || !IGNORABLE.test(char)))
   const has_glyphs = (text: string) => graphemes(text).every(cluster => missing(cluster) === undefined)
-  return Object.freeze({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
+  return freeze_owned({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
     const cached = cache.get(text)
     if (cached) return cached
     let x = 0, ink: Rect | null = null
@@ -150,12 +151,12 @@ function measure_color(font: ColorFont, family: string): MeasuredFont {
       // A color glyph fills its em box; blank clusters advance without painting.
       const box = advance && cluster.trim() ? make_rect(x, -ascent, advance, ascent + descent) : null
       ink = union_rects(ink, box)
-      const result = Object.freeze({ text: cluster, x, advance, ink: box })
+      const result = freeze_owned({ text: cluster, x, advance, ink: box })
       x += advance
       return result
     })
-    const live = Object.freeze({ family, clusters: Object.freeze(clusters) })
-    const result = Object.freeze({ advance: x, commands: copy_path([]), ink, live })
+    const live = freeze_owned({ family, clusters: freeze_owned(clusters) })
+    const result = freeze_owned({ advance: x, commands: copy_path([]), ink, live })
     cache.set(text, result)
     return result
   } })
@@ -169,7 +170,7 @@ function measure_font(font: Font, family: string, oblique: boolean): MeasuredFon
   const ascent = nonnegative(font.ascent / font.unitsPerEm, 'font ascent')
   const descent = nonnegative(-font.descent / font.unitsPerEm, 'font descent')
   const has_glyphs = (text: string) => [...text].every(char => font.hasGlyphForCodePoint(char.codePointAt(0)!))
-  return Object.freeze({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
+  return freeze_owned({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
     const cached = cache.get(text)
     if (cached) return cached
     for (const char of text) {
@@ -197,7 +198,7 @@ function measure_font(font: Font, family: string, oblique: boolean): MeasuredFon
 
     // Curve extrema give tight ink, separately from the shaped advance width.
     const advance = nonnegative(x * scale, 'glyph advance')
-    const result = Object.freeze({ advance, commands: copy_path(commands), ink })
+    const result = freeze_owned({ advance, commands: copy_path(commands), ink })
     cache.set(text, result)
     return result
   } })

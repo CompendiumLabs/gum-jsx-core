@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { copy_coordinate } from './coordinate'
 import type { Coordinate } from './coordinate'
 
@@ -11,7 +12,7 @@ class Projection {
   constructor(project: ProjectionFunction) {
     if (typeof project !== 'function') throw new TypeError('Projection needs a coordinate-record function')
     this.#project = project
-    Object.freeze(this)
+    freeze_owned(this)
   }
 
   project(point: Coordinate): Coordinate | null {

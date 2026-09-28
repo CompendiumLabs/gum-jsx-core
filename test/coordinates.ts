@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Projection, Graph, LayoutPass, read_coordinate, copy_coordinate,
@@ -18,7 +19,7 @@ const tests: Record<string, () => void> = {
     const input = { z: 3, x: 1, y: 2 }, output = read_coordinate(input)
     assert.deepEqual(output, input)
     assert.notEqual(output, input)
-    assert.ok(Object.isFrozen(output))
+    assert.equal(Object.isFrozen(output), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(input))
     input.z = 9
     assert.equal(output.z, 3)
@@ -50,8 +51,8 @@ const tests: Record<string, () => void> = {
     let received: Coordinate | undefined
     const projection = new Projection(point => {
       received = point
-      assert.ok(Object.isFrozen(point))
-      assert.throws(() => { (point as Record<string, number>).a = 99 }, TypeError)
+      assert.equal(Object.isFrozen(point), FREEZE_ENABLED)
+      if (FREEZE_ENABLED) assert.throws(() => { (point as Record<string, number>).a = 99 }, TypeError)
       return result
     })
     const output = projection.project(input)
@@ -59,8 +60,8 @@ const tests: Record<string, () => void> = {
     assert.notEqual(received, input)
     assert.deepEqual(output, result)
     assert.notEqual(output, result)
-    assert.ok(Object.isFrozen(projection))
-    assert.ok(Object.isFrozen(output))
+    assert.equal(Object.isFrozen(projection), FREEZE_ENABLED)
+    assert.equal(Object.isFrozen(output), FREEZE_ENABLED)
     assert.ok(!Object.isFrozen(input))
     assert.ok(!Object.isFrozen(result))
     input.c = 30; result.w = 60

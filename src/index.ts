@@ -1,4 +1,5 @@
 export { DEFAULTS } from './engine/defaults'
+export { FREEZE_ENABLED, freeze_owned } from './lib/immutable'
 export { THEMES, resolve_theme, theme_color } from './engine/theme'
 export type { ThemeName, ThemePalette } from './engine/theme'
 export {

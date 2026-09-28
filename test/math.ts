@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import * as core from '../src/index'
 import * as math from '../src/lib/math'
@@ -45,7 +46,7 @@ const tests: Record<string, () => void> = {
     near(large[2] / 1e307, 8)
     for (const values of [range(0), range(-2), range(3, 1), range(1, 3, -1), range(2, 2)]) {
       assert.deepEqual(values, [])
-      assert.ok(Object.isFrozen(values))
+      assert.equal(Object.isFrozen(values), FREEZE_ENABLED)
     }
   },
 
@@ -71,7 +72,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(linspace(2, 8, 1), [2])
     assert.equal(linspace(0, 1).length, 101)
     assert.deepEqual(linspace(-1e308, 1e308, 3), [-1e308, 0, 1e308])
-    assert.ok(Object.isFrozen(linspace(0, 1)))
+    assert.equal(Object.isFrozen(linspace(0, 1)), FREEZE_ENABLED)
     assert.throws(() => linspace(0, Infinity), /finite/)
   },
 
@@ -81,13 +82,13 @@ const tests: Record<string, () => void> = {
     const rows = zip(values, ['a', 'b'])
     assert.deepEqual(rows, [[2, 'a'], [4, 'b']])
     assert.deepEqual(zip(), [])
-    assert.ok(Object.isFrozen(rows) && Object.isFrozen(rows[0]))
+    assert.ok((Object.isFrozen(rows) === FREEZE_ENABLED) && (Object.isFrozen(rows[0]) === FREEZE_ENABLED))
     assert.deepEqual(meshgrid([1, 2], ['a', 'b']), [[1, 'a'], [1, 'b'], [2, 'a'], [2, 'b']])
     const grid = lingrid([1, 2], [4, 0], { x: 2, y: 3 })
     assert.deepEqual(grid, [{ x: 1, y: 4 }, { x: 1, y: 2 }, { x: 1, y: 0 },
       { x: 2, y: 4 }, { x: 2, y: 2 }, { x: 2, y: 0 }])
     assert.deepEqual(lingrid([0, 1], [0, 1], [0, 3]), [])
-    assert.ok(Object.isFrozen(grid[0]))
+    assert.equal(Object.isFrozen(grid[0]), FREEZE_ENABLED)
     const item = { x: 2 }, copies = repeat(item, 3)
     assert.equal(copies[0], item)
     assert.ok(!Object.isFrozen(item) && !Object.isFrozen(values))
@@ -97,7 +98,7 @@ const tests: Record<string, () => void> = {
     const values = range(6), matrix = reshape(values, [2, 3])
     assert.deepEqual(matrix, [[0, 1, 2], [3, 4, 5]])
     assert.deepEqual(concat(matrix), values)
-    assert.ok(Object.isFrozen(matrix[0]))
+    assert.equal(Object.isFrozen(matrix[0]), FREEZE_ENABLED)
     assert.deepEqual(split(values, 4), [[0, 1, 2, 3], [4, 5]])
     assert.deepEqual(slice(values, 1, 6, 2), [1, 3, 5])
     assert.deepEqual(slice(values, -4, -1), [2, 3, 4])
@@ -164,7 +165,7 @@ const tests: Record<string, () => void> = {
     const point = polar(pi / 2, [2, 3], { x: 4, y: 5 })
     near(point.x, 4); near(point.y, 8)
     assert.deepEqual(polard(90, [2, 3], [4, 5]), point)
-    assert.ok(Object.isFrozen(point))
+    assert.equal(Object.isFrozen(point), FREEZE_ENABLED)
   },
 
   'complex arithmetic uses a squared divisor magnitude and supports real scalars'() {

@@ -1,3 +1,4 @@
+import { freeze_owned } from './immutable'
 import { count_limit } from './checks'
 import { linspace } from './arrays'
 import { copy_limit } from '../engine/coordinates'
@@ -62,10 +63,10 @@ function sample_curve(props: SampleProps = {}): readonly Sample[] {
   const ts = tvals ?? range(props.tlim)
   const xs = xvals ?? range(props.xlim), ys = yvals ?? range(props.ylim)
   if (!f && fx === undefined && fy === undefined && !xvals && !yvals && !props.xlim && !props.ylim) {
-    return Object.freeze([])
+    return freeze_owned([])
   }
-  return Object.freeze(ts.map((t, index) => {
-    if (!Number.isFinite(t)) return Object.freeze({ t, point: null })
+  return freeze_owned(ts.map((t, index) => {
+    if (!Number.isFinite(t)) return freeze_owned({ t, point: null })
     let point: CoordinateValue | null
     try {
       if (f) point = f(t)
@@ -77,7 +78,7 @@ function sample_curve(props: SampleProps = {}): readonly Sample[] {
         const y = yvals ? yvals[index] : tvals || props.tlim ? t : ys[index]
         point = { x: scalar_value(fx, y), y }
       } else point = { x: xs[index], y: ys[index] }
-      return Object.freeze({ t, point: finite_sample(point) })
+      return freeze_owned({ t, point: finite_sample(point) })
     } catch (cause) {
       throw new Error(`Sample ${index} at t=${t} failed`, { cause })
     }
@@ -85,7 +86,7 @@ function sample_curve(props: SampleProps = {}): readonly Sample[] {
 }
 
 function sample_points(props: SampleProps = {}): readonly (Coordinate | null)[] {
-  return Object.freeze(sample_curve(props).map(sample => sample.point))
+  return freeze_owned(sample_curve(props).map(sample => sample.point))
 }
 
 export { linspace, sample_curve, sample_points, sample_count, finite_point, scalar_value }

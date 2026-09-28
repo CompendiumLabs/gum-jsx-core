@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import type { Fragment } from './fragment'
 import type { FlexSpec } from '../lib/flex'
 import type { PositionSpec } from '../elems/group'
@@ -52,7 +53,7 @@ function copy_data<T>(value: T, active = new Set<object>()): T {
     ? value.map(item => copy_data(item, active))
     : Object.fromEntries(Object.entries(value).map(([key, item]) => [key, copy_data(item, active)]))
   active.delete(value)
-  return Object.freeze(result) as T
+  return freeze_owned(result) as T
 }
 
 // Snapshot optional defaults once; each instance overrides them with its own data.
@@ -96,7 +97,7 @@ function element_children(child: Child = []): readonly Element[] {
     else if (item instanceof Element) result.push(item)
     else throw new TypeError('Expected an element child')
   }
-  return Object.freeze(result)
+  return freeze_owned(result)
 }
 
 // Single-content containers share one validation rule, including conditional children.
@@ -134,13 +135,13 @@ function element_definition(ctor: ElementClass): ElementDefinition {
   for (const [key, hook] of Object.entries({ layout, normalize, data_bounds })) {
     if (hook !== undefined && typeof hook !== 'function') throw new TypeError(`${name}.${key} must be a function`)
   }
-  const type: ElementType | undefined = layout && Object.freeze({
+  const type: ElementType | undefined = layout && freeze_owned({
     name,
     layout: (element: Element, query: LayoutQuery) => layout.call(ctor, element.props, query),
     ...(auto_fit === undefined ? {} : { auto_fit }),
     ...(data_bounds ? { data_bounds: (element: Element) => data_bounds.call(ctor, element.props) } : {}),
   })
-  const definition = Object.freeze({ defaults, type, normalize: normalize?.bind(ctor) })
+  const definition = freeze_owned({ defaults, type, normalize: normalize?.bind(ctor) })
   definitions.set(ctor, definition)
   return definition
 }
@@ -153,7 +154,7 @@ class Element<Props extends ElementProps = ElementProps, Input extends ElementPr
   constructor(...args: [props?: Input] | [type: ElementType, props: Props]) {
     if (args.length === 2) {
       // Explicit descriptors remain available for protocol adoption and low-level callers.
-      this.type = Object.freeze({ ...args[0] })
+      this.type = freeze_owned({ ...args[0] })
       this.props = copy_data(args[1])
     } else {
       const definition = element_definition(new.target as unknown as ElementClass)
@@ -168,7 +169,7 @@ class Element<Props extends ElementProps = ElementProps, Input extends ElementPr
     if (id !== undefined && (typeof id !== 'string' || !id.length)) {
       throw new TypeError('An element id must be a nonempty string')
     }
-    Object.freeze(this)
+    freeze_owned(this)
   }
 }
 

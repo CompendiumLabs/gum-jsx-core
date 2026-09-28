@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { make_rect, transform_rect, union_rects } from '../src/engine/geometry'
 import type { PointValue, Rect, Transform } from '../src/engine/geometry'
@@ -40,7 +41,7 @@ for (const invalid of [null, {}, [], [0], [0, 0, 0]]) {
 assert.equal(transform_rect(null, null as unknown as PointValue), null)
 const translated = transform_rect(make_rect(-2, 3, 4, 5), [10, -4])!
 assert.deepEqual(translated, { x: 8, y: -1, width: 4, height: 5 })
-assert.ok(Object.isFrozen(translated))
+assert.equal(Object.isFrozen(translated), FREEZE_ENABLED)
 assert.deepEqual(transform_rect(make_rect(0, 0, 1, 1), [1e16, 1e16]), {
   x: 1e16, y: 1e16, width: 0, height: 0,
 })
@@ -58,7 +59,7 @@ assert.deepEqual(union_rects(null, zero), zero)
 const input = [{ x: -10, y: 2, width: 5, height: 4 }, { x: 8, y: -4, width: 0, height: 0 }]
 const union = union_rects(null, ...input, null)!
 assert.deepEqual(union, { x: -10, y: -4, width: 18, height: 10 })
-assert.ok(Object.isFrozen(union))
+assert.equal(Object.isFrozen(union), FREEZE_ENABLED)
 assert.ok(input.every(rect => !Object.isFrozen(rect)))
 input[0].x = -100
 assert.equal(union.x, -10)

@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   HStack, VStack, Spacer, Box, Svg, Rect, Square, Text, Fonts, LayoutPass,
@@ -249,7 +250,7 @@ const tests: Record<string, () => void> = {
   'Spacer carries ordinary overridable flex metadata in its immutable description'() {
     const pass = new LayoutPass(), spacer = new Spacer()
     assert.deepEqual(spacer.props, { basis: 0, grow: 1 })
-    assert.ok(Object.isFrozen(spacer.props))
+    assert.equal(Object.isFrozen(spacer.props), FREEZE_ENABLED)
     assert.deepEqual(pass.layout(spacer).size, make_size())
     const row = pass.layout(new HStack({ width: px(200), gap: px(5), children: [
       new Square({ width: px(20) }), spacer, new Spacer({ grow: 3 }), new Square({ width: px(20) }),

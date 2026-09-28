@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Overlay, Attach, Rotate, TransformBox, Box, Group, Plot, Rect, Circle, Text, TextRow, TextCol,
@@ -70,7 +71,7 @@ const tests: Record<string, () => void> = {
     const record = new Box({ ...props, anchor: { x: 'end', y: 0.25 } })
     anchor[0] = 0
     assert.deepEqual(tuple.props.anchor, [1, 0.25])
-    assert.ok(Object.isFrozen(tuple.props.anchor))
+    assert.equal(Object.isFrozen(tuple.props.anchor), FREEZE_ENABLED)
     const parents: ((child: Element) => Element)[] = [
       child => new Group({ children: child }),
       child => new Graph({ xlim: [0, 1], ylim: [0, 1], children: child }),

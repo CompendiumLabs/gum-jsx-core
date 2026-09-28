@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { finite, nonnegative } from '../lib/checks'
 import { make_point, make_rect, read_point, clamp_radii } from './geometry'
 import type { Point, PointValue, RectRadii, RectRadiiValue, Rect as PixelRect } from './geometry'
@@ -36,7 +37,7 @@ type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw | TextDraw
 const owned_drawings = new WeakSet<Drawing>()
 function own_drawing<T extends Drawing>(draw: T): T {
   owned_drawings.add(draw)
-  return Object.freeze(draw)
+  return freeze_owned(draw)
 }
 
 // Own paint records at the drawing boundary, including optional SVG stroke policy.
@@ -55,8 +56,8 @@ function copy_paint(paint: Paint): Paint {
   }
   finite(opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
-  const stroke_dasharray = Object.freeze((paint.stroke_dasharray ?? []).map(value => nonnegative(value, 'stroke_dasharray')))
-  return Object.freeze({
+  const stroke_dasharray = freeze_owned((paint.stroke_dasharray ?? []).map(value => nonnegative(value, 'stroke_dasharray')))
+  return freeze_owned({
     fill, stroke, stroke_width, stroke_linecap, stroke_linejoin, stroke_miterlimit,
     stroke_dasharray, opacity,
   })

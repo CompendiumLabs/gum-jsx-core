@@ -1,3 +1,4 @@
+import { freeze_owned } from './immutable'
 import { finite } from './checks'
 import type { Limit } from '../engine/coordinates'
 
@@ -48,7 +49,7 @@ const any = (values: readonly boolean[]): boolean => values.some(Boolean)
 function cumsum(values: readonly number[], first = true): readonly number[] {
   let total = 0
   const result = values.map(value => total += value)
-  return Object.freeze(first ? [0, ...result] : result)
+  return freeze_owned(first ? [0, ...result] : result)
 }
 
 function norm_degree(degree: number): void {
@@ -63,9 +64,9 @@ function norm(values: readonly number[], degree = 2): number {
 function normalize(values: readonly number[], degree = 1): readonly number[] {
   norm_degree(degree)
   const scale = values.reduce((n, value) => Math.max(n, abs(value)), 0)
-  if (scale === 0) return Object.freeze(values.map(() => 0))
+  if (scale === 0) return freeze_owned(values.map(() => 0))
   const scaled = values.map(value => value / scale), magnitude = norm(scaled, degree)
-  return Object.freeze(scaled.map(value => value / magnitude))
+  return freeze_owned(scaled.map(value => value / magnitude))
 }
 
 function numeric_limit(lim: Limit, distinct: boolean): void {

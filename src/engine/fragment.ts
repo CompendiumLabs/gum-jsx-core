@@ -1,3 +1,4 @@
+import { freeze_owned } from '../lib/immutable'
 import { finite } from '../lib/checks'
 import { drawing_ink, copy_drawing } from './drawing'
 import type { Drawing } from './drawing'
@@ -76,7 +77,7 @@ function place_fragment(
   // Normalize external records once; results made here keep their shared identity.
   const owned = owned_fragments.has(fragment)
   const point = read_point(offset, 'offset')
-  return Object.freeze({
+  return freeze_owned({
     fragment: owned ? fragment : make_fragment(fragment),
     offset: make_point(point.x, point.y),
     ...(transform === undefined ? {} : { transform: make_transform(transform) }),
@@ -97,7 +98,7 @@ function outset_bounds(fragment: Pick<Fragment, 'size' | 'outset'>): Rect {
 
 // Translation and uniform fitting move guides along with the completed child.
 function transform_guides(guides: Guides, y: number, scale = 1): Guides {
-  return Object.freeze(Object.fromEntries(Object.entries(guides)
+  return freeze_owned(Object.fromEntries(Object.entries(guides)
     .filter((entry): entry is [string, number] => entry[1] !== undefined)
     .map(([key, value]) => [key, finite(y + scale * value, `guide ${key}`)])))
 }
@@ -149,18 +150,18 @@ function make_fragment(spec: FragmentSpec): Fragment {
   if (spec.connection !== undefined) {
     const { id, boundary } = spec.connection
     if (typeof id !== 'string' || !id.length) throw new TypeError('A connection needs a nonempty string id')
-    connection = Object.freeze({ id, boundary: make_clip(boundary, boundary.radius) })
+    connection = freeze_owned({ id, boundary: make_clip(boundary, boundary.radius) })
   }
   const fragment: Fragment = {
     ...(spec.name === undefined ? {} : { name: spec.name }),
     ...(spec.label === undefined ? {} : { label: spec.label }),
     ...(spec.debug === true ? { debug: true } : {}),
-    size, guides: Object.freeze(guides),
+    size, guides: freeze_owned(guides),
     ...(spec.math === undefined ? {} : { math: copy_math_metrics(spec.math) }),
     ink: clipped_bounds(ink),
     overflow: bounds_overflow(size, bounds),
     ...(Object.values(outset).some(Boolean) ? { outset } : {}),
-    draw: Object.freeze(draw), children: Object.freeze(children),
+    draw: freeze_owned(draw), children: freeze_owned(children),
     ...(content === undefined ? {} : { content }),
     ...(clip === undefined ? {} : { clip }),
     ...(clip_path === undefined ? {} : { clip_path }),
@@ -168,7 +169,7 @@ function make_fragment(spec: FragmentSpec): Fragment {
     ...(spec.connection_scope === true ? { connection_scope: true } : {}),
   }
   owned_fragments.add(fragment)
-  return Object.freeze(fragment)
+  return freeze_owned(fragment)
 }
 
 // Layout metadata does not change geometry. Normalize external results, while
@@ -182,10 +183,10 @@ function fragment_metadata(fragment: Fragment, metadata: Pick<FragmentSpec, 'nam
   else if (result.connection !== fragment.connection) {
     const { id, boundary } = result.connection
     if (typeof id !== 'string' || !id.length) throw new TypeError('A connection needs a nonempty string id')
-    result.connection = Object.freeze({ id, boundary: make_clip(boundary, boundary.radius) })
+    result.connection = freeze_owned({ id, boundary: make_clip(boundary, boundary.radius) })
   }
   owned_fragments.add(result)
-  return Object.freeze(result)
+  return freeze_owned(result)
 }
 
 // Framed elements publish their visible outline when identified. LayoutPass

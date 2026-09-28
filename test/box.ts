@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Box, Frame, Svg, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
@@ -102,7 +103,7 @@ const tests: Record<string, () => void> = {
     object.v = px(50)
     assert.deepEqual(pass.layout(a).size, { width: 6, height: 8 })
     assert.deepEqual(pass.layout(b).size, { width: 6, height: 8 })
-    assert.ok(Object.isFrozen(a.props.padding) && Object.isFrozen(b.props.padding))
+    assert.ok((Object.isFrozen(a.props.padding) === FREEZE_ENABLED) && (Object.isFrozen(b.props.padding) === FREEZE_ENABLED))
     assert.equal(pass.layout(a), pass.layout(a))
   },
 

@@ -1,7 +1,8 @@
+import { freeze_owned } from '../lib/immutable'
 import { black } from '../lib/constants'
 
 // Central defaults: sizes in pixels, line height in em, corner radius as a fraction.
-const DEFAULTS = Object.freeze({
+const DEFAULTS = freeze_owned({
   font_size: 16,
   font_family: 'IBM Plex Sans',
   font_weight: 400,

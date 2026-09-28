@@ -1,3 +1,4 @@
+import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import { distribute_flex } from '../src/index'
 import type { FlexItem } from '../src/index'
@@ -14,7 +15,7 @@ const tests: Record<string, () => void> = {
     for (const budget of [undefined, 0, 100]) {
       const sizes = distribute_flex(items, budget)
       assert.deepEqual(sizes, [20, 30])
-      assert.ok(Object.isFrozen(sizes))
+      assert.equal(Object.isFrozen(sizes), FREEZE_ENABLED)
     }
     assert.equal(JSON.stringify(items), source)
     assert.deepEqual(distribute_flex([], 100), [])
