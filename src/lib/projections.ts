@@ -3,6 +3,15 @@ import { copy_coordinate } from '../engine/coordinate'
 import type { Coordinate } from '../engine/coordinate'
 import { Projection } from '../engine/projection'
 
+type PolarProjectionOptions = Readonly<{
+  degrees?: boolean
+  offset?: number
+  clockwise?: boolean
+}>
+type LogProjectionOptions = Readonly<{
+  axes?: 'x' | 'y' | 'both'
+  base?: number
+}>
 type Point3 = Readonly<{ x: number; y: number; z: number }>
 type OrthographicProjectionOptions = Readonly<{
   azimuth?: number
@@ -60,6 +69,39 @@ function positive(value: number, name: string): number {
   return value
 }
 
+/** Angle and radius to Cartesian coordinates; offset uses the same units as theta. */
+function polar_projection({ degrees = false, offset = 0, clockwise = false }: PolarProjectionOptions = {}): Projection {
+  if (typeof degrees !== 'boolean' || typeof clockwise !== 'boolean') {
+    throw new TypeError('Polar degrees and clockwise options must be booleans')
+  }
+  const turn = degrees ? 360 : 2 * Math.PI, unit = degrees ? Math.PI / 180 : 1
+  const start = (finite(offset, 'offset') % turn) * unit
+  const direction = clockwise ? -1 : 1
+  return new Projection(point => {
+    if (!Object.hasOwn(point, 'theta') || !Object.hasOwn(point, 'r')) {
+      throw new TypeError('polar projection input needs theta and r coordinates')
+    }
+    const angle = start + direction * (point.theta % turn) * unit
+    return { x: point.r * Math.cos(angle), y: point.r * Math.sin(angle) }
+  })
+}
+
+/** Logarithmic coordinates on selected axes; nonpositive logged values are hidden. */
+function log_projection({ axes = 'both', base = 10 }: LogProjectionOptions = {}): Projection {
+  if (!['x', 'y', 'both'].includes(axes)) throw new TypeError('Log axes must be x, y, or both')
+  if (positive(base, 'base') === 1) throw new RangeError('base must not equal 1')
+  const divisor = Math.log(base)
+  const logarithm = base === 10 ? Math.log10 : base === 2 ? Math.log2 : (value: number) => Math.log(value) / divisor
+  const log_x = axes !== 'y', log_y = axes !== 'x'
+  return new Projection(point => {
+    if (!Object.hasOwn(point, 'x') || !Object.hasOwn(point, 'y')) {
+      throw new TypeError('log projection input needs x and y coordinates')
+    }
+    if ((log_x && point.x <= 0) || (log_y && point.y <= 0)) return null
+    return { x: log_x ? logarithm(point.x) : point.x, y: log_y ? logarithm(point.y) : point.y }
+  })
+}
+
 /** Fixed isometric view with unit projected axes, matching the helix example. */
 function isometric_projection(): Projection {
   const horizontal = Math.sqrt(3) / 2
@@ -108,5 +150,5 @@ function perspective_projection({ eye, target = { x: 0, y: 0, z: 0 }, up = { x: 
   })
 }
 
-export { isometric_projection, orthographic_projection, perspective_projection }
-export type { Point3, OrthographicProjectionOptions, PerspectiveProjectionOptions }
+export { polar_projection, log_projection, isometric_projection, orthographic_projection, perspective_projection }
+export type { PolarProjectionOptions, LogProjectionOptions, Point3, OrthographicProjectionOptions, PerspectiveProjectionOptions }

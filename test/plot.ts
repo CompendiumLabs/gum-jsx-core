@@ -1,7 +1,8 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, CoordLine, Points, SymLine, HAxis, Text, Fonts,
+  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, CoordLine, Points, SymLine, HAxis, VAxis,
+  HScale, HLabels, HLabel, HMesh, VMesh, Mesh2D, Text, Fonts,
   LayoutPass, define_element, make_fragment, shape_size, make_request, exact, px,
   infer_coordinates, map_point, unmap_point, linear_ticks, render_svg, evaluate,
 } from '../src/index'
@@ -169,6 +170,87 @@ const tests: Record<string, () => void> = {
     const text = new HAxis({ lim: [0, 2], ticks: [[0, '<first>'], [3, 'outside'], [2, 'last']] })
     const labels = pass.layout(text, fixed).children.map(child => find(child.fragment, 'Text').label)
     assert.deepEqual(labels, ['<first>', 'last'])
+  },
+
+  'axis details follow inherited font size independently of label fonts and frame size'() {
+    const pass = new LayoutPass()
+    const axis = new HAxis({ ticks: [0.5], label_font_size: px(24) })
+    for (const font of [8, 16, 32]) {
+      const scale = font / 16
+      for (const height of [100, 200]) {
+        const request = make_request({ width: exact(200), height: exact(height) })
+        const fragment = find(pass.layout(new Box({ font_size: px(font), children: axis }), request), 'HAxis')
+        assert.deepEqual(fragment.draw.map(draw => draw.stroke_width), [scale, scale])
+        assert.deepEqual((fragment.draw[1] as PathDraw).commands, [
+          { kind: 'M', x: 100, y: height }, { kind: 'L', x: 100, y: height + 5 * scale },
+        ])
+        near(fragment.children[0].offset.y, height + 9 * scale)
+        near(fragment.children[0].fragment.size.height, 24 * 1.2)
+      }
+      const vertical = pass.layout(new VAxis({ font_size: px(font), ticks: [0.5] }), fixed)
+      assert.deepEqual((vertical.draw[1] as PathDraw).commands, [
+        { kind: 'M', x: 0, y: 50 }, { kind: 'L', x: -5 * scale, y: 50 },
+      ])
+      const label = vertical.children[0]
+      near(label.offset.x + label.fragment.size.width, -9 * scale)
+      const ticks = pass.layout(new HScale({ font_size: px(font), ticks: [0.5] }), fixed)
+      assert.equal(ticks.draw[0].stroke_width, scale)
+      for (const source of [new HLabels({ ticks: [0.5] }), new HLabel({ value: 0.5 })]) {
+        const labels = find(pass.layout(new Box({ font_size: px(font), children: source }), fixed), source.type.name)
+        near(labels.children[0].offset.y, 100 + 9 * scale)
+      }
+      // Arrowheads and ticks share the same scale; explicit lengths reproduce the defaults.
+      assert.deepEqual(pass.layout(new HAxis({ font_size: px(font), arrow: true }), fixed),
+        pass.layout(new HAxis({ font_size: px(font), arrow: true, stroke_width: px(scale),
+          tick_size: px(5 * scale), label_offset: px(4 * scale), arrow_size: px(7 * scale) }), fixed))
+    }
+  },
+
+  'plot and bar plot decorations scale with fonts while grid strokes stay stable on resize'() {
+    const pass = new LayoutPass()
+    for (const source of [new Plot({ bounds: 'frame', title: 'Title', xlabel: 'X', ylabel: 'Y',
+      xticks: [0.5], yticks: [0.5], grid: true }),
+    new BarPlot({ bounds: 'frame', values: [1, 2], title: 'Title', xlabel: 'X', ylabel: 'Y',
+      xticks: [0.5], yticks: [0.5], grid: true })]) {
+      const reference = pass.layout(source, fixed)
+      for (const font of [8, 16, 32]) {
+        for (const request of [fixed, make_request({ width: exact(400), height: exact(200) })]) {
+          const fragment = find(pass.layout(new Box({ font_size: px(font), children: source }), request), source.type.name)
+          for (const side of ['left', 'right', 'top', 'bottom'] as const) {
+            near(fragment.outset![side], reference.outset![side] * font / 16)
+          }
+          for (const name of ['HAxis', 'VAxis', 'HMesh', 'VMesh']) {
+            assert.equal(find(fragment, name).draw[0].stroke_width, font / 16)
+          }
+        }
+      }
+    }
+    for (const Grid of [HMesh, VMesh, Mesh2D]) {
+      const source = new Grid()
+      for (const font of [8, 32]) {
+        const fragment = pass.layout(new Box({ font_size: px(font), children: source }), fixed)
+        assert.equal(find(fragment, Grid === VMesh ? 'VMesh' : 'HMesh').draw[0].stroke_width, font / 16)
+      }
+    }
+  },
+
+  'explicit pixel widths and spacing override font-relative plot defaults'() {
+    const pass = new LayoutPass()
+    for (const font of [8, 32]) {
+      const plot = pass.layout(new Plot({ font_size: px(font), grid: true,
+        axis_stroke_width: px(2), xaxis_tick_stroke_width: px(3), grid_stroke_width: px(4),
+        axis_tick_size: px(7), axis_label_offset: px(9), xticks: [0.5], yticks: [0.5] }), fixed)
+      const axis = find(plot, 'HAxis')
+      assert.deepEqual(axis.draw.map(draw => draw.stroke_width), [2, 3])
+      near(axis.children[0].offset.y - axis.size.height, 16)
+      assert.deepEqual(find(plot, 'VAxis').draw.map(draw => draw.stroke_width), [2, 2])
+      assert.equal(find(plot, 'HMesh').draw[0].stroke_width, 4)
+      const grid = pass.layout(new Mesh2D({ font_size: px(font), stroke_width: px(3) }), fixed)
+      for (const name of ['HMesh', 'VMesh']) assert.equal(find(grid, name).draw[0].stroke_width, 3)
+      const spaced = pass.layout(new Plot({ font_size: px(font), axis: false, bounds: 'frame',
+        title: new Text({ children: 'Title', font_size: px(12) }), margin: px(10), label_gap: px(6) }), fixed)
+      assert.deepEqual(spaced.outset, { left: 10, right: 10, top: 10 + 6 + 12 * 1.2, bottom: 10 })
+    }
   },
 
   'axis label anchors attach rotated labels by a selected edge'() {

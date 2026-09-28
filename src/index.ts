@@ -60,7 +60,7 @@ export { png_size } from './lib/png'
 export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
 export { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
 export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
-  LineProps, PolylineProps, PolygonProps, PathProps } from './elems/shapes'
+  LineProps, HLineProps, VLineProps, PolylineProps, PolygonProps, PathProps } from './elems/shapes'
 export { Text, Span } from './elems/text'
 export type { TextProps, TextOptions, SpanProps } from './elems/text'
 export { Box, Frame } from './elems/box'
@@ -99,8 +99,9 @@ export { read_coordinate, copy_coordinate } from './engine/coordinate'
 export type { Coordinate, CoordinateValue, CoordinatePosition } from './engine/coordinate'
 export { Projection } from './engine/projection'
 export type { ProjectionFunction } from './engine/projection'
-export { isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
-export type { Point3, OrthographicProjectionOptions, PerspectiveProjectionOptions } from './lib/projections'
+export { polar_projection, log_projection, isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
+export type { PolarProjectionOptions, LogProjectionOptions, Point3,
+  OrthographicProjectionOptions, PerspectiveProjectionOptions } from './lib/projections'
 export { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
 export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps } from './elems/placement'
 export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
@@ -121,8 +122,8 @@ export { TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, 
 export type { TextStackProps, TextBoxProps, TextFigureProps, TitleBoxProps, TitleFrameProps, TitleFrameTitleStyle, BulletsProps, SlideProps } from './elems/document'
 export { sample_curve, sample_points } from './lib/sampling'
 export type { ScalarFunction, SampleProps, Sample } from './lib/sampling'
-export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
-export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
+export { SymLine, SymSpline, SymArrow, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
+export type { SymLineProps, SymSplineProps, SymArrowProps, SymPointsProps, SymFillProps,
   VectorSample, VectorSampleValue, FieldProps, SymFieldProps } from './elems/symbolic'
 import { Axis as AxisElement } from './elems/axis'
 import type { Axis as LayoutAxis } from './engine/layout'

@@ -8,9 +8,9 @@ import { make_point } from '../engine/geometry'
 import type { Point } from '../engine/geometry'
 import type { Coordinate } from '../engine/coordinate'
 import { exact, make_request } from '../engine/layout'
-import { CoordLine, Spline, Points, Fill, mark_context, mark_bounds, arrow_draw,
+import { CoordLine, Spline, Arrow, Points, Fill, mark_context, mark_bounds, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head } from './marks'
-import type { CoordLineProps, SplineProps, PointsProps, FillProps, MarkProps, ArrowHeadScope } from './marks'
+import type { CoordLineProps, SplineProps, ArrowProps, PointsProps, FillProps, MarkProps, ArrowHeadScope } from './marks'
 import { linspace, sample_points, sample_count, finite_point, scalar_value } from '../lib/sampling'
 import type { PointValue, ScalarFunction, SampleProps } from '../lib/sampling'
 import { px } from '../engine/units'
@@ -19,6 +19,7 @@ import type { Limit } from '../engine/coordinates'
 
 type SymLineProps = Omit<CoordLineProps, 'points'> & SampleProps
 type SymSplineProps = Omit<SplineProps, 'points'> & SampleProps
+type SymArrowProps = Omit<ArrowProps, 'points' | 'from' | 'to'> & SampleProps
 type SymPointsProps = Omit<PointsProps<Coordinate>, 'points'> & SampleProps
 type SymFillProps = Omit<FillProps, 'points' | 'boundary'> & Readonly<{
   upper?: ScalarFunction; lower?: ScalarFunction; xlim?: Limit; xvals?: readonly number[]; samples?: number
@@ -50,6 +51,10 @@ const SymLine = define_component<SymLineProps>('SymLine', props => {
 const SymSpline = define_component<SymSplineProps>('SymSpline', props => {
   const { style, points } = split_samples(props)
   return new Spline({ ...style, points })
+})
+const SymArrow = define_component<SymArrowProps>('SymArrow', props => {
+  const { style, points } = split_samples(props)
+  return new Arrow({ ...style, points })
 })
 const SymPoly = define_component<SymLineProps>('SymPoly', props => {
   const { style, points } = split_samples(props)
@@ -131,6 +136,6 @@ const SymField = define_component<SymFieldProps>('SymField', ({ f, xlim = [-1, 1
   return new Field({ ...props, vectors })
 })
 
-export { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField }
-export type { SymLineProps, SymSplineProps, SymPointsProps, SymFillProps,
+export { SymLine, SymSpline, SymArrow, SymPoly, SymPoints, SymFill, Field, SymField }
+export type { SymLineProps, SymSplineProps, SymArrowProps, SymPointsProps, SymFillProps,
   VectorSample, VectorSampleValue, FieldProps, SymFieldProps }

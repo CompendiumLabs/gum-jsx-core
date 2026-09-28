@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  LayoutPass, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Dot, Line, UnitLine, HLine, VLine,
+  LayoutPass, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Dot, Line, UnitLine,
   Polyline, Polygon, Triangle, CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points, Field, exact, make_request, px, em, evaluate, render_svg,
   data_bounds, infer_coordinates, point_bounds, map_point, unmap_point,
@@ -21,7 +21,7 @@ function equivalent(a: Element, b: Element) {
 const tests: Record<string, () => void> = {
   'primitives mix tuple and record positions with fractions, px, and em'() {
     const from = [px(12), em(2)] as const, to = [0.75, 0.5] as const
-    for (const Shape of [Line, UnitLine, HLine, VLine]) {
+    for (const Shape of [Line, UnitLine]) {
       equivalent(new Shape({ from, to: { x: to[0], y: to[1] } }),
         new Shape({ from: { x: from[0], y: from[1] }, to }))
     }

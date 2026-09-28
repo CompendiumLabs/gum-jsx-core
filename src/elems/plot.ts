@@ -151,8 +151,8 @@ function plot_data(input: PlotProps): PlotData {
 function plot_layout(props: PlotData, query: LayoutQuery): Fragment {
   const size = graph_size(query), { coordinates } = props
   const basis = make_measure(query.measure, { reference: size })
-  const margin = resolve_insets(props.margin ?? px(12), basis, 'margin')
-  const gap = resolve_length(props.label_gap ?? px(8),
+  const margin = resolve_insets(props.margin ?? em(3 / 4), basis, 'margin')
+  const gap = resolve_length(props.label_gap ?? em(1 / 2),
     query.measure, Math.min(size.width, size.height), 'label_gap')
   if (gap < 0) throw new RangeError('label_gap must be nonnegative')
   const context = { coordinates }

@@ -28,6 +28,9 @@ type RectProps = ElementProps & Readonly<{ border_radius?: RectRadius }>
 type CircleProps = ElementProps & Readonly<{ center?: PositionValue; radius?: Length }>
 type EllipseProps = ElementProps & Readonly<{ center?: PositionValue; radius?: PositionValue }>
 type LineProps = ElementProps & Readonly<{ from?: CoordinatePosition; to?: CoordinatePosition; space?: GeometrySpace }>
+type AxisLineProps = Omit<LineProps, 'from' | 'to'> & Readonly<{ lim?: readonly [Length, Length] }>
+type HLineProps = AxisLineProps & Readonly<{ y?: Length }>
+type VLineProps = AxisLineProps & Readonly<{ x?: Length }>
 type PolygonProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>
 type PolylineProps = ElementProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; space?: GeometrySpace }>
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>
@@ -218,12 +221,22 @@ class Path extends Element<PathProps> {
 const UnitLine = define_component<LineProps>('UnitLine', props => new Line({
   from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props,
 }))
-const HLine = define_component<LineProps>('HLine', props => new Line({
-  from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props,
-}))
-const VLine = define_component<LineProps>('VLine', props => new Line({
-  from: { x: 0.5, y: 0 }, to: { x: 0.5, y: 1 }, ...props,
-}))
+
+// Directional lines share Line's sizing and coordinate mapping, with one fixed axis.
+function axis_line({ lim = [0, 1], ...props }: AxisLineProps, axis: 'x' | 'y', position: Length) {
+  const name = axis === 'y' ? 'HLine' : 'VLine'
+  if ('from' in props || 'to' in props) {
+    throw new TypeError(`${name} uses ${axis} and lim; use Line for from/to endpoints`)
+  }
+  if (!Array.isArray(lim) || lim.length !== 2 || !Object.hasOwn(lim, 0) || !Object.hasOwn(lim, 1)) {
+    throw new TypeError(`${name}.lim needs two endpoints`)
+  }
+  const point = (value: Length) => axis === 'y' ? { x: value, y: position } : { x: position, y: value }
+  return new Line({ ...props, from: point(lim[0]), to: point(lim[1]) })
+}
+
+const HLine = define_component<HLineProps>('HLine', ({ y = 0.5, ...props }) => axis_line(props, 'y', y))
+const VLine = define_component<VLineProps>('VLine', ({ x = 0.5, ...props }) => axis_line(props, 'x', x))
 const Dot = define_component<CircleProps>('Dot', props => new Circle({
   width: px(6), height: px(6), fill: 'theme:foreground', stroke: 'none', ...props,
 }))
@@ -235,4 +248,4 @@ export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Pa
   resolve_radius, resolve_rect_radius, is_position,
   UnitLine, HLine, VLine, Dot, Triangle }
 export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
-  LineProps, PolylineProps, PolygonProps, PathProps }
+  LineProps, HLineProps, VLineProps, PolylineProps, PolygonProps, PathProps }

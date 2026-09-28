@@ -1101,8 +1101,17 @@ ordinary shape sizing policy.
 | `Circle` | `center: {x: 0.5, y: 0.5}`, scalar `radius: 0.5` of the shorter side. |
 | `Ellipse` | Same center, `radius: {x: 0.5, y: 0.5}`. |
 | `Line` | `from: {x: 0, y: 0}`, `to: {x: 1, y: 1}`. Fill is ignored. |
+| `HLine` | `y: 0.5`, `lim: [0, 1]` along x. Position and span accept lengths. |
+| `VLine` | `x: 0.5`, `lim: [0, 1]` along y. Position and span accept lengths. |
 | `Polyline` / `Polygon` | `points: [{x,y}, ...]`; Polygon closes the path. |
 | `Path` | `commands` from the absolute path helpers below. |
+
+HLine and VLine share Line's sizing, stroke, and `space` behavior. Geometry is local
+by default; `space="data"` maps their endpoints through the enclosing coordinates.
+For example, `<HLine y={0.3} lim={[0.1, 0.9]} />` spans x=0.1 to x=0.9 at y=0.3.
+Their spans may be reversed or degenerate. Use Line for arbitrary `from`/`to`
+endpoints; HLine and VLine reject those props. UnitLine retains Line's endpoint
+props with defaults `[0, 0.5]` and `[1, 0.5]`.
 
 Point inputs accept `{x,y}` or `[x,y]`, including mixtures in a list. This applies
 to endpoints, centers, paired radii, plot marks, field vectors, and curve/coordinate
@@ -1228,6 +1237,24 @@ Omitting it keeps the child at the local origin; an explicit `pos={[0, 0]}` maps
 data zero. Complete explicit limits bypass source bounds discovery, so Node
 annotations can also use named projected positions.
 
+Two core factories provide 2D coordinate transforms and are also available in JSX:
+
+| Factory | Options and behavior |
+|---|---|
+| `polar_projection({degrees = false, offset = 0, clockwise = false} = {})` | Requires `{theta, r}` and maps to `{x, y}`. The angle is `offset + theta`, or `offset - theta` when clockwise. Both angles use radians unless `degrees` is true. Signed radii are allowed. |
+| `log_projection({axes = 'both', base = 10} = {})` | Requires `{x, y}` and takes logarithms on `'x'`, `'y'`, or `'both'` axes. The other axis passes through. Base must be finite, positive, and different from 1. Nonpositive values on a logged axis return null. |
+
+Each returns an immutable `Projection`, capturing options at construction.
+Extra finite numeric dimensions are allowed. Polar inputs require named records;
+logarithmic mark inputs also accept `[x, y]` shorthand. The readonly option types
+are `PolarProjectionOptions` and `LogProjectionOptions`.
+
+Graph limits, axes, and meshes use output coordinates: a base-10 log view with
+limits `[0, 3]` covers source values `[1, 1000]`. Supply explicit axis ticks such
+as `[[0, '1'], [1, '10'], [2, '100'], [3, '1000']]` to retain data-unit labels.
+Projections carry no axis metadata or tick formatting. Plot retains its existing
+Cartesian behavior. See the [logarithmic example](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/gallery/code/log_projection.jsx).
+
 Three core factories provide standard 3D views and are also available in JSX:
 
 | Factory | Options and behavior |
@@ -1277,7 +1304,7 @@ projections. Plot and Network retain Cartesian coordinate policies. See the
 | Plot composition | [Plot](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |
-| Sampling | [SymLine](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/SymLine.md), SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField |
+| Sampling | [SymLine](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/SymLine.md), SymSpline, SymArrow, SymPoly, SymPoints, SymFill, Field, SymField |
 | Composition | Overlay, Attach, Rotate, TransformBox |
 | Text and slides | TextStack/Row/Col, TextGrid, TextBox/Frame, TextFigure, Bullets, TitleBox/Frame, Slide |
 
@@ -1301,6 +1328,13 @@ and per-axis option objects. It reserves space from measured axis overflow and
 title sizes. Data clips by default; axes and labels remain outside that clip.
 Standalone axes/meshes require their own lim for tick generation.
 
+Axis and mesh strokes default to `em(1/16)`. Axis tick lengths, label offsets,
+and arrowheads default to `em(5/16)`, `em(1/4)`, and `em(7/16)`. Plot margins and
+outer label gaps default to `em(3/4)` and `em(1/2)`. These dimensions scale with the
+owning element's font size and preserve the original appearance at 16px. Label
+font overrides affect text independently. Explicit pixel values on axis, tick,
+grid, and spacing props stay fixed when the font changes.
+
 Sampling, marker-shape/size functions, bar styles, and tick formatters run once
 at construction and produce immutable descriptions. Resizing reuses samples and
 prepared glyph measurements. Null/nonfinite samples create path gaps. Use fy for
@@ -1310,7 +1344,9 @@ and `sample_points` retain all dimensions. Points callbacks receive the complete
 frozen source record and original index; tuple inputs become `{x, y}`. In
 TypeScript, `Points` infers callback fields from its supplied points, and
 `SymPoints` callbacks receive numeric `Coordinate` records. `samples`
-defaults to 101. SymFill takes upper/lower functions or constants; SymField
+defaults to 101. SymArrow shares those sampling options and draws an Arrow with
+optional start/end heads; head sizes remain layout lengths after projection.
+SymFill takes upper/lower functions or constants; SymField
 samples a grid and maps vector directions before drawing fixed-size heads.
 
 The public linear_ticks, linspace, sample_curve/sample_points, spline1d/spline2d,

@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  sample_points, sample_curve, linspace, SymLine, SymFill, SymField, Field, Graph,
+  sample_points, sample_curve, linspace, SymLine, SymArrow, SymFill, SymField, Field, Graph,
   LayoutPass, render_svg, make_request, exact, px,
 } from '../src/index'
 import type { PathDraw } from '../src/index'
@@ -51,6 +51,39 @@ const tests: Record<string, () => void> = {
     assert.equal(path.commands.filter(command => command.kind === 'Z').length, 2)
     assert.equal(path.commands.filter(command => command.kind === 'M').length, 2)
     assert.ok(!/NaN|Infinity/.test(render_svg(graph)))
+  },
+
+  'sampled arrows keep optional heads on visible endpoints and reuse samples across resize'() {
+    for (const start_head of [false, true]) for (const end_head of [false, true]) {
+      let calls = 0
+      const arrow = new SymArrow({ tlim: [0, 8], samples: 9,
+        f: t => { calls++; return t === 3 ? null : { theta: t * Math.PI / 8, r: 1, step: t }; },
+        start_head, end_head, head_open: true, head_size: px(6),
+        stroke: 'blue', head_stroke: 'red',
+      })
+      const pass = new LayoutPass()
+      for (const hide_end of [false, true]) {
+        const graph = new Graph({ xlim: [-2, 2], ylim: [-2, 2], children: arrow,
+          projection: ({ theta, r, step }) => step === 6 || (hide_end && step === 8)
+            ? null : { x: r * Math.cos(theta), y: r * Math.sin(theta) },
+        })
+        for (const width of [200, 400]) {
+          const root = pass.layout(graph, make_request({ width: exact(width), height: exact(width / 2) }))
+          const draw = root.children[0].fragment.draw as readonly PathDraw[]
+          assert.equal(draw.filter(path => path.stroke === 'blue').length, 3)
+          const heads = draw.filter(path => path.stroke === 'red')
+          assert.equal(heads.length, Number(start_head) + Number(end_head && !hide_end))
+          for (const head of heads) {
+            const [base, tip] = head.commands
+            assert.ok(base.kind === 'M' && tip.kind === 'L')
+            assert.ok(Math.abs(Math.hypot(tip.x - base.x, tip.y - base.y) - Math.hypot(6, 6 * 1.3 / 2)) < 1e-8)
+          }
+          assert.ok(!/NaN|Infinity/.test(render_svg(root)))
+        }
+      }
+      assert.equal(calls, 9)
+    }
+    assert.equal(new LayoutPass().layout(new SymArrow()).ink, null)
   },
 
   'sampled fields skip zero vectors and preserve callback counts across resizing'() {

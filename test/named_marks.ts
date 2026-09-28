@@ -2,7 +2,7 @@ import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   Arc, Arrow, ArrowHead, Bars, CoordLine, Field, Fill, Graph, LayoutPass, Line, Points,
-  Polyline, Ray, Rect, RoundedLine, Segments, Spline, SymField, SymLine, SymPoints,
+  Polyline, Ray, Rect, RoundedLine, Segments, Spline, SymArrow, SymField, SymLine, SymPoints,
   SymPoly, SymSpline, data_bounds, evaluate, exact, make_request, px, sample_points,
 } from '../src/index'
 import type { Coordinate, CoordinatePosition, Element, PathDraw, ProjectionFunction } from '../src/index'
@@ -89,7 +89,7 @@ const tests: Record<string, () => void> = {
   },
 
   'parametric curves preserve dimensions and snapshots before projection'() {
-    for (const Mark of [SymLine, SymSpline, SymPoly]) {
+    for (const Mark of [SymLine, SymSpline, SymArrow, SymPoly]) {
       let calls = 0
       const source = { t: 0, z: 2 }
       const mark = new Mark({ tvals: [0, 1, 2, 3], f: t => {
@@ -208,10 +208,13 @@ const tests: Record<string, () => void> = {
       return <Graph xlim={[-5, 5]} ylim={[-5, 5]} projection={({theta, r}) => ({x: r * cos(theta), y: r * sin(theta)})}>
         <Points points={[point]} point-size={({r}) => px(r + 4)} />
         <SymLine f={t => ({theta: t, r: 2})} tvals={[0, 1]} />
+        <SymArrow f={t => ({theta: t, r: 2})} tvals={[0, 1]} start-head head-open />
       </Graph>
     `)
     const expected = new Graph({ ...limits, children: [new Points({ points: [[2, 0]], point_size: px(6) }),
-      new SymLine({ tvals: [0, 1], f: t => [2 * Math.cos(t), 2 * Math.sin(t)] })] })
+      new SymLine({ tvals: [0, 1], f: t => [2 * Math.cos(t), 2 * Math.sin(t)] }),
+      new SymArrow({ tvals: [0, 1], f: t => [2 * Math.cos(t), 2 * Math.sin(t)],
+        start_head: true, head_open: true })] })
     const pass = new LayoutPass()
     assert.deepEqual(pass.layout(source, fixed), pass.layout(expected, fixed))
     const seen: Coordinate[] = []

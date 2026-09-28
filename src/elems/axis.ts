@@ -19,7 +19,7 @@ import type { StyleSpec } from '../engine/style'
 import { Text } from './text'
 import type { TextOptions } from './text'
 import { linear_ticks, format_tick } from '../lib/ticks'
-import { px, resolve_length } from '../engine/units'
+import { em, resolve_length } from '../engine/units'
 import type { Length } from '../engine/units'
 import type { LayoutQuery } from '../engine/pass'
 
@@ -111,14 +111,14 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
       horizontal ? size.height : size.width, horizontal ? coord.flip_y : coord.flip_x)
   const point = (a: number, b: number) => horizontal ? make_point(a, b) : make_point(b, a)
   const fraction = Math.min(size.width, size.height)
-  const tick_size = nonnegative(resolve_length(props.tick_size ?? px(5), query.measure, fraction, 'tick_size'), 'tick_size')
-  const gap = nonnegative(resolve_length(props.label_offset ?? px(4), query.measure, fraction, 'label_offset'), 'label_offset')
+  const tick_size = nonnegative(resolve_length(props.tick_size ?? em(5 / 16), query.measure, fraction, 'tick_size'), 'tick_size')
+  const gap = nonnegative(resolve_length(props.label_offset ?? em(1 / 4), query.measure, fraction, 'label_offset'), 'label_offset')
   const sign = positive ? 1 : -1, tick_sign = tick_positive ? 1 : -1
   const line_style = resolve_style(props.line_style, query.style, query.measure)
   const paint = resolve_paint(line_style, size, query.measure)
   const draw = mode === 'axis' && (props.line ?? true) ? arrow_draw(
     [point(along(lim[0]), cross), point(along(lim[1]), cross)], paint,
-    resolve_arrow_head({ head_size: props.arrow_size ?? px(7), head_width: props.arrow_width,
+    resolve_arrow_head({ head_size: props.arrow_size ?? em(7 / 16), head_width: props.arrow_width,
       ...props.arrow_style }, size, line_style, query.measure, paint),
     { end_head: props.arrow ?? false }) : []
   if (mode !== 'labels' && tick_size) {
@@ -148,6 +148,7 @@ function axis_layout(props: AxisData, query: LayoutQuery, mode: 'axis' | 'scale'
 }
 
 class Axis extends Element<AxisData, AxisProps> {
+  static defaults: Partial<AxisData> = { stroke_width: em(1 / 16) }
   static normalize = axis_data
   static data_bounds() { return null; }
   static layout = axis_layout
@@ -230,7 +231,7 @@ function mesh_layout(props: MeshData, query: LayoutQuery) {
 }
 
 class Mesh extends Element<MeshData, MeshProps> {
-  static defaults: Partial<MeshData> = { stroke: 'theme:grid' }
+  static defaults: Partial<MeshData> = { stroke: 'theme:grid', stroke_width: em(1 / 16) }
   static normalize = mesh_data
   static data_bounds = Axis.data_bounds
   static layout = mesh_layout
@@ -249,9 +250,10 @@ class Mesh2D extends Element<ElementProps, Mesh2DProps> {
     return null
   }
   static normalize({ xlim, ylim, xticks, yticks, ...props }: Mesh2DProps): ElementProps {
+    const style = { stroke: props.stroke ?? 'theme:grid', stroke_width: props.stroke_width ?? em(1 / 16) }
     return { ...props,
-      children: [new HMesh({ lim: xlim, ticks: xticks, stroke: props.stroke ?? 'theme:grid' }),
-        new VMesh({ lim: ylim, ticks: yticks, stroke: props.stroke ?? 'theme:grid' })],
+      children: [new HMesh({ lim: xlim, ticks: xticks, ...style }),
+        new VMesh({ lim: ylim, ticks: yticks, ...style })],
     }
   }
   static layout(props: ElementProps, query: LayoutQuery) {

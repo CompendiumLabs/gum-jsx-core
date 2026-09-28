@@ -1,9 +1,11 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  LayoutPass, Svg, Box, Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
+  LayoutPass, Svg, Box, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Line, HLine, VLine, Polyline, Polygon, Path,
   px, em, make_request, available, exact, move_to, line_to, quad_to, curve_to, close_path, render_svg,
+  data_bounds, infer_coordinates, evaluate,
 } from '../src/index'
+import type { HLineProps, VLineProps, Length, PathDraw } from '../src/index'
 
 const tests: Record<string, () => void> = {
   'aspectless shapes fill available space from Svg, including through Box insets'() {
@@ -125,6 +127,88 @@ const tests: Record<string, () => void> = {
     assert.equal(fraction.draw[0].stroke_width, 4)
   },
 
+  'directional lines keep centered defaults and resolve positions and spans against their own size'() {
+    const pass = new LayoutPass()
+    for (const [width, height] of [[200, 100], [300, 200]]) {
+      const request = make_request({ width: exact(width), height: exact(height) })
+      const cases = [
+        [new HLine(), [0, height / 2, width, height / 2]],
+        [new VLine(), [width / 2, 0, width / 2, height]],
+        [new HLine({ y: 0, lim: [0.25, 0.75] }), [width / 4, 0, width * 0.75, 0]],
+        [new VLine({ x: 0, lim: [0.75, 0.25] }), [0, height * 0.75, 0, height / 4]],
+        [new HLine({ y: em(2), lim: [px(12), '75%'], font_size: px(10) }), [12, 20, width * 0.75, 20]],
+        [new VLine({ x: '25%', lim: ['12px', em(2)], font_size: px(10) }), [width / 4, 12, width / 4, 20]],
+      ] as const
+      for (const [line, [x1, y1, x2, y2]] of cases) {
+        const fragment = pass.layout(line, request), draw = fragment.draw[0] as PathDraw
+        assert.deepEqual(fragment.size, { width, height })
+        assert.deepEqual(draw.commands, [{ kind: 'M', x: x1, y: y1 }, { kind: 'L', x: x2, y: y2 }])
+        assert.equal(draw.fill, 'none')
+      }
+    }
+    const sized = pass.layout(new HLine({ width: px(80), height: px(40), y: 0.25, lim: [0.25, 0.75],
+      stroke_width: px(3), stroke: 'red' }), make_request({ width: available(200), height: available(100) }))
+    const draw = sized.draw[0] as PathDraw
+    assert.deepEqual(draw.commands, [{ kind: 'M', x: 20, y: 10 }, { kind: 'L', x: 60, y: 10 }])
+    assert.equal(draw.stroke_width, 3)
+    assert.equal(draw.stroke, 'red')
+  },
+
+  'directional lines retain local geometry in Graph and opt into data mapping and bounds'() {
+    const pass = new LayoutPass(), request = make_request({ width: exact(200), height: exact(100) })
+    const h = new HLine({ space: 'data', y: 3, lim: [-2, 6] })
+    const v = new VLine({ space: 'data', x: 2, lim: [-1, 7] })
+    assert.deepEqual(data_bounds(h), { xlim: [-2, 6], ylim: [3, 3] })
+    assert.deepEqual(data_bounds(v), { xlim: [2, 2], ylim: [-1, 7] })
+    const local = [new HLine({ y: 0.25, lim: [0.2, 0.8] }), new VLine({ x: 0.75, lim: [0.8, 0.2] })]
+    for (const line of local) assert.equal(data_bounds(line), null)
+    const coordinates = infer_coordinates([h, v, ...local])
+    assert.deepEqual(coordinates.xlim, [-2, 6])
+    assert.deepEqual(coordinates.ylim, [-1, 7])
+    const graph = pass.layout(new Graph({ children: [h, v, ...local] }), request)
+    assert.deepEqual((graph.children[0].fragment.draw[0] as PathDraw).commands,
+      [{ kind: 'M', x: 0, y: 50 }, { kind: 'L', x: 200, y: 50 }])
+    assert.deepEqual((graph.children[1].fragment.draw[0] as PathDraw).commands,
+      [{ kind: 'M', x: 100, y: 100 }, { kind: 'L', x: 100, y: 0 }])
+    for (const [index, line] of local.entries()) {
+      assert.deepEqual(graph.children[index + 2].fragment.draw, pass.layout(line, request).draw)
+    }
+    assert.throws(() => pass.layout(h, request), /Data geometry needs a coordinate context/)
+    assert.throws(() => pass.layout(v, request), /Data geometry needs a coordinate context/)
+  },
+
+  'directional lines accept degenerate spans and snapshot input lengths'() {
+    const pass = new LayoutPass(), request = make_request({ width: exact(200), height: exact(100) })
+    const start = { value: 12, unit: 'px' as const }, lim: [Length, Length] = [start, 0.75]
+    const line = new HLine({ y: 0.25, lim })
+    start.value = 99
+    lim[1] = 1
+    assert.deepEqual((pass.layout(line, request).draw[0] as PathDraw).commands,
+      [{ kind: 'M', x: 12, y: 25 }, { kind: 'L', x: 150, y: 25 }])
+    for (const Shape of [HLine, VLine]) {
+      const dot = pass.layout(new Shape({ lim: [0.5, 0.5], stroke_linecap: 'round', stroke_width: px(4) }), request)
+      assert.deepEqual(dot.ink, { x: 98, y: 48, width: 4, height: 4 })
+    }
+  },
+
+  'directional JSX uses position and span and rejects malformed spans and endpoint overrides'() {
+    const pass = new LayoutPass(), request = make_request({ width: exact(200), height: exact(100) })
+    for (const [source, expected] of [
+      ['<HLine y={0.3} lim={[0.1, 0.9]} />', new HLine({ y: 0.3, lim: [0.1, 0.9] })],
+      ['<VLine x={0.7} lim={[0.2, 0.8]} />', new VLine({ x: 0.7, lim: [0.2, 0.8] })],
+    ] as const) {
+      assert.deepEqual(pass.layout(evaluate(source), request), pass.layout(expected, request))
+    }
+    for (const Shape of [HLine, VLine]) {
+      for (const lim of [[], [0], [0, 1, 2], Array(2), { 0: 0, 1: 1, length: 2 }, null]) {
+        assert.throws(() => new Shape({ lim: lim as unknown as readonly [Length, Length] }), /lim needs two endpoints/)
+      }
+      for (const endpoint of ['from', 'to']) {
+        assert.throws(() => evaluate(`<${new Shape().type.name} ${endpoint}={[0, 1]} />`), /use Line for from\/to endpoints/)
+      }
+    }
+  },
+
   'paths resolve every control point, own source data, and bound curves conservatively'() {
     const pass = new LayoutPass()
     const commands = [move_to(0, 0.5), quad_to(px(5), em(-1), 0.5, 0.5),
@@ -161,3 +245,20 @@ for (const [name, test] of Object.entries(tests)) {
   console.log(`ok - ${name}`)
 }
 console.log(`${Object.keys(tests).length} shape checks passed.`)
+
+function directional_line_types() {
+  const horizontal: HLineProps = { y: em(2), lim: [px(8), '90%'], space: 'data' }
+  const vertical: VLineProps = { x: 0.25, lim: [0, 1] }
+  new HLine(horizontal)
+  new VLine(vertical)
+  // @ts-expect-error Horizontal lines use y and lim, not arbitrary endpoints.
+  new HLine({ from: [0, 0] })
+  // @ts-expect-error Vertical lines use x and lim, not arbitrary endpoints.
+  new VLine({ to: [1, 1] })
+  // @ts-expect-error HLine's fixed position is y.
+  new HLine({ x: 0.5 })
+  // @ts-expect-error VLine's fixed position is x.
+  new VLine({ y: 0.5 })
+  // @ts-expect-error A span needs exactly two lengths.
+  new HLine({ lim: [0, 0.5, 1] })
+}

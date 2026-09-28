@@ -34,13 +34,13 @@ import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
 import { Plot, BarPlot, Legend, LegendItem, OuterLabel } from './elems/plot'
 import { TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide } from './elems/document'
-import { SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
+import { SymLine, SymSpline, SymArrow, SymPoly, SymPoints, SymFill, Field, SymField } from './elems/symbolic'
 import { sample_curve, sample_points } from './lib/sampling'
 import { linear_ticks, format_tick } from './lib/ticks'
 import { spline1d, spline2d } from './lib/curves'
 import { infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point } from './engine/coordinates'
 import { Projection } from './engine/projection'
-import { isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
+import { polar_projection, log_projection, isometric_projection, orthographic_projection, perspective_projection } from './lib/projections'
 import { read_coordinate, copy_coordinate } from './engine/coordinate'
 
 type EvaluateOptions = Readonly<{ scope?: Readonly<Record<string, unknown>>; name?: string; seed?: number }>
@@ -59,13 +59,13 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,
     TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,
-    SymLine, SymSpline, SymPoly, SymPoints, SymFill, Field, SymField,
+    SymLine, SymSpline, SymArrow, SymPoly, SymPoints, SymFill, Field, SymField,
     sample_curve, sample_points, linear_ticks, format_tick, spline1d, spline2d,
     move_to, line_to, quad_to, curve_to, close_path,
     em, px, Element, define_element, define_component, element_children, prefix_split, prefix_join,
     infer_coordinates, data_bounds, point_bounds, merge_bounds, map_point, unmap_point, coordinate_point,
     Projection, read_coordinate, copy_coordinate, graph_children,
-    isometric_projection, orthographic_projection, perspective_projection,
+    polar_projection, log_projection, isometric_projection, orthographic_projection, perspective_projection,
     available, exact, natural, make_request, finish_size, shape_size,
     make_size, make_point, make_rect, make_fragment, place_fragment, draw_rect,
     ...defaults.scope, ...scope,
