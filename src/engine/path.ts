@@ -1,4 +1,4 @@
-import { make_point, make_rect } from './geometry'
+import { make_rect } from './geometry'
 import type { Point, Rect, Transform } from './geometry'
 import type { Length } from './units'
 import { finite } from '../lib/checks'
@@ -61,21 +61,53 @@ function map_path<T>(
   }))
 }
 
+// Numeric copies and transforms construct commands directly, without allocating
+// a temporary point for each endpoint and control point. The private coordinate
+// callbacks validate their results; generic map_path keeps its callback contract.
+function map_coordinates(
+  commands: readonly PathCommand[],
+  map_x: (x: number, y: number) => number, map_y: (x: number, y: number) => number,
+): readonly PathCommand[] {
+  if (commands.length && commands[0].kind !== 'M') {
+    throw new TypeError('A path must begin with move_to')
+  }
+  const path = Object.freeze(commands.map(command => {
+    const { kind } = command
+    switch (kind) {
+      case 'Z': return Object.freeze({ kind })
+      case 'M': case 'L': {
+        const { x, y } = command
+        return Object.freeze({ kind, x: map_x(x, y), y: map_y(x, y) })
+      }
+      case 'Q': {
+        const { x1, y1, x, y } = command
+        return Object.freeze({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1), x: map_x(x, y), y: map_y(x, y) })
+      }
+      case 'C': {
+        const { x1, y1, x2, y2, x, y } = command
+        return Object.freeze({ kind, x1: map_x(x1, y1), y1: map_y(x1, y1),
+          x2: map_x(x2, y2), y2: map_y(x2, y2), x: map_x(x, y), y: map_y(x, y) })
+      }
+      default: throw new TypeError(`Unknown path command: ${kind}`)
+    }
+  }))
+  owned_paths.add(path)
+  return path
+}
+
 // Copying validates all coordinates without retaining a caller's mutable records.
 function copy_path(commands: readonly PathCommand[]): readonly PathCommand[] {
   if (owned_paths.has(commands)) return commands
-  const path = map_path(commands, make_point)
-  owned_paths.add(path)
-  return path
+  return map_coordinates(commands, (x = 0) => finite(x, 'x'), (_, y = 0) => finite(y, 'y'))
 }
 
 function transform_path(
   commands: readonly PathCommand[], transform: Transform,
 ): readonly PathCommand[] {
   const [a, b, c, d, e, f] = transform
-  const path = map_path(commands, (x, y) => make_point(a * x + c * y + e, b * x + d * y + f))
-  owned_paths.add(path)
-  return path
+  return map_coordinates(commands,
+    (x, y) => finite(a * x + c * y + e, 'x'),
+    (x, y) => finite(b * x + d * y + f, 'y'))
 }
 
 // Bezier curves stay inside their control hull. This deliberately conservative

@@ -178,13 +178,17 @@ function bounds_overflow(size: Size, bounds: Rect | null): Insets {
 
 // Union nullable bounds, preserving the difference between no paint and zero size.
 function union_rects(...rects: readonly (Rect | null)[]): Rect | null {
-  const items = rects.filter((rect): rect is Rect => rect !== null)
-  if (items.length === 0) return null
-  const x = Math.min(...items.map(rect => rect.x))
-  const y = Math.min(...items.map(rect => rect.y))
-  const right = Math.max(...items.map(rect => rect.x + rect.width))
-  const bottom = Math.max(...items.map(rect => rect.y + rect.height))
-  return make_rect(x, y, right - x, bottom - y)
+  let x = Infinity, y = Infinity, right = -Infinity, bottom = -Infinity
+  let found = false
+  for (const rect of rects) {
+    if (rect === null) continue
+    found = true
+    x = Math.min(x, rect.x)
+    y = Math.min(y, rect.y)
+    right = Math.max(right, rect.x + rect.width)
+    bottom = Math.max(bottom, rect.y + rect.height)
+  }
+  return found ? make_rect(x, y, right - x, bottom - y) : null
 }
 
 // A clip with no overlapping area leaves no visible ink.
@@ -208,9 +212,22 @@ function make_transform(values: Transform): Transform {
 function transform_rect(rect: Rect | null, offset: PointValue, transform?: Transform): Rect | null {
   if (rect === null) return null
   const translation = read_point(offset, 'offset')
-  const [a, b, c, d, e, f] = transform ?? [1, 0, 0, 1, 0, 0]
   const { x, y, width, height } = rect
-  const corners = [[x, y], [x + width, y], [x, y + height], [x + width, y + height]]
+  const x2 = x + width, y2 = y + height
+  if (transform == null && Number.isFinite(x) && Number.isFinite(y)
+    && Number.isFinite(x2) && Number.isFinite(y2)) {
+    // Match the identity matrix's arithmetic, including signed zero and the
+    // rounding of both endpoints after translation. Invalid corners retain the
+    // general path's validation below.
+    const start_x = finite(x + 0 + translation.x, 'x')
+    const start_y = finite(y + 0 + translation.y, 'y')
+    const end_x = finite(x2 + 0 + translation.x, 'x')
+    const end_y = finite(y2 + 0 + translation.y, 'y')
+    const left = Math.min(start_x, end_x), top = Math.min(start_y, end_y)
+    return make_rect(left, top, Math.max(start_x, end_x) - left, Math.max(start_y, end_y) - top)
+  }
+  const [a, b, c, d, e, f] = transform ?? [1, 0, 0, 1, 0, 0]
+  const corners = [[x, y], [x2, y], [x, y2], [x2, y2]]
   const points = corners.map(([x, y]) => make_point(
     a * x + c * y + e + translation.x,
     b * x + d * y + f + translation.y,

@@ -11,7 +11,7 @@ bun run perf --json > /tmp/core-perf.json
 ```
 
 The workspace also exposes `bun run perf:core`. Its `bun run perf` command runs
-core, math, and maps sequentially with the same options and one combined report.
+core, math, maps, and docs demos sequentially with the same options and one combined report.
 
 ## Workloads
 
