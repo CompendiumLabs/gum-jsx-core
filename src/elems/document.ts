@@ -195,10 +195,10 @@ class TitleFrame extends Element<TitleFrameData, TitleFrameProps> {
     // applies to the bordered body, whose allocation excludes the title overhang.
     // The body is a part, not a node: only the complete element carries the id.
     // The title reserves no room inside the body: content starts at the ordinary
-    // padding, and may run beneath the title box unless the top padding clears it.
+    // padding, with any content behind the title box clipped away.
     const layout_body = (request = body_request) => box_layout(frame,
       { ...query, request: prepare_request(request, body_sizing), sizing: body_sizing },
-      size => make_rect((size.width - title.size.width) * position, 0, title.size.width, half))
+      size => make_rect((size.width - title.size.width) * position, -half, title.size.width, title.size.height))
     let body = layout_body()
     const measured = make_size(body.size.width, body.size.height + raise)
     const size = finish_size(measured, query.request, query.sizing)
