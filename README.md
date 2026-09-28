@@ -96,6 +96,21 @@ assets, call `await fonts.load()` on a `Fonts` instance, and pass it to
 `render_element(element, { fonts })` before rendering text. See the
 [fonts guide](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/fonts.md) for resource setup.
 
+Use `render_element(element, { fonts, text_mode: 'live' })` to keep ordinary
+text as positioned SVG text. The default is `text_mode: 'path'`. Both modes use
+the same measurements, wrapping, baselines, and ink bounds; math retains its
+outlines. The option also works on `layout_element`, before calling `render_svg`.
+Changing modes invalidates a reused pass's layout cache.
+
+Live text requires the same fonts in the display host. `fonts.font_sources()`
+returns face family, weight, style, and a URL or byte snapshot for browser
+`FontFace` registration; add the faces to `document.fonts` and await their loading
+before displaying the SVG. The metrics-only emoji face is excluded. Fontkit's
+`fonts.load()` loads measurement data and does not register browser fonts.
+Custom providers can expose `MeasuredFont.face` to support live text; providers
+without that metadata keep their outlines. Browser shaping and antialiasing can
+differ from outlined output even with the same fonts.
+
 Emoji are measured with a bundled fallback face and emitted as live SVG text.
 Their appearance depends on the display host's emoji font; PDF export currently
 rejects live color-font text. Ordinary outlined text needs no viewer-side fonts.

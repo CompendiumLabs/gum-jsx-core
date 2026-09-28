@@ -42,7 +42,7 @@ export type { PathCommand, PathSegment } from './engine/path'
 export { resolve_style, resolve_paint } from './engine/style'
 export type { Style, StyleSpec, FontStyle, FontWeight, LineCap, LineJoin } from './engine/style'
 export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY } from './engine/fonts'
-export type { FontProvider, MeasuredFont, GlyphShape, LiveCluster, FontOptions, FontData } from './engine/fonts'
+export type { FontProvider, MeasuredFont, GlyphShape, LiveCluster, FontOptions, FontData, FontSource } from './engine/fonts'
 export { Element, define_element, define_component, element_children, content_child } from './engine/element'
 export type { Child, ElementProps, ElementType, LayoutMethod, ElementOptions } from './engine/element'
 export { prefix_split, prefix_join } from './lib/props'
@@ -82,6 +82,7 @@ export type { OutputPrecision } from './engine/output_number'
 export { make_viewport, layout_element, render_element } from './render'
 export type {
   ViewportOptions, LayoutElementOptions, RenderElementOptions, LayoutElementResult, RenderElementResult,
+  TextRenderMode,
 } from './render'
 export { inspect_fragment } from './inspect'
 export type { InspectOptions } from './inspect'

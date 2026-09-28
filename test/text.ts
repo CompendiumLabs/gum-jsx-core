@@ -357,7 +357,7 @@ const tests: Record<string, () => void> = {
       + sans.shape('\u03a9').advance))
   },
 
-  'outlined SVG is self-contained, escaped, and renderable without a font resource'() {
+  'outlined SVG is self-contained and renderable without a font resource'() {
     const pass = new LayoutPass()
     const fragment = pass.layout(new Text({ children: '<A & "B">', font_style: 'italic' }))
     const before = pass.stats
@@ -365,8 +365,7 @@ const tests: Record<string, () => void> = {
     pass.set_resource('fonts', null, 1)
     const svg = render_svg(root)
     assert.match(svg, /<path d="M/)
-    assert.match(svg, /aria-label="&lt;A &amp; &quot;B&quot;&gt;"/)
-    assert.doesNotMatch(svg, /<text|font-family|@font-face/)
+    assert.doesNotMatch(svg, /<text|font-family|@font-face|role=|aria-label=|<g>/)
     assert.deepEqual(pass.stats, before)
     assert.equal(Object.isFrozen(fragment.children[0].fragment.draw[0]), FREEZE_ENABLED)
   },

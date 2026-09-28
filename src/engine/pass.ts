@@ -95,6 +95,7 @@ class LayoutPass {
   // Resources and cache lifetimes belong to this pass, never to source elements.
   constructor(resources: Readonly<Record<string, Resource>> = {}) {
     if (!resources.fonts) this.set_resource('fonts', new Fonts(), 0)
+    if (!resources.text_mode) this.set_resource('text_mode', 'path', 'path')
     for (const [name, resource] of Object.entries(resources)) {
       this.set_resource(name, resource.value, resource.version)
     }

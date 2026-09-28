@@ -4,7 +4,7 @@ import { make_point, make_rect, read_point, clamp_radii } from './geometry'
 import type { Point, PointValue, RectRadii, RectRadiiValue, Rect as PixelRect } from './geometry'
 import { copy_path, path_bounds } from './path'
 import type { PathCommand } from './path'
-import type { LineCap, LineJoin } from './style'
+import type { LineCap, LineJoin, FontStyle } from './style'
 
 type Paint = Readonly<{
   fill: string
@@ -24,14 +24,16 @@ type PathDraw = Readonly<{
 // Images carry opacity but cannot carry vector fill or stroke settings.
 type ImageDraw = Readonly<{ kind: 'image'; rect: PixelRect; data: string; opacity?: number }
   & { [Key in Exclude<keyof Paint, 'opacity'>]?: never }>
-// Live text is the one drawing that needs a host font: a color face has no
-// outline to fill. Core measured the advance; the named family must paint it.
+// Live text needs a host font. Core retains the measured advance and ink bounds.
 type TextDraw = Readonly<{
   kind: 'text'; text: string; origin: Point; advance: number
   font_family: string; font_size: number; fill: string; opacity?: number
+  font_weight?: number; font_style?: FontStyle; font_oblique?: boolean
+  color_font?: boolean
+  text_anchor?: 'start' | 'middle'
   bounds: PixelRect | null
 } & { [Key in Exclude<keyof Paint, 'fill' | 'opacity'>]?: never }>
-type TextFont = Readonly<{ family: string; size: number }>
+type TextFont = Readonly<{ family: string; size: number; weight?: number; style?: FontStyle; oblique?: boolean; color?: boolean }>
 type Drawing = RectDraw | EllipseDraw | PathDraw | ImageDraw | TextDraw
 
 const owned_drawings = new WeakSet<Drawing>()
@@ -103,11 +105,12 @@ function draw_image(rect: PixelRect, data: string, opacity = 1): ImageDraw {
   return own_drawing({ kind: 'image', rect: make_rect(rect.x, rect.y, rect.width, rect.height), data, opacity })
 }
 
-// The origin is the baseline start of a measured advance. Hosts center the text
-// within that advance, so a substituted host font cannot drift along a line.
+// The origin is the baseline start of a measured advance. Color clusters default
+// to a centered anchor; ordinary live runs start at their measured position.
 function draw_text(
   text: string, origin_value: PointValue, advance: number, font: TextFont,
   paint: Pick<Paint, 'fill' | 'opacity'>, bounds: PixelRect | null,
+  anchor: 'start' | 'middle' = 'middle',
 ): TextDraw {
   const origin = read_point(origin_value, 'origin')
   const { fill, opacity = 1 } = paint
@@ -115,11 +118,23 @@ function draw_text(
   if (typeof font.family !== 'string' || !font.family) throw new TypeError('Text drawing requires a font family')
   if (typeof fill !== 'string') throw new TypeError('Drawing paints must be strings')
   nonnegative(advance, 'advance'); nonnegative(font.size, 'font_size')
+  if (font.weight !== undefined && (!Number.isFinite(font.weight) || font.weight < 1 || font.weight > 1000)) {
+    throw new TypeError('Text font weight must be between 1 and 1000')
+  }
+  if (font.style !== undefined && !['normal', 'italic'].includes(font.style)) throw new TypeError('Unknown text font style')
+  if (font.oblique !== undefined && typeof font.oblique !== 'boolean') throw new TypeError('Text oblique must be boolean')
+  if (font.color !== undefined && typeof font.color !== 'boolean') throw new TypeError('Text color font must be boolean')
+  if (!['start', 'middle'].includes(anchor)) throw new TypeError('Unknown text anchor')
   finite(opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
   return own_drawing({
     kind: 'text', text, origin: make_point(origin.x, origin.y), advance,
     font_family: font.family, font_size: font.size, fill, opacity,
+    ...(font.weight === undefined ? {} : { font_weight: font.weight }),
+    ...(font.style === undefined ? {} : { font_style: font.style }),
+    ...(font.oblique === undefined ? {} : { font_oblique: font.oblique }),
+    ...(font.color === undefined ? {} : { color_font: font.color }),
+    ...(anchor === 'middle' ? {} : { text_anchor: anchor }),
     bounds: bounds && make_rect(bounds.x, bounds.y, bounds.width, bounds.height),
   })
 }
@@ -132,7 +147,8 @@ function copy_drawing(draw: Drawing): Drawing {
     case 'path': return draw_path(draw.commands, draw, draw.bounds)
     case 'image': return draw_image(draw.rect, draw.data, draw.opacity)
     case 'text': return draw_text(draw.text, draw.origin, draw.advance,
-      { family: draw.font_family, size: draw.font_size }, draw, draw.bounds)
+      { family: draw.font_family, size: draw.font_size, weight: draw.font_weight,
+        style: draw.font_style, oblique: draw.font_oblique, color: draw.color_font }, draw, draw.bounds, draw.text_anchor)
     default: throw new TypeError('Unknown drawing kind')
   }
 }
@@ -143,7 +159,10 @@ function drawing_ink(draw: Drawing): PixelRect | null {
   if (draw.opacity === 0) return null
   if (draw.kind === 'image') return draw.rect.width && draw.rect.height ? draw.rect : null
   // A color glyph paints its own palette, whatever the requested fill.
-  if (draw.kind === 'text') return draw.bounds?.width && draw.bounds.height ? draw.bounds : null
+  if (draw.kind === 'text') {
+    if (draw.color_font === false && draw.fill === 'none') return null
+    return draw.bounds?.width && draw.bounds.height ? draw.bounds : null
+  }
   let bounds: PixelRect | null
   switch (draw.kind) {
     case 'rect': bounds = draw.rect; break

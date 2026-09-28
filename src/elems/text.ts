@@ -31,7 +31,8 @@ type TextOptions = Omit<TextProps, 'children'>
 type SpanProps = StyleSpec & Readonly<{ children?: Child }>
 type Run = { text: string; style: Style; element?: Element; index?: number }
 type Metrics = Readonly<{ font: MeasuredFont; above: number; below: number }>
-type GlyphPart = Readonly<{ shape: GlyphShape; style: Style; width: number }>
+type ShapedRun = Readonly<{ shape: GlyphShape; font: MeasuredFont; text: string }>
+type GlyphPart = ShapedRun & Readonly<{ style: Style; width: number }>
 type SourcePart = GlyphPart | Readonly<{ element: Element; style: Style; index: number }>
 type Part = (GlyphPart | Readonly<{ fragment: Fragment; baseline: number }>) & Readonly<{ x: number }>
 type Token<Content = SourcePart> = Readonly<{
@@ -121,8 +122,8 @@ function font_metrics(style: Style, fonts: FontProvider, measure: LengthContext)
 // The requested face shapes whatever it covers, keeping its kerning. Only after
 // a missing glyph do whole grapheme clusters move to a registered fallback face,
 // so an emoji sequence never splits. Uncovered text still reports the requested face.
-function shape_run(value: string, font: MeasuredFont, style: Style, fonts: FontProvider): GlyphShape[] {
-  try { return [font.shape(value)] } catch (error) {
+function shape_run(value: string, font: MeasuredFont, style: Style, fonts: FontProvider): ShapedRun[] {
+  try { return [{ shape: font.shape(value), font, text: value }] } catch (error) {
     if (!(error instanceof MissingGlyphError) || !fonts.fallback) throw error
   }
   const pieces: { text: string; font: MeasuredFont }[] = []
@@ -133,7 +134,7 @@ function shape_run(value: string, font: MeasuredFont, style: Style, fonts: FontP
     if (last?.font === chosen) last.text += cluster
     else pieces.push({ text: cluster, font: chosen })
   }
-  return pieces.map(piece => piece.font.shape(piece.text))
+  return pieces.map(piece => ({ ...piece, shape: piece.font.shape(piece.text) }))
 }
 
 // Break the entire logical string before intersecting it with style runs. Span
@@ -188,8 +189,8 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
       const from = Math.max(start, run.start)
       const to = Math.min(boundary, run.end)
       const value = text.slice(from, Math.max(from, to)).replace(/\u200b/g, '')
-      for (const shape of value ? shape_run(value, metrics.font, run.style, fonts) : []) {
-        parts.push({ shape, style: run.style, width: shape.advance * run.style.font_size })
+      for (const shaped of value ? shape_run(value, metrics.font, run.style, fonts) : []) {
+        parts.push({ ...shaped, style: run.style, width: shaped.shape.advance * run.style.font_size })
       }
       const space = text.slice(Math.max(from, boundary), Math.min(limit, run.end))
       if (space) gap += metrics.font.shape(space).advance * run.style.font_size
@@ -257,6 +258,7 @@ function flow_lines(prepared: MeasuredText, budget: number): Line[] {
 // Lines are result fragments, never reconstructed elements. Their drawing paths
 // use fixed font pixels, with real ink independent of the allocated line boxes.
 function text_layout(props: TextProps, query: LayoutQuery) {
+  const live = query.resource<string>('text_mode') === 'live' && !query.math
   const { justify = 'start', wrap = true } = props
   if (typeof justify !== 'number' && typeof justify !== 'string') {
     throw new TypeError('Text.justify must be start, center, end, or a fraction')
@@ -272,7 +274,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   const size = finish_size(make_size(width, height), query.request, query.sizing)
   let y = 0
   const children = lines.map(line => {
-    const glyph = ({ shape, style }: GlyphPart, x: number): Drawing[] => {
+    const glyph = ({ shape, style, font, text }: GlyphPart, x: number): Drawing[] => {
       const scale = style.font_size
       const matrix = [scale, 0, 0, scale, x, line.above] as const
       const paint = { fill: style.color, opacity: style.opacity }
@@ -282,6 +284,10 @@ function text_layout(props: TextProps, query: LayoutQuery) {
         return shape.live.clusters.filter(cluster => cluster.ink).map(cluster => draw_text(
           cluster.text, make_point(x + cluster.x * scale, line.above), cluster.advance * scale,
           font, paint, transform_rect(cluster.ink, make_point(), matrix)))
+      }
+      if (live && font.face) {
+        return [draw_text(text, make_point(x, line.above), shape.advance * scale,
+          { ...font.face, size: scale, color: false }, paint, transform_rect(shape.ink, make_point(), matrix), 'start')]
       }
       const commands = transform_path(shape.commands, matrix)
       const ink = transform_rect(shape.ink, make_point(), matrix)

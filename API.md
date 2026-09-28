@@ -219,7 +219,7 @@ The [fragment schema](./src/engine/fragment.ts) contains only the result for one
 - `clip`: an optional local rectangle with optional rounded corners, clipping the fragment and its descendants.
 - `clip_path`: optional local pixel path commands using nonzero winding, clipping the fragment and its descendants. Intersects `clip` when both are present; an empty path hides all paint.
 - `name`: an optional inspection label, assigned from the element type by the pass.
-- `label`: optional accessible content; Text retains its normalized logical string here.
+- `label`: optional logical content for inspection; Text retains its normalized string here.
 
 The parent owns placement. An explicit transform acts in child coordinates before
 the placement offset; ordinary placement changes neither font size nor stroke
@@ -1014,15 +1014,43 @@ shapes contain an advance, immutable outline commands, and ink in y-down coordin
 at a one-em font with baseline zero. Font resources and preparation caches belong to
 the pass, and source elements contain no resource objects.
 
-**SVG text is currently outlined.** The same measured glyphs become pixel paths,
-so SVG and PNG agree without installing or embedding fonts. Text retains an escaped
-accessible label. Outlines make output larger and text is not selectable/searchable
-as native SVG text; an optional native-text rendering route can be added later.
+**Text defaults to outlines.** The same measured glyphs become pixel paths,
+so SVG and PNG agree without installing or embedding fonts. Set
+`text_mode: 'live'` on `render_element` or `layout_element`
+to emit ordinary text as positioned SVG text. `TextRenderMode` is `'path' | 'live'`;
+the default is `'path'`. Wrapping, baselines, advances, and ink bounds still come
+from Gum's measurements. Math keeps its outlines. Live mode avoids transforming
+and serializing ordinary text's path commands; initial shaping still computes
+outlines and exact ink bounds in the shared font cache.
+
+SVG output shares font and paint attributes across adjacent live words with the
+same style on a line. Positioned `tspan` children retain each word's measured
+location. Runs stop at style changes, inline elements, and fragment boundaries.
+SVGs containing live text set the inherited defaults (`text-anchor="start"`,
+`font-weight="400"`, and `font-style="normal"`) once on the root. Text runs emit
+only overrides for those properties. The root also sets `xml:space="preserve"`
+once so all live text retains leading, trailing, and repeated spaces.
+
+Live text needs the matching fonts in the display host. `Fonts.font_sources()`
+returns readonly `FontSource` snapshots with `family`, `weight`, `style`, and
+`source: URL | Uint8Array`, excluding the bundled metrics-only emoji face.
+Browser hosts register these using `FontFace` and `document.fonts`, then await
+the faces they need. Calling `Fonts.load()` only loads Fontkit's measurement
+data. Source snapshots can be edited without changing the font registry.
+
+`MeasuredFont.face` optionally describes the actual selected face as
+`{ family, weight, style, oblique }`. Built-in fonts supply it; `oblique` identifies
+the synthesized 12-degree slant used when no italic face exists. Custom providers
+without this metadata retain their paths in live mode. Live drawing records keep
+the selected family, weight, style, slant, baseline origin and measured advance;
+ordinary runs use a start anchor and preserve whitespace. Color glyphs retain
+their centered anchor. Font substitution, browser shaping and antialiasing can
+change painted pixels; live mode does not promise pixel equality with outlines.
 
 **Color fonts are the exception.** A face with a `CBDT`, `sbix`, `COLR`, or `SVG `
 table has no outline that one fill can paint, so emoji stay live text. This works
 with no setup: `<Text>Ship it 🚀</Text>` outlines its Plex words and emits the
-rocket as `<text font-family="'Noto Color Emoji'">`.
+rocket as `<text font-family="Noto Color Emoji">`.
 
 A color face only measures. Each grapheme cluster, including joined, flag, keycap,
 and skin tone sequences, takes the advance of its base glyph from `cmap` and
@@ -1412,7 +1440,8 @@ omits trailing zeroes and changes only serialized output, not layout or fragment
 For example, `precision: 3` formats `123.45678` as `123.457`; `precision: 0` rounds to whole numbers.
 It emits escaped SVG, resolved drawing geometry, explicit placement transforms,
 and rectangular or path clip definitions. Identity placements and attribute-free fragment
-groups are omitted; transforms, clipping, and accessible labels retain their groups.
+groups are omitted; transforms and clipping retain their groups. Fragment labels
+remain available for inspection but do not emit SVG wrappers or ARIA attributes.
 The fragment tree remains intact for layout and inspection. Rendering performs no
 layout or font work. Definition
 IDs are allocated per render and reused for repeated placements of a shared clip;
@@ -1435,6 +1464,14 @@ tagged: `{ kind: 'svg', svg, size, fragment, pass }` for an element, or
 instead. `layout_element` stops at the fragment and `make_viewport` performs only
 the wrapping. Both `render_element` and `layout_element` return the narrower
 element result when the argument is statically an `Element`.
+
+Both entry points accept `text_mode`, which is applied during layout. A reused
+pass invalidates its cached fragments when the mode changes; omitting the option
+restores the default `'path'`. Direct `LayoutPass` users can set the `text_mode`
+resource to `'path'` or `'live'`, with that same string as its version.
+`render_svg` serializes the drawings already selected during layout. A fragment
+containing live text requires a backend that supports it; PDF callers should lay
+out in path mode.
 
 `inspect_fragment(fragment)` prints local sizes, content rectangles, offsets,
 matrices, ink, overflow, and guides. The CLI's `tree` format uses it; `json` exposes

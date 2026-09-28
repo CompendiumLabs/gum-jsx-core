@@ -1,4 +1,4 @@
-import type { Drawing } from './engine/drawing'
+import type { Drawing, TextDraw } from './engine/drawing'
 import type { Fragment } from './engine/fragment'
 import type { Point, Rect, RectRadii } from './engine/geometry'
 import { path_data } from './engine/path'
@@ -40,19 +40,62 @@ function render_rect(rect: Rect, number: (value: number) => string, radius?: Rec
   return `<path d="${d}"${paint ? ` ${paint}` : ''}/>`
 }
 
+function render_text(draw: TextDraw, number: (value: number) => string, spans?: string): string {
+  // Ordinary family names need no inner quotes. Quote punctuation and CSS keywords.
+  const bare_family = /^[a-z_][\w-]*(?: [a-z_][\w-]*)*$/i.test(draw.font_family)
+    && !/^(?:inherit|initial|unset|revert|revert-layer|default|serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded|emoji|math|fangsong|caption|icon|menu|message-box|small-caption|status-bar)$/i.test(draw.font_family)
+  const family = bare_family ? draw.font_family : `'${draw.font_family.replace(/[\\']/g, '\\$&')}'`
+  const anchor = draw.text_anchor ?? 'middle'
+  const typography = (draw.font_weight === undefined || draw.font_weight === 400 ? '' : ` font-weight="${number(draw.font_weight)}"`)
+    + ((draw.font_style === undefined || draw.font_style === 'normal') && !draw.font_oblique ? ''
+      : ` font-style="${draw.font_oblique ? 'oblique 12deg' : draw.font_style}"`)
+  return `<text x="${number(draw.origin.x + (anchor === 'middle' ? draw.advance / 2 : 0))}" y="${number(draw.origin.y)}"`
+    + (anchor === 'start' ? '' : ` text-anchor="${anchor}"`)
+    + ` font-family="${escape_xml(family)}" font-size="${number(draw.font_size)}" fill="${escape_xml(draw.fill)}"`
+    + typography
+    + `${spans === undefined && draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : ''}>${spans ?? escape_xml(draw.text)}</text>`
+}
+
+// Share typography within a line, keeping each word's measured position and
+// separate opacity compositing. Color clusters retain their centered anchors.
+function render_drawings(drawings: readonly Drawing[], number: (value: number) => string): string[] {
+  const result: string[] = []
+  for (let index = 0; index < drawings.length; index++) {
+    const first = drawings[index]
+    let end = index + 1
+    if (first.kind === 'text' && first.text_anchor === 'start' && first.color_font === false) {
+      while (end < drawings.length) {
+        const next = drawings[end]
+        if (next.kind !== 'text' || next.text_anchor !== first.text_anchor || next.color_font !== first.color_font
+          || next.origin.y !== first.origin.y || next.font_family !== first.font_family || next.font_size !== first.font_size
+          || next.font_weight !== first.font_weight || next.font_style !== first.font_style
+          || next.font_oblique !== first.font_oblique || next.fill !== first.fill || next.opacity !== first.opacity) break
+        end++
+      }
+    }
+    if (first.kind !== 'text' || end === index + 1) {
+      result.push(render_drawing(first, number))
+      continue
+    }
+    const spans: string[] = []
+    for (; index < end; index++) {
+      const word = drawings[index] as TextDraw
+      const opacity = word.opacity !== undefined && word.opacity !== 1 ? ` opacity="${number(word.opacity)}"` : ''
+      spans.push(`<tspan x="${number(word.origin.x)}"${opacity}>${escape_xml(word.text)}</tspan>`)
+    }
+    result.push(render_text(first, number, spans.join('')))
+    index--
+  }
+  return result
+}
+
 // Each drawing kind has an explicit vocabulary, with no arbitrary attribute injection.
 function render_drawing(draw: Drawing, number: (value: number) => string): string {
   if (draw.kind === 'image') {
     return `<image ${rect_attributes(draw.rect, number)} xlink:href="${escape_xml(draw.data)}"`
       + ` preserveAspectRatio="none"${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : ''}/>`
   }
-  if (draw.kind === 'text') {
-    // Quote the family as one CSS string; an unquoted name must be identifiers.
-    const family = `'${draw.font_family.replace(/[\\']/g, '\\$&')}'`
-    return `<text x="${number(draw.origin.x + draw.advance / 2)}" y="${number(draw.origin.y)}" text-anchor="middle"`
-      + ` font-family="${escape_xml(family)}" font-size="${number(draw.font_size)}" fill="${escape_xml(draw.fill)}"`
-      + `${draw.opacity !== undefined && draw.opacity !== 1 ? ` opacity="${number(draw.opacity)}"` : ''}>${escape_xml(draw.text)}</text>`
-  }
+  if (draw.kind === 'text') return render_text(draw, number)
   const { fill, stroke, stroke_width, stroke_linecap = 'butt',
     stroke_linejoin = 'miter', stroke_miterlimit = 4 } = draw
   const paint = `fill="${escape_xml(fill)}" stroke="${escape_xml(stroke)}"`
@@ -121,7 +164,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       }
       path_clip = ` clip-path="url(#${id})"`
     }
-    const draw = node.draw.map(item => render_drawing(item, number))
+    const draw = render_drawings(node.draw, number)
     const children = node.children.map(child => {
       const { x, y } = child.offset
       const transforms: string[] = []
@@ -134,17 +177,19 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
       return placement_transform ? `<g transform="${placement_transform}">${body}</g>` : body
     })
 
-    // Layout hierarchy needs no matching SVG group unless it carries semantics.
-    const label = node.label === undefined ? '' : ` role="img" aria-label="${escape_xml(node.label)}"`
+    // Layout hierarchy needs no matching SVG group unless it carries clipping.
     let body = [...draw, ...children].join('')
     if (path_clip) body = `<g${path_clip}>${body}</g>`
-    return clip || label ? `<g${clip}${label}>${body}</g>` : body
+    return clip ? `<g${clip}>${body}</g>` : body
   }
 
   const body = render_fragment(fragment)
   const image_namespace = body.includes('<image ') ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ''
+  // Establish inherited text settings once, including when embedded in a styled page.
+  const text_defaults = body.includes('<text ')
+    ? ' text-anchor="start" font-weight="400" font-style="normal" xml:space="preserve"' : ''
   const parts = [`<svg xmlns="http://www.w3.org/2000/svg"${image_namespace} width="${number(width)}" height="${number(height)}"`,
-    ` viewBox="0 0 ${number(width)} ${number(height)}" overflow="hidden">`]
+    ` viewBox="0 0 ${number(width)} ${number(height)}" overflow="hidden"${text_defaults}>`]
   if (title !== undefined) parts.push(`<title>${escape_xml(title)}</title>`)
   if (definitions.length) parts.push(`<defs>${definitions.join('')}</defs>`)
   if (background !== undefined) {

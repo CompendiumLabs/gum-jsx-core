@@ -15,12 +15,15 @@ import type { SvgOptions } from './svg'
 // Undefined entries are absent, so
 // optional caller settings can be forwarded directly.
 type ViewportOptions = Readonly<{ defaults?: SvgProps; overrides?: SvgProps; wrap?: SvgProps }>
+type TextRenderMode = 'path' | 'live'
 // A reused pass keeps its cache; otherwise fonts, or the core defaults, seed a new one.
 // Fonts given alongside a pass are installed on it, refreshing the cache if they changed.
 type LayoutElementOptions = ViewportOptions & Readonly<{
   request?: LayoutRequest
   pass?: LayoutPass
   fonts?: FontProvider
+  /** Ordinary text paint; math keeps its outlines. Live text requires host fonts. */
+  text_mode?: TextRenderMode
 }>
 type RenderElementOptions = LayoutElementOptions & SvgOptions
 
@@ -42,12 +45,12 @@ function font_version(fonts: FontProvider): string | number {
   return typeof version === 'number' || typeof version === 'string' ? version : 0
 }
 
-function resolve_pass({ pass, fonts }: LayoutElementOptions): LayoutPass {
-  if (pass) {
-    if (fonts) pass.set_resource('fonts', fonts, font_version(fonts))
-    return pass
-  }
-  return fonts ? new LayoutPass({ fonts: { value: fonts, version: font_version(fonts) } }) : new LayoutPass()
+function resolve_pass({ pass, fonts, text_mode = 'path' }: LayoutElementOptions): LayoutPass {
+  if (text_mode !== 'path' && text_mode !== 'live') throw new TypeError('text_mode must be path or live')
+  const result = pass ?? new LayoutPass(fonts ? { fonts: { value: fonts, version: font_version(fonts) } } : {})
+  if (pass && fonts) result.set_resource('fonts', fonts, font_version(fonts))
+  result.set_resource('text_mode', text_mode, text_mode)
+  return result
 }
 
 // A bare element gets a viewport that hugs it. An existing viewport keeps its
@@ -72,8 +75,8 @@ function layout_element(value: unknown, options: LayoutElementOptions = {}): Lay
 function render_element(element: Element, options?: RenderElementOptions): SvgResult
 function render_element(value: unknown, options?: RenderElementOptions): RenderElementResult
 function render_element(value: unknown, options: RenderElementOptions = {}): RenderElementResult {
-  const { request, defaults, overrides, wrap, pass, fonts, ...svg_options } = options
-  const result = layout_element(value, { request, defaults, overrides, wrap, pass, fonts })
+  const { request, defaults, overrides, wrap, pass, fonts, text_mode, ...svg_options } = options
+  const result = layout_element(value, { request, defaults, overrides, wrap, pass, fonts, text_mode })
   if (result.kind === 'value') return result
   const { fragment } = result
   return { kind: 'svg', svg: render_svg(fragment, svg_options), size: fragment.size, fragment, pass: result.pass }
@@ -83,4 +86,5 @@ export { make_viewport, layout_element, render_element }
 export type {
   ViewportOptions, LayoutElementOptions, RenderElementOptions,
   LayoutElementResult, RenderElementResult,
+  TextRenderMode,
 }

@@ -20,6 +20,8 @@ type GlyphShape = Readonly<{
   live?: Readonly<{ family: string; clusters: readonly LiveCluster[] }>
 }>
 type MeasuredFont = Readonly<{
+  /** Actual selected face, for hosts that paint ordinary text themselves. */
+  face?: Readonly<{ family: string; weight: number; style: FontStyle; oblique: boolean }>
   ascent: number
   descent: number
   has_glyphs: (text: string) => boolean
@@ -32,8 +34,10 @@ interface FontProvider {
 }
 type FontOptions = Readonly<{ weight?: number; style?: FontStyle; fallback?: boolean }>
 type FontData = ArrayBuffer | Uint8Array
+type FontSource = Readonly<{ family: string; weight: number; style: FontStyle; source: URL | Uint8Array }>
 type Face = {
   family: string; weight: number; style: FontStyle; fallback: boolean; url?: URL; font?: Font
+  data?: Uint8Array; metrics_only?: boolean
   pending?: Promise<void>
 }
 
@@ -164,13 +168,14 @@ function measure_color(font: ColorFont, family: string): MeasuredFont {
 
 // Keep real kerning and ligatures within each shaped run. Italic requests use
 // a matching face when available, or a 12-degree oblique of the normal outline.
-function measure_font(font: Font, family: string, oblique: boolean): MeasuredFont {
+function measure_font(font: Font, family: string, oblique: boolean, weight: number, style: FontStyle): MeasuredFont {
   if (is_color(font)) return measure_color(font, family)
   const cache = new Map<string, GlyphShape>()
   const ascent = nonnegative(font.ascent / font.unitsPerEm, 'font ascent')
   const descent = nonnegative(-font.descent / font.unitsPerEm, 'font descent')
   const has_glyphs = (text: string) => [...text].every(char => font.hasGlyphForCodePoint(char.codePointAt(0)!))
-  return freeze_owned({ ascent, descent, has_glyphs, shape(text: string): GlyphShape {
+  const face = freeze_owned({ family, weight, style, oblique })
+  return freeze_owned({ face, ascent, descent, has_glyphs, shape(text: string): GlyphShape {
     const cached = cache.get(text)
     if (cached) return cached
     for (const char of text) {
@@ -223,6 +228,7 @@ class Fonts implements FontProvider {
     // of Noto Color Emoji (scripts/emoji-metrics.ts), and no glyph data at all.
     this.#faces.push({
       family: EMOJI_FAMILY, weight: 400, style: 'normal', fallback: true,
+      metrics_only: true,
       url: new URL('../fonts/NotoColorEmoji-Metrics.ttf', import.meta.url),
     })
   }
@@ -231,7 +237,8 @@ class Fonts implements FontProvider {
 
   // Registration copies/parses bytes now. Notify a reused pass of this new version.
   register(family: string, data: FontData, options: FontOptions = {}): void {
-    const face = { ...font_options(family, options), font: parse_font(data) }
+    const bytes = data instanceof Uint8Array ? new Uint8Array(data) : new Uint8Array(data.slice(0))
+    const face = { ...font_options(family, options), font: parse_font(bytes), data: bytes }
     this.#register(face)
   }
 
@@ -251,6 +258,16 @@ class Fonts implements FontProvider {
     this.#faces.push(face)
     this.#measured.clear()
     this.#version++
+  }
+
+  // Browser hosts can register these same faces with their FontFaceSet. Return
+  // snapshots so neither URLs nor caller edits can change the font registry.
+  // The bundled emoji face contains metrics only and cannot paint browser text.
+  font_sources(): readonly FontSource[] {
+    return freeze_owned(this.#faces.filter(face => !face.metrics_only).map(face => freeze_owned({
+      family: face.family, weight: face.weight, style: face.style,
+      source: face.url ? new URL(face.url.href) : new Uint8Array(face.data!),
+    })))
   }
 
   // Optional asynchronous preload for hosts without synchronous file access.
@@ -288,7 +305,7 @@ class Fonts implements FontProvider {
       if (!fs || !face.url) throw new FontNotLoadedError(family)
       face.font = parse_font(fs.readFileSync(face.url))
     }
-    const measured = measure_font(face.font, family, oblique)
+    const measured = measure_font(face.font, family, oblique, face.weight, face.style)
     this.#measured.set(key, measured)
     return measured
   }
@@ -305,4 +322,4 @@ class Fonts implements FontProvider {
 
 export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY }
 export { graphemes }
-export type { GlyphShape, LiveCluster, MeasuredFont, FontProvider, FontOptions, FontData }
+export type { GlyphShape, LiveCluster, MeasuredFont, FontProvider, FontOptions, FontData, FontSource }

@@ -167,9 +167,8 @@ const tests: Record<string, () => void> = {
     assert.ok(a.overflow.bottom > 20)
     assert.ok(a.overflow.left > 0)
     const text = new HAxis({ lim: [0, 2], ticks: [[0, '<first>'], [3, 'outside'], [2, 'last']] })
-    const svg = render_svg(pass.layout(text, fixed))
-    assert.match(svg, /&lt;first&gt;/)
-    assert.ok(!svg.includes('outside'))
+    const labels = pass.layout(text, fixed).children.map(child => find(child.fragment, 'Text').label)
+    assert.deepEqual(labels, ['<first>', 'last'])
   },
 
   'axis label anchors attach rotated labels by a selected edge'() {
