@@ -43,7 +43,7 @@ const tests: Record<string, () => void> = {
 
   'rotated point shapes stay visually centered on their marker coordinates'() {
     const points = new Points({ points: [[0.5, 0.5]], point_size: px(8),
-      shape: new Rotate({ angle: 45, children: new Rect() }) })
+      shape: new Rotate({ angle: 45, children: new Rect({ fill: 'black', stroke: 'none' }) }) })
     const marker = new LayoutPass().layout(new Graph({ xlim: [0, 1], ylim: [0, 1], children: points }), fixed)
       .children[0].fragment.children[0]
     const ink = marker.fragment.ink!

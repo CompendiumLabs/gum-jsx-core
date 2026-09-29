@@ -459,8 +459,14 @@ class Ray extends Element<RayProps> {
 }
 
 class Points<P extends CoordinatePosition = CoordinatePosition> extends Element<PointsData, PointsProps<P>> {
-  static defaults: Partial<PointsData> = { fill: 'theme:foreground', stroke: 'none' }
-  static normalize<P extends CoordinatePosition>({ points = [], point_size = px(6), shape = new Circle(), ...props }: PointsProps<P>): PointsData {
+  static normalize<P extends CoordinatePosition>({ points = [], point_size = px(6), shape, children, ...props }: PointsProps<P>): PointsData {
+    const child = content_child(children)
+    if (child && shape !== undefined) throw new TypeError('Points accepts either a child marker or shape, not both')
+    shape ??= child
+    if (shape === undefined) {
+      props = { fill: 'theme:foreground', stroke: 'none', ...props }
+      shape = new Circle()
+    }
     return { ...props,
       markers: points.flatMap((value, index) => {
         const point = finite_position(value, `points[${index}]`) as MarkerPoint<P> | null

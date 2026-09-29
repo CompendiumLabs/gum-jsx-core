@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   LayoutPass, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Dot, Line, UnitLine,
   Polyline, Polygon, Triangle, CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
-  Arrow, ArrowHead, Ray, Points, Field, exact, make_request, px, em, evaluate, render_svg,
+  Arrow, ArrowHead, Ray, Points, SymPoints, Field, exact, make_request, px, em, evaluate, render_svg,
   data_bounds, infer_coordinates, point_bounds, map_point, unmap_point,
   spline_path, rounded_path, arc_path, spline2d, sample_points, add2, lingrid, zip,
   draw_rect, draw_ellipse, make_rect, make_clip, make_fragment, place_fragment, transform_rect,
@@ -19,6 +19,59 @@ function equivalent(a: Element, b: Element) {
 }
 
 const tests: Record<string, () => void> = {
+  'child markers share shape sizing, styling, and JSX behavior'() {
+    const shape = new Rect({ fill: 'red' })
+    for (const Mark of [Points, SymPoints]) {
+      const sample = Mark === Points ? { points: [[0.5, 0.5] as const, [0.75, 0.25] as const] }
+        : { tvals: [0.5, 0.75], f: (t: number) => [t, 1 - t] as const }
+      const props = { ...sample, point_size: [px(8), px(12)] as const, stroke: 'blue' }
+      equivalent(new Mark({ ...props, children: shape }), new Mark({ ...props, shape }))
+      equivalent(new Mark({ ...props, children: [null, false, [' ', shape]] }), new Mark({ ...props, shape }))
+      equivalent(new Mark({ ...sample, children: [null, false, ' '] }), new Mark(sample))
+      assert.throws(() => new Mark({ ...sample, children: [shape, new Circle()] }), /one content element/)
+      for (const marker of [shape, () => shape]) {
+        assert.throws(() => new Mark({ ...sample, children: shape, shape: marker }), /either a child marker or shape/)
+      }
+    }
+    equivalent(evaluate(`<Points points={[[0.5, 0.5]]} point-size={px(8)}><Rect fill="red" /></Points>`),
+      new Points({ points: [[0.5, 0.5]], point_size: px(8), shape }))
+    equivalent(evaluate(`<SymPoints fy={x => x} xvals={[0.5]} point-size={px(8)}><Rect fill="red" /></SymPoints>`),
+      new SymPoints({ fy: x => x, xvals: [0.5], point_size: px(8), shape }))
+  },
+
+  'marker paint defaults apply only to the built-in circle'() {
+    for (const Mark of [Points, SymPoints]) {
+      const sample = Mark === Points ? { points: [[0.5, 0.5] as const] }
+        : { tvals: [0.5], f: (t: number) => [t, t] as const }
+      const paint = (props: Record<string, unknown> = {}, inherited = {}) => {
+        const fragment = new LayoutPass().layout(new Graph({ ...inherited,
+          children: new Mark({ ...sample, ...props }),
+        }), fixed)
+        return fragment.children[0].fragment.children[0].fragment.draw[0]
+      }
+      const defaults = paint()
+      assert.equal(defaults.fill, '#000000')
+      assert.equal(defaults.stroke, 'none')
+      for (const shape of [new Circle(), () => new Circle(), new Line(), () => new Line()]) {
+        const custom = paint({ shape })
+        assert.equal(custom.fill, 'none')
+        assert.equal(custom.stroke, '#000000')
+        const inherited = paint({ shape }, { fill: 'orange', stroke: 'purple' })
+        assert.equal(inherited.stroke, 'purple')
+      }
+      for (const shape of [undefined, new Circle(), () => new Circle()]) {
+        const explicit = paint({ shape, fill: 'red', stroke: 'blue' })
+        assert.equal(explicit.fill, 'red')
+        assert.equal(explicit.stroke, 'blue')
+      }
+      const styled = paint({ shape: new Circle({ fill: 'green', stroke: 'purple' }),
+        fill: 'red', stroke: 'blue' })
+      assert.equal(styled.fill, 'green')
+      assert.equal(styled.stroke, 'purple')
+      assert.equal(paint({ shape: new Circle() }, { fill: 'orange' }).fill, 'orange')
+    }
+  },
+
   'primitives mix tuple and record positions with fractions, px, and em'() {
     const from = [px(12), em(2)] as const, to = [0.75, 0.5] as const
     for (const Shape of [Line, UnitLine]) {
