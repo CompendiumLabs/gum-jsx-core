@@ -1,4 +1,5 @@
 import { freeze_owned } from '../lib/immutable'
+import { bundled_font } from '../fonts/assets'
 import { create } from 'fontkit'
 import type { Font, PathCommand as FontCommand } from 'fontkit'
 import { nonnegative } from '../lib/checks'
@@ -216,11 +217,11 @@ class Fonts implements FontProvider {
 
   // Bundled faces are metadata until first use; no old registry or Env is involved.
   constructor() {
-    for (const family of ['Sans', 'Mono']) {
+    for (const family of ['Sans', 'Mono'] as const) {
       for (const [name, weight] of [['Light', 300], ['Regular', 400], ['Bold', 700]] as const) {
         this.#faces.push({
           family: `IBM Plex ${family}`, weight, style: 'normal', fallback: false,
-          url: new URL(`../fonts/IBMPlex${family}-${name}.ttf`, import.meta.url),
+          url: bundled_font(`${family}${name}`),
         })
       }
     }
@@ -229,7 +230,7 @@ class Fonts implements FontProvider {
     this.#faces.push({
       family: EMOJI_FAMILY, weight: 400, style: 'normal', fallback: true,
       metrics_only: true,
-      url: new URL('../fonts/NotoColorEmoji-Metrics.ttf', import.meta.url),
+      url: bundled_font('EmojiMetrics'),
     })
   }
 
