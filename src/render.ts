@@ -22,7 +22,7 @@ type LayoutElementOptions = ViewportOptions & Readonly<{
   request?: LayoutRequest
   pass?: LayoutPass
   fonts?: FontProvider
-  /** Ordinary text paint; math keeps its outlines. Live text requires host fonts. */
+  /** Text and math glyph paint. Live text requires host fonts. */
   text_mode?: TextRenderMode
 }>
 type RenderElementOptions = LayoutElementOptions & SvgOptions

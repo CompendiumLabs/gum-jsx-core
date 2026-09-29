@@ -1017,10 +1017,10 @@ the pass, and source elements contain no resource objects.
 **Text defaults to outlines.** The same measured glyphs become pixel paths,
 so SVG and PNG agree without installing or embedding fonts. Set
 `text_mode: 'live'` on `render_element` or `layout_element`
-to emit ordinary text as positioned SVG text. `TextRenderMode` is `'path' | 'live'`;
+to emit text and math glyphs as positioned SVG text. `TextRenderMode` is `'path' | 'live'`;
 the default is `'path'`. Wrapping, baselines, advances, and ink bounds still come
-from Gum's measurements. Math keeps its outlines. Live mode avoids transforming
-and serializing ordinary text's path commands; initial shaping still computes
+from Gum's measurements. Drawn decorations retain their vector geometry.
+Live mode avoids transforming and serializing glyph path commands; initial shaping still computes
 outlines and exact ink bounds in the shared font cache.
 
 SVG output shares font and paint attributes across adjacent live words with the
