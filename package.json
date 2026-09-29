@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit",
     "probe": "bun test/probe.ts"
   },
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "license": "MIT",
   "description": "JSX vector graphics, layout, and SVG rendering for Gum.",
   "repository": {
