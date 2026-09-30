@@ -18,7 +18,7 @@ type ASTNode = acorn.Node & Record<string, any>
 
 const parser = acorn.Parser.extend(jsx())
 
-// parse gum.jsx code; a `return` at the top level is allowed since the code
+// parse Gum code; a `return` at the top level is allowed since the code
 // runs as a function body
 function parseJSX(code: string): ASTNode {
     try {
@@ -300,7 +300,7 @@ function runBody(body: string, source: string, name: string, scope: Record<strin
     }
 }
 
-// run gum.jsx code with `scope` bound as its globals (see Env.scope) and
+// run Gum code with `scope` bound as its globals (see Env.scope) and
 // return what it evaluates to: the value of a bare jsx element, else what the
 // code returns
 function runJSX(text: string, scope: Record<string, any> = {}, debug: boolean = false, name: string = SOURCE_NAME): any {
