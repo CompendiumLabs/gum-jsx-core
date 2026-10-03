@@ -15,14 +15,14 @@ import type { SvgOptions } from './svg'
 // Undefined entries are absent, so
 // optional caller settings can be forwarded directly.
 type ViewportOptions = Readonly<{ defaults?: SvgProps; overrides?: SvgProps; wrap?: SvgProps }>
-type TextRenderMode = 'path' | 'live'
+type TextRenderMode = 'path' | 'live' | 'mixed'
 // A reused pass keeps its cache; otherwise fonts, or the core defaults, seed a new one.
 // Fonts given alongside a pass are installed on it, refreshing the cache if they changed.
 type LayoutElementOptions = ViewportOptions & Readonly<{
   request?: LayoutRequest
   pass?: LayoutPass
   fonts?: FontProvider
-  /** Text and math glyph paint. Live text requires host fonts. */
+  /** Live renders prose and math as text; mixed keeps math outlined. */
   text_mode?: TextRenderMode
 }>
 type RenderElementOptions = LayoutElementOptions & SvgOptions
@@ -46,7 +46,9 @@ function font_version(fonts: FontProvider): string | number {
 }
 
 function resolve_pass({ pass, fonts, text_mode = 'path' }: LayoutElementOptions): LayoutPass {
-  if (text_mode !== 'path' && text_mode !== 'live') throw new TypeError('text_mode must be path or live')
+  if (text_mode !== 'path' && text_mode !== 'live' && text_mode !== 'mixed') {
+    throw new TypeError('text_mode must be path, live, or mixed')
+  }
   const result = pass ?? new LayoutPass(fonts ? { fonts: { value: fonts, version: font_version(fonts) } } : {})
   if (pass && fonts) result.set_resource('fonts', fonts, font_version(fonts))
   result.set_resource('text_mode', text_mode, text_mode)

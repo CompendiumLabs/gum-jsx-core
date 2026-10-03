@@ -97,8 +97,9 @@ assets, call `await fonts.load()` on a `Fonts` instance, and pass it to
 [fonts guide](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/fonts.md) for resource setup.
 
 Use `render_element(element, { fonts, text_mode: 'live' })` to keep text and math
-glyphs as positioned SVG text. The default is `text_mode: 'path'`. Both modes use
-the same measurements, wrapping, baselines, and ink bounds.
+glyphs as positioned SVG text. Use `text_mode: 'mixed'` for live prose with
+outlined math. The default is `text_mode: 'path'`. All three modes use the same
+measurements, wrapping, baselines, and ink bounds.
 The option also works on `layout_element`, before calling `render_svg`.
 Changing modes invalidates a reused pass's layout cache.
 

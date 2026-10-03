@@ -1017,8 +1017,10 @@ the pass, and source elements contain no resource objects.
 **Text defaults to outlines.** The same measured glyphs become pixel paths,
 so SVG and PNG agree without installing or embedding fonts. Set
 `text_mode: 'live'` on `render_element` or `layout_element`
-to emit text and math glyphs as positioned SVG text. `TextRenderMode` is `'path' | 'live'`;
-the default is `'path'`. Wrapping, baselines, advances, and ink bounds still come
+to emit text and math glyphs as positioned SVG text. Set `text_mode: 'mixed'` for
+live prose with outlined math. This choice applies to math elements, including
+custom math fonts. `TextRenderMode` is `'path' | 'live' | 'mixed'`; the default is
+`'path'`. Wrapping, baselines, advances, and ink bounds still come
 from Gum's measurements. Drawn decorations retain their vector geometry.
 Live mode avoids transforming and serializing glyph path commands; initial shaping still computes
 outlines and exact ink bounds in the shared font cache.
@@ -1514,7 +1516,7 @@ element result when the argument is statically an `Element`.
 Both entry points accept `text_mode`, which is applied during layout. A reused
 pass invalidates its cached fragments when the mode changes; omitting the option
 restores the default `'path'`. Direct `LayoutPass` users can set the `text_mode`
-resource to `'path'` or `'live'`, with that same string as its version.
+resource to `'path'`, `'live'`, or `'mixed'`, with that same string as its version.
 `render_svg` serializes the drawings already selected during layout. A fragment
 containing live text requires a backend that supports it. PDF supports live text
 when given the font provider used for layout; path mode remains available.

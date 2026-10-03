@@ -269,7 +269,8 @@ function flow_lines(prepared: MeasuredText, budget: number): Line[] {
 // Lines are result fragments, never reconstructed elements. Their drawing paths
 // use fixed font pixels, with real ink independent of the allocated line boxes.
 function text_layout(props: TextProps, query: LayoutQuery) {
-  const live = query.resource<string>('text_mode') === 'live'
+  const mode = query.resource<string>('text_mode')
+  const live = mode === 'live' || mode === 'mixed'
   const { justify = 'start', wrap = true } = props
   if (typeof justify !== 'number' && typeof justify !== 'string') {
     throw new TypeError('Text.justify must be start, center, end, or a fraction')
