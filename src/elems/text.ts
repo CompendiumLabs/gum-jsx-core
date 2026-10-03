@@ -195,6 +195,17 @@ function prepare_text(props: TextProps, query: LayoutQuery): PreparedText {
       const space = text.slice(Math.max(from, boundary), Math.min(limit, run.end))
       if (space) gap += metrics.font.shape(space).advance * run.style.font_size
     }
+    // Keep word separators in live prose without adding the gap to its measured width.
+    const last = parts.at(-1)
+    if (last && 'shape' in last && !last.shape.live && boundary < limit) {
+      const space = text.slice(boundary, limit)
+      const glyphs = last.shape.glyphs, spaces = last.font.has_glyphs(space) ? last.font.shape(space).glyphs : undefined
+      // Preserve the word's shaped positions. Trailing spaces are selectable,
+      // while their advance remains the separate gap used for wrapping.
+      const shape = glyphs && spaces ? { ...last.shape, glyphs: [...glyphs,
+        ...spaces.map(glyph => ({ ...glyph, x: glyph.x + last.shape.advance }))] } : last.shape
+      parts[parts.length - 1] = { ...last, shape, text: last.text + space }
+    }
     tokens.push({ parts, gap, hard, above, below })
     start = end
   }
@@ -287,7 +298,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
       }
       if (live && font.face) {
         return [draw_text(text, make_point(x, line.above), shape.advance * scale,
-          { ...font.face, size: scale, color: false }, paint, transform_rect(shape.ink, make_point(), matrix), 'start')]
+          { ...font.face, size: scale, color: false }, paint, transform_rect(shape.ink, make_point(), matrix), 'start', shape.glyphs)]
       }
       const commands = transform_path(shape.commands, matrix)
       const ink = transform_rect(shape.ink, make_point(), matrix)

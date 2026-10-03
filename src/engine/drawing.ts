@@ -5,6 +5,7 @@ import type { Point, PointValue, RectRadii, RectRadiiValue, Rect as PixelRect } 
 import { copy_path, path_bounds } from './path'
 import type { PathCommand } from './path'
 import type { LineCap, LineJoin, FontStyle } from './style'
+import type { FontGlyph } from './fonts'
 
 type Paint = Readonly<{
   fill: string
@@ -31,6 +32,7 @@ type TextDraw = Readonly<{
   font_weight?: number; font_style?: FontStyle; font_oblique?: boolean
   color_font?: boolean
   text_anchor?: 'start' | 'middle'
+  glyphs?: readonly FontGlyph[]
   bounds: PixelRect | null
 } & { [Key in Exclude<keyof Paint, 'fill' | 'opacity'>]?: never }>
 type TextFont = Readonly<{ family: string; size: number; weight?: number; style?: FontStyle; oblique?: boolean; color?: boolean }>
@@ -111,6 +113,7 @@ function draw_text(
   text: string, origin_value: PointValue, advance: number, font: TextFont,
   paint: Pick<Paint, 'fill' | 'opacity'>, bounds: PixelRect | null,
   anchor: 'start' | 'middle' = 'middle',
+  glyphs?: readonly FontGlyph[],
 ): TextDraw {
   const origin = read_point(origin_value, 'origin')
   const { fill, opacity = 1 } = paint
@@ -135,6 +138,14 @@ function draw_text(
     ...(font.oblique === undefined ? {} : { font_oblique: font.oblique }),
     ...(font.color === undefined ? {} : { color_font: font.color }),
     ...(anchor === 'middle' ? {} : { text_anchor: anchor }),
+    ...(glyphs === undefined ? {} : { glyphs: freeze_owned(glyphs.map(glyph => {
+      if (!Number.isInteger(glyph.id) || glyph.id < 0 || glyph.id > 65535 || typeof glyph.text !== 'string') {
+        throw new TypeError('Text glyph requires a valid ID and text')
+      }
+      return freeze_owned({ id: glyph.id, text: glyph.text,
+        x: finite(glyph.x, 'glyph.x'), y: finite(glyph.y, 'glyph.y'),
+        advance: nonnegative(glyph.advance, 'glyph.advance') })
+    })) }),
     bounds: bounds && make_rect(bounds.x, bounds.y, bounds.width, bounds.height),
   })
 }
@@ -148,7 +159,7 @@ function copy_drawing(draw: Drawing): Drawing {
     case 'image': return draw_image(draw.rect, draw.data, draw.opacity)
     case 'text': return draw_text(draw.text, draw.origin, draw.advance,
       { family: draw.font_family, size: draw.font_size, weight: draw.font_weight,
-        style: draw.font_style, oblique: draw.font_oblique, color: draw.color_font }, draw, draw.bounds, draw.text_anchor)
+        style: draw.font_style, oblique: draw.font_oblique, color: draw.color_font }, draw, draw.bounds, draw.text_anchor, draw.glyphs)
     default: throw new TypeError('Unknown drawing kind')
   }
 }

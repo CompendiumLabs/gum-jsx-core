@@ -1040,12 +1040,22 @@ data. Source snapshots can be edited without changing the font registry.
 
 `MeasuredFont.face` optionally describes the actual selected face as
 `{ family, weight, style, oblique }`. Built-in fonts supply it; `oblique` identifies
-the synthesized 12-degree slant used when no italic face exists. Custom providers
+the synthesized 12-degree slant used when no italic face exists. Its optional
+`typeface: { family, weight, style }` gives the font's installed identity for native
+text exporters, which may differ from the registered alias. Custom providers
 without this metadata retain their paths in live mode. Live drawing records keep
 the selected family, weight, style, slant, baseline origin and measured advance;
 ordinary runs use a start anchor and preserve whitespace. Color glyphs retain
 their centered anchor. Font substitution, browser shaping and antialiasing can
 change painted pixels; live mode does not promise pixel equality with outlines.
+
+For native PDF output, built-in shapes also retain `glyphs`: records with the
+font glyph `id`, Unicode `text`, positioned `x`/`y`, and nominal `advance`, in em
+with y pointing down. Live drawings carry these records for reuse by the exporter.
+`MeasuredFont.subset(glyph_ids)` returns a TrueType or CFF subset and its metrics.
+IDs must be unique and start with `.notdef` (0); their array indices become the
+subset glyph IDs. `FontSubset` metrics use em and y-down bounds, with positive
+ascent/descent. Pass the same font provider to layout and `render_pdf`.
 
 **Color fonts are the exception.** A face with a `CBDT`, `sbix`, `COLR`, or `SVG `
 table has no outline that one fill can paint, so emoji stay live text. This works
@@ -1506,8 +1516,8 @@ pass invalidates its cached fragments when the mode changes; omitting the option
 restores the default `'path'`. Direct `LayoutPass` users can set the `text_mode`
 resource to `'path'` or `'live'`, with that same string as its version.
 `render_svg` serializes the drawings already selected during layout. A fragment
-containing live text requires a backend that supports it; PDF callers should lay
-out in path mode.
+containing live text requires a backend that supports it. PDF supports live text
+when given the font provider used for layout; path mode remains available.
 
 `inspect_fragment(fragment)` prints local sizes, content rectangles, offsets,
 matrices, ink, overflow, and guides. The CLI's `tree` format uses it; `json` exposes

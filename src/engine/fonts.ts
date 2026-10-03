@@ -14,19 +14,34 @@ import type { FontStyle } from './style'
 // A color face has no fillable outline. Its shapes carry measured source
 // clusters instead, which the host draws as live text in the named family.
 type LiveCluster = Readonly<{ text: string; x: number; advance: number; ink: Rect | null }>
+// Positioned glyphs use em and y-down coordinates, just like the combined outline.
+// Advance is the glyph's nominal width; x/y already include shaping adjustments.
+type FontGlyph = Readonly<{ id: number; text: string; x: number; y: number; advance: number }>
+type FontSubset = Readonly<{
+  data: Uint8Array; format: 'truetype' | 'cff'; name: string
+  ascent: number; descent: number; cap_height: number; bounds: Rect
+  italic_angle: number; fixed_pitch: boolean
+}>
 type GlyphShape = Readonly<{
   advance: number
   commands: readonly PathCommand[]
   ink: Rect | null
+  glyphs?: readonly FontGlyph[]
   live?: Readonly<{ family: string; clusters: readonly LiveCluster[] }>
 }>
 type MeasuredFont = Readonly<{
   /** Actual selected face, for hosts that paint ordinary text themselves. */
-  face?: Readonly<{ family: string; weight: number; style: FontStyle; oblique: boolean }>
+  face?: Readonly<{
+    family: string; weight: number; style: FontStyle; oblique: boolean
+    /** Installed-font identity, which can differ from a registered family alias. */
+    typeface?: Readonly<{ family: string; weight: number; style: FontStyle }>
+  }>
   ascent: number
   descent: number
   has_glyphs: (text: string) => boolean
   shape: (text: string) => GlyphShape
+  /** Embed unique glyph IDs in order, beginning with .notdef (0). Subset IDs match array indices. */
+  subset?: (glyph_ids: readonly number[]) => FontSubset
 }>
 // A provider may name a face for text that the requested one cannot shape.
 interface FontProvider {
@@ -175,8 +190,16 @@ function measure_font(font: Font, family: string, oblique: boolean, weight: numb
   const ascent = nonnegative(font.ascent / font.unitsPerEm, 'font ascent')
   const descent = nonnegative(-font.descent / font.unitsPerEm, 'font descent')
   const has_glyphs = (text: string) => [...text].every(char => font.hasGlyphForCodePoint(char.codePointAt(0)!))
-  const face = freeze_owned({ family, weight, style, oblique })
-  return freeze_owned({ face, ascent, descent, has_glyphs, shape(text: string): GlyphShape {
+  const tables = font as Font & {
+    'OS/2'?: { usWeightClass: number }
+    head: { macStyle: { italic: boolean; bold: boolean } }
+  }
+  const typeface = freeze_owned({ family: font.familyName || family,
+    weight: tables['OS/2']?.usWeightClass ?? (tables.head.macStyle.bold ? 700 : 400),
+    style: tables.head.macStyle.italic ? 'italic' as const : 'normal' as const })
+  const face = freeze_owned({ family, weight, style, oblique, typeface })
+  const subset = (glyph_ids: readonly number[]) => subset_font(font, glyph_ids)
+  return freeze_owned({ face, ascent, descent, has_glyphs, subset, shape(text: string): GlyphShape {
     const cached = cache.get(text)
     if (cached) return cached
     for (const char of text) {
@@ -189,10 +212,13 @@ function measure_font(font: Font, family: string, oblique: boolean, weight: numb
     const scale = 1 / font.unitsPerEm
     const skew = oblique ? Math.tan(Math.PI / 15) : 0
     const commands: PathCommand[] = []
+    const glyphs: FontGlyph[] = []
     let x = 0, y = 0, ink: Rect | null = null
     run.glyphs.forEach((glyph, index) => {
       const { xAdvance, yAdvance, xOffset, yOffset } = run.positions[index]
       const dx = (x + xOffset) * scale, dy = -(y + yOffset) * scale
+      glyphs.push(freeze_owned({ id: glyph.id, text: String.fromCodePoint(...glyph.codePoints),
+        x: dx - skew * dy, y: dy, advance: glyph.advanceWidth * scale }))
       const path = glyph.path.transform(scale, 0, skew * scale, -scale, dx - skew * dy, dy)
       commands.push(...path.commands.map(font_command))
       if (path.commands.length) {
@@ -204,10 +230,33 @@ function measure_font(font: Font, family: string, oblique: boolean, weight: numb
 
     // Curve extrema give tight ink, separately from the shaped advance width.
     const advance = nonnegative(x * scale, 'glyph advance')
-    const result = freeze_owned({ advance, commands: copy_path(commands), ink })
+    const result = freeze_owned({ advance, commands: copy_path(commands), ink, glyphs: freeze_owned(glyphs) })
     cache.set(text, result)
     return result
   } })
+}
+
+// Fontkit keeps composite dependencies inside the subset. Only the requested
+// glyphs need text mappings; components added by encode() are never shown alone.
+function subset_font(font: Font, glyph_ids: readonly number[]): FontSubset {
+  const subset = font.createSubset() as unknown as {
+    includeGlyph(id: number): number; encode(): Uint8Array; cff?: unknown
+  }
+  if (glyph_ids[0] !== 0) throw new TypeError('Font subset must begin with glyph 0')
+  glyph_ids.forEach((id, index) => {
+    if (!Number.isInteger(id) || id < 0 || id >= font.numGlyphs || subset.includeGlyph(id) !== index) {
+      throw new TypeError('Font subset requires unique, valid glyph IDs')
+    }
+  })
+  const scale = 1 / font.unitsPerEm, { minX, maxY, width, height } = font.bbox
+  return freeze_owned({
+    data: subset.encode(), format: subset.cff ? 'cff' : 'truetype', name: font.postscriptName || font.familyName,
+    ascent: font.ascent * scale, descent: -font.descent * scale,
+    cap_height: (font.capHeight || font.ascent) * scale,
+    bounds: make_rect(minX * scale, -maxY * scale, width * scale, height * scale),
+    italic_angle: font.italicAngle || 0,
+    fixed_pitch: Boolean((font as Font & { post?: { isFixedPitch?: number } }).post?.isFixedPitch),
+  })
 }
 
 class Fonts implements FontProvider {
@@ -323,4 +372,4 @@ class Fonts implements FontProvider {
 
 export { Fonts, FontNotLoadedError, MissingGlyphError, EMOJI_FAMILY }
 export { graphemes }
-export type { GlyphShape, LiveCluster, MeasuredFont, FontProvider, FontOptions, FontData, FontSource }
+export type { GlyphShape, FontGlyph, FontSubset, LiveCluster, MeasuredFont, FontProvider, FontOptions, FontData, FontSource }

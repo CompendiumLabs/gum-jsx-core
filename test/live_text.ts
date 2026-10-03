@@ -30,8 +30,8 @@ assert.match(live.svg, /^<svg [^>]*text-anchor="start" font-weight="400" font-st
 assert.match(live.svg, /font-family="IBM Plex Sans"/)
 assert.match(live.svg, /font-weight="700"/)
 assert.match(live.svg, /font-style="oblique 12deg"/)
-assert.match(live.svg, />&lt;italic&gt;<\/text>/)
-assert.match(live.svg, />&amp;<\/(?:text|tspan)>/)
+assert.match(live.svg, />&lt;italic&gt; <\/text>/)
+assert.match(live.svg, />&amp; <\/(?:text|tspan)>/)
 assert.deepEqual(drawings(live.fragment).map(draw => draw.kind === 'text' ? draw.bounds : draw),
   drawings(paths.fragment).map(draw => draw.kind === 'path' ? draw.bounds : draw))
 console.log('ok - live text preserves wrapping, placement, ink, inline elements, resolved weights and oblique faces')
