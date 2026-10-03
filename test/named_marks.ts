@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Arc, Arrow, ArrowHead, Bars, Polyline, Field, Fill, Graph, LayoutPass, Line, Points,
+  Arc, Arrow, ArrowHead, Bars, Polyline, Field, Fill, Graph, LayoutPass, Line, Polygon, Points,
   Ray, Rect, RoundedLine, Segments, Spline, SymArrow, SymField, SymLine, SymPoints,
   SymPoly, SymSpline, data_bounds, evaluate, exact, make_request, px, sample_points,
 } from '../src/index'
@@ -35,10 +35,11 @@ const tests: Record<string, () => void> = {
       const pairs = [
         [new Rect({ pos: input[0], width: px(6), height: px(4), anchor: 'center' }),
           new Rect({ pos: output[0], width: px(6), height: px(4), anchor: 'center' })],
-        [new Line({ space: 'data', from: input[0], to: input[1] }),
-          new Line({ space: 'data', from: output[0], to: output[1] })],
+        [new Line({ from: input[0], to: input[1] }),
+          new Line({ from: output[0], to: output[1] })],
         [new Polyline({ space: 'data', points: input }), new Polyline({ space: 'data', points: output })],
         [new Polyline({ points: input }), new Polyline({ points: output })],
+        [new Polygon({ points: input }), new Polygon({ points: output })],
         [new Spline({ points: input }), new Spline({ points: output })],
         [new RoundedLine({ points: input }), new RoundedLine({ points: output })],
         [new Arrow({ points: input, start_head: true }), new Arrow({ points: output, start_head: true })],
@@ -112,7 +113,7 @@ const tests: Record<string, () => void> = {
       return t === 2 ? null : { x: t, y: z }
     }
     const expected = points.map(({ t, z }) => t === 2 || t === 5 ? null : { x: t, y: z })
-    for (const Mark of [Polyline, Spline, RoundedLine]) {
+    for (const Mark of [Polyline, Polygon, Spline, RoundedLine]) {
       const mark = new Mark({ points, space: 'data' })
       equivalent(mark, new Mark({ points: expected, space: 'data' }), project)
       const fragment = new LayoutPass().layout(graph(mark, project), fixed).children[0].fragment

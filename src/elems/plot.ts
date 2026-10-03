@@ -19,13 +19,13 @@ import type { InsetSpec } from '../engine/geometry'
 import { graph_size, graph_children } from './graph'
 import type { GraphProps } from './graph'
 import { available, exact, make_request, shape_size } from '../engine/layout'
-import { Points } from './marks'
+import { Line, Points } from './marks'
 import type { LayoutQuery } from '../engine/pass'
 import { Rotate } from './placement'
 import type { Side } from './placement'
 import { prefix_split, scope_props, merge_scoped } from '../lib/props'
 import type { Prefixed } from '../lib/props'
-import { Line, Rect } from './shapes'
+import { Rect } from './shapes'
 import { HStack, VStack } from './stack'
 import type { StyleSpec } from '../engine/style'
 import { theme_color } from '../engine/theme'
@@ -75,7 +75,7 @@ function legend_item(input: LegendItemProps, badge_width: Length, label_style: T
     ? new Rect({ width: badge_width, height: em(0.7), fill: badge_color, stroke: 'none' })
     : kind === 'point' ? new Points({ width: badge_width, height: em(0.8), space: 'local',
       points: [{ x: 0.5, y: 0.5 }], fill: badge_color, point_size: px(7) })
-      : new Line({ width: badge_width, height: em(0.8), from: { x: 0, y: 0.5 },
+      : new Line({ space: 'local', width: badge_width, height: em(0.8), from: { x: 0, y: 0.5 },
         to: { x: 1, y: 0.5 }, stroke: badge_color, stroke_width: px(2) }))
   return new HStack({ ...props, gap: em(0.5), align: 'center',
     children: [icon, text_element(children, label_style)] })

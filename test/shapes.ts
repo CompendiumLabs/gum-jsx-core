@@ -154,13 +154,13 @@ const tests: Record<string, () => void> = {
     assert.equal(draw.stroke, 'red')
   },
 
-  'directional lines retain local geometry in Graph and opt into data mapping and bounds'() {
+  'directional lines use ambient coordinates and exclude explicit local geometry from bounds'() {
     const pass = new LayoutPass(), request = make_request({ width: exact(200), height: exact(100) })
-    const h = new HLine({ space: 'data', y: 3, lim: [-2, 6] })
-    const v = new VLine({ space: 'data', x: 2, lim: [-1, 7] })
+    const h = new HLine({ y: 3, lim: [-2, 6] })
+    const v = new VLine({ x: 2, lim: [-1, 7] })
     assert.deepEqual(data_bounds(h), { xlim: [-2, 6], ylim: [3, 3] })
     assert.deepEqual(data_bounds(v), { xlim: [2, 2], ylim: [-1, 7] })
-    const local = [new HLine({ y: 0.25, lim: [0.2, 0.8] }), new VLine({ x: 0.75, lim: [0.8, 0.2] })]
+    const local = [new HLine({ space: 'local', y: 0.25, lim: [0.2, 0.8] }), new VLine({ space: 'local', x: 0.75, lim: [0.8, 0.2] })]
     for (const line of local) assert.equal(data_bounds(line), null)
     const coordinates = infer_coordinates([h, v, ...local])
     assert.deepEqual(coordinates.xlim, [-2, 6])
@@ -173,8 +173,8 @@ const tests: Record<string, () => void> = {
     for (const [index, line] of local.entries()) {
       assert.deepEqual(graph.children[index + 2].fragment.draw, pass.layout(line, request).draw)
     }
-    assert.throws(() => pass.layout(h, request), /Data geometry needs a coordinate context/)
-    assert.throws(() => pass.layout(v, request), /Data geometry needs a coordinate context/)
+    assert.throws(() => pass.layout(new HLine({ space: 'data' }), request), /Data geometry needs a coordinate context/)
+    assert.throws(() => pass.layout(new VLine({ space: 'data' }), request), /Data geometry needs a coordinate context/)
   },
 
   'directional lines accept degenerate spans and snapshot input lengths'() {

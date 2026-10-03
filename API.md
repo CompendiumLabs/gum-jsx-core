@@ -1116,15 +1116,18 @@ ordinary shape sizing policy.
 | `HLine` | `y: 0.5`, `lim: [0, 1]` along x. Position and span accept lengths. |
 | `VLine` | `x: 0.5`, `lim: [0, 1]` along y. Position and span accept lengths. |
 | `Polyline` | `points: [{x,y}, ...]`; ambient coordinates by default; `closed: true` closes each finite run. |
-| `Polygon` | `points: [{x,y}, ...]`; local coordinates; closes the path. |
+| `Polygon` | `points: [{x,y}, ...]`; ambient coordinates by default; closes each finite run. |
 | `Path` | `commands` from the absolute path helpers below. |
 
-HLine and VLine share Line's sizing, stroke, and `space` behavior. Geometry is local
-by default; `space="data"` maps their endpoints through the enclosing coordinates.
+Line, HLine, VLine, Polyline, and Polygon use ambient coordinates by default,
+and local geometry outside a coordinate context. `space="local"` opts out;
+`space="data"` requires a coordinate context. HLine and VLine share Line's sizing
+and stroke behavior.
 For example, `<HLine y={0.3} lim={[0.1, 0.9]} />` spans x=0.1 to x=0.9 at y=0.3.
 Their spans may be reversed or degenerate. Use Line for arbitrary `from`/`to`
 endpoints; HLine and VLine reject those props. UnitLine retains Line's endpoint
-props with defaults `[0, 0.5]` and `[1, 0.5]`.
+props with defaults `[0, 0.5]` and `[1, 0.5]`. UnitLine and Triangle keep local
+defaults, with `space="data"` available as an explicit override.
 
 Point inputs accept `{x,y}` or `[x,y]`, including mixtures in a list. This applies
 to endpoints, centers, paired radii, plot marks, field vectors, and curve/coordinate
@@ -1210,12 +1213,12 @@ limits can reverse either axis; explicit limits remain exact. Empty data uses
 [0,1]; constant data expands to a finite span. Both fill finite offers, naturally
 measure 480×320, and derive a missing axis from a 1.5 default aspect.
 
-Polyline and the other marks interpret numeric geometry as data inside
-Graph/Plot/GeoMap and as fractions outside. `space="local"` opts out;
-`space="data"` requires a coordinate context. Line defaults to local geometry
-and accepts `space="data"` to opt into coordinate mapping. In data space
+Line, HLine, VLine, Polyline, Polygon, and the other marks interpret numeric
+geometry as data inside Graph/Plot/GeoMap and as fractions outside.
+`space="local"` opts out; `space="data"` requires a coordinate context. In data space
 their numeric points contribute to Graph/Plot limit inference. A hidden endpoint
-omits a Line; hidden vertices split a Polyline into separate runs. They project
+omits a Line; hidden vertices split a Polyline or Polygon into separate runs.
+Polygon closes each run. They project
 only supplied points. Path retains local geometry. px/em
 positions stay local. Graph directly positions annotations by numeric `pos` and
 ordinary anchor metadata. Text remains upright; widths and fonts remain lengths.
@@ -1294,8 +1297,8 @@ visibility and child drawing order; they do not add segment clipping or depth
 sorting.
 
 Projected marks preserve arbitrary numeric records in `points`, `from`, `to`,
-`segments`, `tip`, `origin`, and Arc's `center`. This includes Polyline by
-default and Line with `space="data"`. A nonfinite value in any dimension creates a sample gap.
+`segments`, `tip`, `origin`, and Arc's `center`. This includes Line, Polyline,
+and Polygon by default. A nonfinite value in any dimension creates a sample gap.
 Fill accepts named coordinates on both explicit boundary arrays and splits the
 region if either side has a gap or projects to null. A scalar Fill boundary
 requires exactly Cartesian `x` and `y`, because it replaces one source axis.

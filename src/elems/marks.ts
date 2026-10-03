@@ -7,7 +7,7 @@ import { arc_path, rounded_path, spline_path } from '../lib/curves'
 import { arrow_barb } from '../lib/arrows'
 import { draw_path } from '../engine/drawing'
 import type { Paint } from '../engine/drawing'
-import { Element, content_child, element_children } from '../engine/element'
+import { Element, define_component, content_child, element_children } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
 import { make_point, read_point } from '../engine/geometry'
@@ -28,6 +28,11 @@ import type { Length, LengthContext } from '../engine/units'
 
 type MarkProps = ElementProps & Readonly<{ space?: GeometrySpace }>
 type PolylineProps = MarkProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; closed?: boolean }>
+type LineProps = MarkProps & Readonly<{ from?: CoordinatePosition; to?: CoordinatePosition }>
+type AxisLineProps = Omit<LineProps, 'from' | 'to'> & Readonly<{ lim?: readonly [Length, Length] }>
+type HLineProps = AxisLineProps & Readonly<{ y?: Length }>
+type VLineProps = AxisLineProps & Readonly<{ x?: Length }>
+type PolygonProps = Omit<PolylineProps, 'closed'>
 type SplineProps = PolylineProps & Readonly<{ tension?: number }>
 type RoundedLineProps = PolylineProps & Readonly<{ radius?: Length }>
 type SegmentsProps = MarkProps & Readonly<{ segments?: readonly (readonly [CoordinatePosition, CoordinatePosition])[] }>
@@ -129,6 +134,19 @@ function line_path(points: readonly Point[], closed = false): PathCommand[] {
   return path
 }
 
+class Line extends Element<LineProps> {
+  static data_bounds(props: LineProps) {
+    return mark_bounds(props, [props.from ?? [0, 0], props.to ?? [1, 1]])
+  }
+  static layout(props: LineProps, query: LayoutQuery) {
+    const { size, point, paint } = mark_context(props, query)
+    const from = point(props.from ?? [0, 0])
+    const to = point(props.to ?? [1, 1])
+    const commands: PathCommand[] = from && to ? [{ kind: 'M', ...from }, { kind: 'L', ...to }] : []
+    return make_fragment({ size, draw: [draw_path(commands, { ...paint, fill: 'none' })] })
+  }
+}
+
 class Polyline extends Element<PolylineProps> {
   static data_bounds(props: PolylineProps) {
     return mark_bounds(props, props.points ?? [])
@@ -139,6 +157,33 @@ class Polyline extends Element<PolylineProps> {
     return make_fragment({ size, draw: [draw_path(commands, paint)] })
   }
 }
+
+// A polygon shares Polyline's coordinate mapping and closes every finite run.
+const Polygon = define_component<PolygonProps>('Polygon', props => new Polyline({ ...props, closed: true }))
+
+// Unit conveniences retain local geometry unless a space is explicitly supplied.
+const UnitLine = define_component<LineProps>('UnitLine', ({ space = 'local', ...props }) => new Line({
+  from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, ...props, space,
+}))
+
+// Directional lines share Line's sizing and coordinate mapping, with one fixed axis.
+function axis_line({ lim = [0, 1], ...props }: AxisLineProps, axis: 'x' | 'y', position: Length) {
+  const name = axis === 'y' ? 'HLine' : 'VLine'
+  if ('from' in props || 'to' in props) {
+    throw new TypeError(`${name} uses ${axis} and lim; use Line for from/to endpoints`)
+  }
+  if (!Array.isArray(lim) || lim.length !== 2 || !Object.hasOwn(lim, 0) || !Object.hasOwn(lim, 1)) {
+    throw new TypeError(`${name}.lim needs two endpoints`)
+  }
+  const point = (value: Length) => axis === 'y' ? { x: value, y: position } : { x: position, y: value }
+  return new Line({ ...props, from: point(lim[0]), to: point(lim[1]) })
+}
+
+const HLine = define_component<HLineProps>('HLine', ({ y = 0.5, ...props }) => axis_line(props, 'y', y))
+const VLine = define_component<VLineProps>('VLine', ({ x = 0.5, ...props }) => axis_line(props, 'x', x))
+const Triangle = define_component<PolygonProps>('Triangle', ({ space = 'local', ...props }) => new Polygon({
+  points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props, space,
+}))
 
 class Spline extends Element<SplineProps> {
   static data_bounds(props: SplineProps) {
@@ -500,8 +545,9 @@ class Points<P extends CoordinatePosition = CoordinatePosition> extends Element<
   }
 }
 
-export { Polyline, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
-  Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, line_path, arrow_draw,
+export { Line, HLine, VLine, UnitLine, Polygon, Triangle, Polyline, Spline, RoundedLine,
+  Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, line_path, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head }
-export type { MarkProps, PolylineProps, SplineProps, RoundedLineProps, SegmentsProps,
-  ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }
+export type { LineProps, HLineProps, VLineProps, PolygonProps, MarkProps, PolylineProps,
+  SplineProps, RoundedLineProps, SegmentsProps, ArcProps, FillProps, ArrowProps, ArrowBarbSide,
+  ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }
