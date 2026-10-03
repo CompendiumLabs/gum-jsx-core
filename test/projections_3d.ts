@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  CoordLine, Graph, LayoutPass, Points, Rect, SymLine, evaluate, exact, make_request, px,
+  Polyline, Graph, LayoutPass, Points, Rect, SymLine, evaluate, exact, make_request, px,
   isometric_projection, orthographic_projection, perspective_projection,
 } from '../src/index'
 import type { Coordinate, Point3, Projection, PerspectiveProjectionOptions } from '../src/index'
@@ -123,7 +123,7 @@ const tests: Record<string, () => void> = {
       const source = evaluate(`
         const points = ${JSON.stringify(points)}
         return <Graph xlim={[-5, 5]} ylim={[-5, 5]} projection={${factory}}>
-          <CoordLine points={points} />
+          <Polyline points={points} />
           <Points points={points} point-size={({z}) => px(z + 2)} />
           <SymLine f={t => points[t]} tvals={[0, 1, 2]} />
           <Rect pos={points[1]} width={px(4)} height={px(6)} anchor="center" />
@@ -132,7 +132,7 @@ const tests: Record<string, () => void> = {
       `)
       const projected = points.map(point => projection.project(point))
       const expected = new Graph({ xlim: [-5, 5], ylim: [-5, 5], children: [
-        new CoordLine({ points: projected }),
+        new Polyline({ points: projected }),
         new Points({ points: projected, point_size: (_, i) => px(points[i].z + 2) }),
         new SymLine({ f: t => projected[t], tvals: [0, 1, 2] }),
         new Rect({ pos: projected[1]!, width: px(4), height: px(6), anchor: 'center' }),

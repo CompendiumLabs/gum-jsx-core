@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Box, Circle, CoordLine, Edge, Element, Evaluator, Fonts, Grid, Group,
+  Box, Circle, Polyline, Edge, Element, Evaluator, Fonts, Grid, Group,
   HStack, LayoutPass, Network, Node, Plot, Points, Rect, Span, Text, VStack,
   exact, make_request, px, render_element, render_svg,
 } from '../../src'
@@ -45,7 +45,7 @@ function plot(scatter: boolean) {
     title: 'Deterministic series', xlabel: 'Time', ylabel: 'Value', grid: true,
     children: scatter
       ? new Points({ points: scatter_points, point_size: px(3), fill: '#3978b8' })
-      : new CoordLine({ points: line_points, stroke: '#3978b8', stroke_width: px(2) }),
+      : new Polyline({ points: line_points, stroke: '#3978b8', stroke_width: px(2) }),
   })
 }
 

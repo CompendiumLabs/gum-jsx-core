@@ -5,7 +5,7 @@ import { Element, define_element, define_component, element_children } from './e
 import { prefix_split, prefix_join } from './lib/props'
 import { Svg } from './elems/svg'
 import { PngImage } from './elems/image'
-import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
+import { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polygon, Path } from './elems/shapes'
 import { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
 import { Box, Frame } from './elems/box'
 import { HStack, VStack, Spacer } from './elems/stack'
@@ -28,7 +28,7 @@ import { RNG } from './lib/random'
 import { Graph, graph_children } from './elems/graph'
 import { Node, Edge, Network } from './elems/network'
 import { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
-import { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './elems/marks'
+import { Polyline, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points } from './elems/marks'
 import { Bar, VBar, HBar, Bars, VBars, HBars } from './elems/bars'
 import { Axis, HAxis, VAxis, Scale, HScale, VScale, Label, HLabel, VLabel,
   Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D } from './elems/axis'
@@ -52,10 +52,10 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
     Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Grid, Group, Rect, RoundedRect, Square, Circle, Ellipse,
-    Line, Polyline, Polygon, Path, Text, Span,
+    Line, Polygon, Path, Text, Span,
     UnitLine, HLine, VLine, Dot, Triangle,
     Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Node, Edge, Network,
-    CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
+    Polyline, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill, Arrow, ArrowHead, Ray, Points,
     Bar, VBar, HBar, Bars, VBars, HBars, Axis, HAxis, VAxis, Scale, HScale, VScale,
     Label, HLabel, VLabel, Labels, HLabels, VLabels, Mesh, HMesh, VMesh, Mesh2D,
     TextStack, TextRow, TextCol, TextGrid, TextBox, TextFrame, TextFigure, TitleBox, TitleFrame, Bullets, Slide,

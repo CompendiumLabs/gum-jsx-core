@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  CoordLine, Graph, HAxis, HMesh, LayoutPass, Points, Projection, Rect, SymArrow,
+  Polyline, Graph, HAxis, HMesh, LayoutPass, Points, Projection, Rect, SymArrow,
   VAxis, VMesh, evaluate, exact, log_projection, make_request, polar_projection, px, render_svg,
 } from '../src/index'
 import type { Coordinate, LogProjectionOptions, PathDraw, PolarProjectionOptions } from '../src/index'
@@ -114,11 +114,11 @@ const tests: Record<string, () => void> = {
     const points = [1, 10, 100, 1000].map(value => ({ x: value, y: value }))
     const projected = [0, 1, 2, 3].map(value => ({ x: value, y: value }))
     const source = new Graph({ projection: log_projection(), xlim: [0, 3], ylim: [0, 3], children: [
-      ...axes, new CoordLine({ points }), new Points({ points, point_size: px(6) }),
+      ...axes, new Polyline({ points }), new Points({ points, point_size: px(6) }),
       new Rect({ pos: points[1], width: px(4), height: px(4) }),
     ] })
     const expected = new Graph({ xlim: [0, 3], ylim: [0, 3], children: [
-      ...axes, new CoordLine({ points: projected }), new Points({ points: projected, point_size: px(6) }),
+      ...axes, new Polyline({ points: projected }), new Points({ points: projected, point_size: px(6) }),
       new Rect({ pos: projected[1], width: px(4), height: px(4) }),
     ] })
     const pass = new LayoutPass()

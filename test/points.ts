@@ -2,7 +2,7 @@ import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
   LayoutPass, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Dot, Line, UnitLine,
-  Polyline, Polygon, Triangle, CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
+  Polyline, Polygon, Triangle, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points, SymPoints, Field, exact, make_request, px, em, evaluate, render_svg,
   data_bounds, infer_coordinates, point_bounds, map_point, unmap_point,
   spline_path, rounded_path, arc_path, spline2d, sample_points, add2, lingrid, zip,
@@ -100,7 +100,7 @@ const tests: Record<string, () => void> = {
     const tuples: readonly PointValue[] = [[-2, 1], { x: 0, y: 4 }, [3, 2]]
     const records = [{ x: -2, y: 1 }, { x: 0, y: 4 }, { x: 3, y: 2 }]
     const pairs: [Element, Element][] = []
-    for (const Mark of [CoordLine, Spline, RoundedLine, Fill, HFill, VFill, Arrow, Points]) {
+    for (const Mark of [Polyline, Spline, RoundedLine, Fill, HFill, VFill, Arrow, Points]) {
       pairs.push([new Mark({ points: tuples }), new Mark({ points: records })])
     }
     pairs.push(
@@ -124,7 +124,7 @@ const tests: Record<string, () => void> = {
       const coord = { xlim: [4, -4] as const, ylim: [-3, 6] as const, flip_x: true, flip_y: false }
       equivalent(new Graph({ ...coord, children: a }), new Graph({ ...coord, children: b }))
     }
-    assert.deepEqual(infer_coordinates(new CoordLine({ points: tuples })),
+    assert.deepEqual(infer_coordinates(new Polyline({ points: tuples })),
       { xlim: [-2, 3], ylim: [1, 4], flip_x: false, flip_y: true })
     assert.deepEqual(data_bounds(new Arc({ center: [1, 2], radius: [3, 1] })),
       { xlim: [-2, 4], ylim: [1, 3] })
@@ -137,7 +137,7 @@ const tests: Record<string, () => void> = {
     const expected = { xlim: [-2, 2], ylim: [2, 4] }
     assert.deepEqual(point_bounds(points), expected)
     const pass = new LayoutPass()
-    for (const Mark of [CoordLine, Spline, RoundedLine]) {
+    for (const Mark of [Polyline, Spline, RoundedLine]) {
       const mark = new Mark({ points })
       assert.deepEqual(data_bounds(mark), expected)
       const fragment = pass.layout(new Graph({ children: mark }), fixed)
@@ -154,9 +154,9 @@ const tests: Record<string, () => void> = {
       assert.equal(path.commands.filter(c => c.kind === 'M').length, 2)
       assert.equal(path.commands.filter(c => c.kind === 'Z').length, 2)
     }
-    assert.deepEqual(data_bounds(new CoordLine({ points: [[px(-100), 50], [1, 2], [3, 4]] })),
+    assert.deepEqual(data_bounds(new Polyline({ points: [[px(-100), 50], [1, 2], [3, 4]] })),
       { xlim: [1, 3], ylim: [2, 4] })
-    assert.equal(data_bounds(new CoordLine({ points: [[1, 2]], space: 'local' })), null)
+    assert.equal(data_bounds(new Polyline({ points: [[1, 2]], space: 'local' })), null)
   },
 
   'marker callbacks receive owned records and original indices for tuple inputs'() {
@@ -218,7 +218,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(spline_path(tuples), spline_path(records))
     assert.deepEqual(rounded_path(tuples, 0.2), rounded_path(records, 0.2))
     assert.deepEqual(arc_path([1, 2], [3, 4], 10, 130), arc_path({ x: 1, y: 2 }, { x: 3, y: 4 }, 10, 130))
-    const coord = infer_coordinates(new CoordLine({ points: tuples })), size = { width: 200, height: 100 }
+    const coord = infer_coordinates(new Polyline({ points: tuples })), size = { width: 200, height: 100 }
     assert.deepEqual(map_point([1, 2], coord, size), { x: 100, y: 50 })
     assert.deepEqual(unmap_point([100, 50], coord, size), { x: 1, y: 2 })
     const paint = { fill: 'blue', stroke: 'none', stroke_width: 0 }, rect = make_rect(0, 0, 20, 10)
@@ -235,7 +235,7 @@ const tests: Record<string, () => void> = {
 
   'tuple inputs are snapshotted by elements and spline samplers'() {
     const points: [number, number][] = [[0, 1], [1, 3], [2, 2]]
-    const line = new CoordLine({ points }), spline = spline2d(points)
+    const line = new Polyline({ points }), spline = spline2d(points)
     points[0][1] = 99; points[1][1] = 99; points.length = 0
     assert.deepEqual(data_bounds(line), { xlim: [0, 2], ylim: [1, 3] })
     assert.deepEqual(spline(0), { x: 0, y: 1 })
@@ -252,7 +252,7 @@ const tests: Record<string, () => void> = {
       const error = /exactly two coordinates/
       assert.throws(() => pass.layout(new Line({ from: value })), /coordinate record|Local positions need exactly x and y/)
       assert.throws(() => pass.layout(new Ellipse({ radius: value })), error)
-      assert.throws(() => data_bounds(new CoordLine({ points: [value] })), /coordinate record|named coordinates require a projection/)
+      assert.throws(() => data_bounds(new Polyline({ points: [value] })), /coordinate record|named coordinates require a projection/)
       assert.throws(() => pass.layout(new Points({ points: [[0, 0]], point_size: value })), error)
       assert.throws(() => new Field({ vectors: [{ point: [0, 0], vector: value }] }), /coordinate record|exactly two coordinates/)
       assert.throws(() => spline2d([value]), error)
@@ -273,12 +273,12 @@ const tests: Record<string, () => void> = {
 
   'JSX and host code can pass zip results straight to point-taking elements'() {
     const code = `const xs = linspace(0, 2, 3); return <Graph>
-      <CoordLine points={zip(xs, xs.map(x => x * x))} />
+      <Polyline points={zip(xs, xs.map(x => x * x))} />
       <Points points={[[0, 0], {x: 1, y: 1}, [2, 4]]} point-size={[px(6), px(8)]} />
     </Graph>`
     const points = zip([0, 1, 2], [0, 1, 4])
     equivalent(evaluate(code), new Graph({ children: [
-      new CoordLine({ points }), new Points({ points, point_size: [px(6), px(8)] }),
+      new Polyline({ points }), new Points({ points, point_size: [px(6), px(8)] }),
     ] }))
   },
 }

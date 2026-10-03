@@ -57,10 +57,10 @@ export type { SvgProps } from './elems/svg'
 export { PngImage } from './elems/image'
 export type { PngImageProps } from './elems/image'
 export { png_size } from './lib/png'
-export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path } from './elems/shapes'
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polygon, Path } from './elems/shapes'
 export { UnitLine, HLine, VLine, Dot, Triangle } from './elems/shapes'
 export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
-  LineProps, HLineProps, VLineProps, PolylineProps, PolygonProps, PathProps } from './elems/shapes'
+  LineProps, HLineProps, VLineProps, PolygonProps, PathProps } from './elems/shapes'
 export { Text, Span } from './elems/text'
 export type { TextProps, TextOptions, SpanProps } from './elems/text'
 export { Box, Frame } from './elems/box'
@@ -104,9 +104,9 @@ export type { PolarProjectionOptions, LogProjectionOptions, Point3,
   OrthographicProjectionOptions, PerspectiveProjectionOptions } from './lib/projections'
 export { Overlay, TransformBox, Rotate, Attach } from './elems/placement'
 export type { Side, OverlayProps, TransformBoxProps, RotateProps, AttachProps } from './elems/placement'
-export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
+export { Polyline, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points } from './elems/marks'
-export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
+export type { MarkProps, PolylineProps, SplineProps, RoundedLineProps, SegmentsProps,
   ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadProps, RayProps, PointSize, PointsProps } from './elems/marks'
 export { spline_path, rounded_path, arc_path, spline1d, spline2d } from './lib/curves'
 export { arrow_barb } from './lib/arrows'

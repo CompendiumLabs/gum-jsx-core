@@ -8,16 +8,16 @@ import { make_point } from '../engine/geometry'
 import type { Point } from '../engine/geometry'
 import type { Coordinate } from '../engine/coordinate'
 import { exact, make_request } from '../engine/layout'
-import { CoordLine, Spline, Arrow, Points, Fill, mark_context, mark_bounds, arrow_draw,
+import { Polyline, Spline, Arrow, Points, Fill, mark_context, mark_bounds, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head } from './marks'
-import type { CoordLineProps, SplineProps, ArrowProps, PointsProps, FillProps, MarkProps, ArrowHeadScope } from './marks'
+import type { PolylineProps, SplineProps, ArrowProps, PointsProps, FillProps, MarkProps, ArrowHeadScope } from './marks'
 import { linspace, sample_points, sample_count, finite_point, scalar_value } from '../lib/sampling'
 import type { PointValue, ScalarFunction, SampleProps } from '../lib/sampling'
 import { px } from '../engine/units'
 import type { Length } from '../engine/units'
 import type { Limit } from '../engine/coordinates'
 
-type SymLineProps = Omit<CoordLineProps, 'points'> & SampleProps
+type SymLineProps = Omit<PolylineProps, 'points'> & SampleProps
 type SymSplineProps = Omit<SplineProps, 'points'> & SampleProps
 type SymArrowProps = Omit<ArrowProps, 'points' | 'from' | 'to'> & SampleProps
 type SymPointsProps = Omit<PointsProps<Coordinate>, 'points'> & SampleProps
@@ -46,7 +46,7 @@ function split_samples<T extends SampleProps>(props: T) {
 
 const SymLine = define_component<SymLineProps>('SymLine', props => {
   const { style, points } = split_samples(props)
-  return new CoordLine({ ...style, points })
+  return new Polyline({ ...style, points })
 })
 const SymSpline = define_component<SymSplineProps>('SymSpline', props => {
   const { style, points } = split_samples(props)
@@ -58,7 +58,7 @@ const SymArrow = define_component<SymArrowProps>('SymArrow', props => {
 })
 const SymPoly = define_component<SymLineProps>('SymPoly', props => {
   const { style, points } = split_samples(props)
-  return new CoordLine({ ...style, points, closed: true })
+  return new Polyline({ ...style, points, closed: true })
 })
 const SymPoints = define_component<SymPointsProps>('SymPoints', props => {
   const { style, points } = split_samples(props)

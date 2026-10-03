@@ -1,8 +1,8 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Arrow, ArrowHead, Arc, Bars, CoordLine, Element, Field, Fill, Graph, LayoutPass,
-  Line, Points, Polyline, Projection, Ray, Rect, RoundedLine, Segments, Spline,
+  Arrow, ArrowHead, Arc, Bars, Polyline, Element, Field, Fill, Graph, LayoutPass,
+  Line, Points, Projection, Ray, Rect, RoundedLine, Segments, Spline,
   coordinate_point, copy_coordinates, evaluate, exact, infer_coordinates, make_measure, make_request, map_point,
   px, unmap_point,
 } from '../src/index'
@@ -20,7 +20,7 @@ const tests: Record<string, () => void> = {
   'polar projection maps pairs before viewport limits and flips'() {
     const polar: ProjectionFunction = ({ x: theta, y: r }) => ({ x: r * Math.cos(theta), y: r * Math.sin(theta) })
     const fragment = new LayoutPass().layout(new Graph({ projection: polar,
-      xlim: [-1, 1], ylim: [-1, 1], children: new CoordLine({ points: [[0, 1], [Math.PI / 2, 1]] }) }), fixed)
+      xlim: [-1, 1], ylim: [-1, 1], children: new Polyline({ points: [[0, 1], [Math.PI / 2, 1]] }) }), fixed)
     const path = commands(fragment.children[0].fragment)
     near((path[0] as { x: number }).x, 200)
     near((path[0] as { y: number }).y, 50)
@@ -35,7 +35,7 @@ const tests: Record<string, () => void> = {
       [new Line({ from: input[0], to: input[1], space: 'data' }),
         new Line({ from: output[0], to: output[1], space: 'data' })],
       [new Polyline({ points: input, space: 'data' }), new Polyline({ points: output, space: 'data' })],
-      [new CoordLine({ points: input }), new CoordLine({ points: output })],
+      [new Polyline({ points: input }), new Polyline({ points: output })],
       [new Spline({ points: input }), new Spline({ points: output })],
       [new RoundedLine({ points: input }), new RoundedLine({ points: output })],
       [new Arrow({ points: input }), new Arrow({ points: output })],
@@ -69,16 +69,16 @@ const tests: Record<string, () => void> = {
   'local geometry and tagged pairs bypass projection; mixed pairs are rejected'() {
     const pass = new LayoutPass()
     const points = [[1, 2], [3, 4]] as const
-    const local = new CoordLine({ points, space: 'local' })
+    const local = new Polyline({ points, space: 'local' })
     assert.deepEqual(pass.layout(graph(local), fixed).children[0].fragment, pass.layout(local, fixed))
-    const tagged = new CoordLine({ points: [[px(10), px(20)], ['50%', '25%']] })
+    const tagged = new Polyline({ points: [[px(10), px(20)], ['50%', '25%']] })
     assert.deepEqual(commands(pass.layout(graph(tagged), fixed).children[0].fragment), [
       { kind: 'M', x: 10, y: 20 }, { kind: 'L', x: 100, y: 25 },
     ])
     assert.throws(() => pass.layout(graph(new Points({ points: [[1, px(2)]] })), fixed), /numeric data coordinates/)
   },
   'projection identity participates in caching and survives source copies'() {
-    const pass = new LayoutPass(), child = new CoordLine({ points: [[1, 2], [3, 4]] })
+    const pass = new LayoutPass(), child = new Polyline({ points: [[1, 2], [3, 4]] })
     const a = graph(child), b = graph(child, ({ x, y }) => ({ x: x - y, y }))
     const first = pass.layout(a, fixed).children[0].fragment
     assert.notDeepEqual(first, pass.layout(b, fixed).children[0].fragment)
@@ -88,7 +88,7 @@ const tests: Record<string, () => void> = {
     assert.equal(Object.isFrozen(a.props.projection), FREEZE_ENABLED)
   },
   'nested graphs establish their own coordinate frame'() {
-    const inner = new Graph({ ...limits, children: new CoordLine({ points: [[1, 2], [3, 4]] }) })
+    const inner = new Graph({ ...limits, children: new Polyline({ points: [[1, 2], [3, 4]] }) })
     const pass = new LayoutPass()
     assert.deepEqual(pass.layout(graph(inner), fixed).children[0].fragment, pass.layout(inner, fixed))
   },
@@ -96,7 +96,7 @@ const tests: Record<string, () => void> = {
     const project: ProjectionFunction = ({ x, y }) => x === 2 ? null : { x, y }
     const points = [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]] as const
     const pass = new LayoutPass()
-    const path = commands(pass.layout(graph(new CoordLine({ points }), project), fixed).children[0].fragment)
+    const path = commands(pass.layout(graph(new Polyline({ points }), project), fixed).children[0].fragment)
     assert.deepEqual(path.map(c => c.kind), ['M', 'L', 'M', 'L'])
     const arrow = pass.layout(graph(new Arrow({ points, start_head: true }), project), fixed).children[0].fragment
     assert.equal(arrow.draw.length, 4) // Two shafts, one head at each original endpoint.
@@ -131,19 +131,28 @@ const tests: Record<string, () => void> = {
     const source = evaluate(`
       const projection = new Projection(({x, y}) => ({x: x + y, y}))
       return <Graph projection={projection} xlim={[0, 10]} ylim={[0, 10]}>
-        <CoordLine points={[[1, 2], [3, 4]]} />
+        <Polyline points={[[1, 2], [3, 4]]} />
       </Graph>
     `)
     const pass = new LayoutPass()
-    assert.deepEqual(pass.layout(source, fixed), pass.layout(graph(new CoordLine({ points: [[1, 2], [3, 4]] })), fixed))
+    assert.deepEqual(pass.layout(source, fixed), pass.layout(graph(new Polyline({ points: [[1, 2], [3, 4]] })), fixed))
     assert.throws(() => source.props.projection.project([1, 2, 3]), /coordinate record/)
   },
-  'Line and Polyline keep local defaults and require an explicit data context'() {
+  'Line defaults to local while Polyline uses ambient coordinates with explicit overrides'() {
     const pass = new LayoutPass()
     for (const Shape of [Line, Polyline]) {
       const props = { from: [0.2, 0.3], to: [0.8, 0.7], points: [[0.2, 0.3], [0.8, 0.7]] } as const
       const local = new Shape(props)
-      assert.deepEqual(pass.layout(graph(local), fixed).children[0].fragment, pass.layout(local, fixed))
+      if (Shape === Line) {
+        assert.deepEqual(pass.layout(graph(local), fixed).children[0].fragment, pass.layout(local, fixed))
+      } else {
+        assert.deepEqual(pass.layout(graph(local), fixed).children[0].fragment,
+          pass.layout(graph(new Shape({ ...props, space: 'data' })), fixed).children[0].fragment)
+        assert.notDeepEqual(pass.layout(graph(local), fixed).children[0].fragment, pass.layout(local, fixed))
+        assert.deepEqual(commands(pass.layout(local, fixed)), [
+          { kind: 'M', x: 40, y: 30 }, { kind: 'L', x: 160, y: 70 },
+        ])
+      }
       assert.deepEqual(pass.layout(graph(new Shape({ ...props, space: 'local' })), fixed).children[0].fragment,
         pass.layout(local, fixed))
       assert.throws(() => pass.layout(new Shape({ ...props, space: 'data' }), fixed), /coordinate context/)
@@ -164,7 +173,9 @@ const tests: Record<string, () => void> = {
     const coordinates = infer_coordinates([line, polyline, local])
     assert.deepEqual(coordinates.xlim, [5, 30])
     assert.deepEqual(coordinates.ylim, [-5, 8])
-    assert.deepEqual(infer_coordinates([new Line(), new Polyline({ points: [[10, 20], [30, 40]] })]).xlim, [0, 1])
+    const points = [[10, 20], [30, 40]] as const
+    assert.deepEqual(infer_coordinates(new Polyline({ points })).xlim, [10, 30])
+    assert.deepEqual(infer_coordinates([new Line(), new Polyline({ points, space: 'local' })]).xlim, [0, 1])
     const fragment = new LayoutPass().layout(new Graph({ children: line }), fixed)
     assert.deepEqual(commands(fragment.children[0].fragment), [{ kind: 'M', x: 0, y: 100 }, { kind: 'L', x: 200, y: 0 }])
   },
@@ -187,6 +198,23 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(commands(resized).at(-1), { kind: 'L', x: 160, y: 200 })
     const other = pass.layout(graph(polyline, shear), fixed).children[0].fragment
     assert.equal(commands(other).length, points.length)
+  },
+  'closed Polyline closes each visible run and preserves fill'() {
+    const pass = new LayoutPass()
+    const points = [[0, 0], [1, 1], null, [2, NaN], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], null, [10, 10]] as const
+    const project: ProjectionFunction = ({ x, y }) => x === 4 ? null : { x, y }
+    const fragment = pass.layout(graph(new Polyline({ points, closed: true, fill: 'red' }), project), fixed)
+      .children[0].fragment
+    assert.deepEqual(commands(fragment), [
+      { kind: 'M', x: 0, y: 100 }, { kind: 'L', x: 20, y: 90 }, { kind: 'Z' },
+      { kind: 'M', x: 40, y: 80 }, { kind: 'L', x: 60, y: 70 }, { kind: 'Z' },
+      { kind: 'M', x: 100, y: 50 }, { kind: 'L', x: 120, y: 40 }, { kind: 'Z' },
+      { kind: 'M', x: 200, y: 0 },
+    ])
+    assert.equal(fragment.draw[0].fill, 'red')
+    for (const points of [[], [null], [[0, NaN]]] as const) {
+      assert.deepEqual(commands(pass.layout(new Polyline({ points, closed: true }), fixed)), [])
+    }
   },
 }
 

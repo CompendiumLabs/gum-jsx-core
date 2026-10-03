@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, CoordLine, Points, SymLine, HAxis, VAxis,
+  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, Polyline, Points, SymLine, HAxis, VAxis,
   HScale, HLabels, HLabel, HMesh, VMesh, Mesh2D, Text, Fonts,
   LayoutPass, define_element, make_fragment, shape_size, make_request, exact, px,
   infer_coordinates, map_point, unmap_point, linear_ticks, render_svg, evaluate,
@@ -22,9 +22,9 @@ const fixed = make_request({ width: exact(200), height: exact(100) })
 
 const tests: Record<string, () => void> = {
   'graph limits infer data, expand constants, ignore annotations, and isolate nested graphs'() {
-    const line = new CoordLine({ points: [{ x: 2, y: 4 }, { x: 8, y: 4 }, null, { x: NaN, y: 1 }] })
+    const line = new Polyline({ points: [{ x: 2, y: 4 }, { x: 8, y: 4 }, null, { x: NaN, y: 1 }] })
     const coord = infer_coordinates([line, new Text({ children: ['A ', 'label'], pos: { x: 99, y: px(0) } }),
-      new Graph({ children: new CoordLine({ points: [{ x: -100, y: -100 }] }) })])
+      new Graph({ children: new Polyline({ points: [{ x: -100, y: -100 }] }) })])
     assert.deepEqual(coord.xlim, [2, 8])
     assert.deepEqual(coord.ylim, [3.5, 4.5])
     assert.deepEqual(infer_coordinates([]).xlim, [0, 1])
@@ -36,7 +36,7 @@ const tests: Record<string, () => void> = {
   },
 
   'data padding shares Box shorthand forms across Graph, Plot, and BarPlot'() {
-    const line = new CoordLine({ points: [[10, 30], [20, 50]] })
+    const line = new Polyline({ points: [[10, 30], [20, 50]] })
     const forms: CoordinateSpec['padding'][] = [
       [0.2, 0.4], { h: 0.2, v: 0.4 }, [0.4, 0.4, 0.2, 0.2],
       { t: 0.4, b: 0.4, l: 0.2, r: 0.2 }, { x: 0.2, y: 0.4 },
@@ -59,7 +59,7 @@ const tests: Record<string, () => void> = {
   },
 
   'asymmetric data padding follows screen sides and preserves explicit limits'() {
-    const line = new CoordLine({ points: [[10, 30], [20, 50]] })
+    const line = new Polyline({ points: [[10, 30], [20, 50]] })
     const padding = [0.2, 0.4, 0.2, 0.6] as const
     const coord = infer_coordinates(line, { padding })
     assert.deepEqual(coord.xlim, [8, 26])
@@ -114,7 +114,7 @@ const tests: Record<string, () => void> = {
   },
 
   'reused marks distinguish coordinate contexts in the layout cache and keep pixel strokes'() {
-    const line = new CoordLine({ points: [{ x: 0, y: 0 }, { x: 10, y: 10 }], stroke_width: px(3) })
+    const line = new Polyline({ points: [{ x: 0, y: 0 }, { x: 10, y: 10 }], stroke_width: px(3) })
     const pass = new LayoutPass()
     const a = pass.layout(new Graph({ xlim: [0, 10], ylim: [0, 10], children: line }), fixed)
     const b = pass.layout(new Graph({ xlim: [0, 20], ylim: [0, 10], children: line }), fixed)
@@ -315,7 +315,7 @@ const tests: Record<string, () => void> = {
   'plot fills its viewport and reserves measured margins for titles and large tick labels'() {
     const plot = new Plot({ title: 'A long title that can wrap when the plot becomes narrow',
       xlabel: 'Elapsed time', ylabel: 'Revenue', xlim: [0, 2], ylim: [0, 1000000],
-      yticks: [[0, '$0'], [1000000, '$1,000,000']], children: new CoordLine({ points: [{ x: 0, y: 0 }, { x: 2, y: 1000000 }] }) })
+      yticks: [[0, '$0'], [1000000, '$1,000,000']], children: new Polyline({ points: [{ x: 0, y: 0 }, { x: 2, y: 1000000 }] }) })
     const pass = new LayoutPass(), wide = pass.layout(plot, make_request({ width: exact(600), height: exact(360) }))
     const narrow = pass.layout(plot, make_request({ width: exact(300), height: exact(360) }))
     assert.deepEqual(wide.size, { width: 600, height: 360 })
@@ -431,7 +431,7 @@ const tests: Record<string, () => void> = {
 
   'data clipping preserves overflow while axes and labels remain outside the clip'() {
     const source = new Plot({ xlim: [0, 1], ylim: [0, 1], children:
-      new CoordLine({ points: [{ x: -1, y: 0.5 }, { x: 2, y: 0.5 }] }) })
+      new Polyline({ points: [{ x: -1, y: 0.5 }, { x: 2, y: 0.5 }] }) })
     const root = new LayoutPass().layout(source, make_request({ width: exact(400), height: exact(300) }))
     const graph = find(root, 'Graph')
     assert.ok(graph.clip)

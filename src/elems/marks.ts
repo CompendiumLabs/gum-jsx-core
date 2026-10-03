@@ -27,9 +27,9 @@ import { make_measure, px, resolve_length } from '../engine/units'
 import type { Length, LengthContext } from '../engine/units'
 
 type MarkProps = ElementProps & Readonly<{ space?: GeometrySpace }>
-type CoordLineProps = MarkProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; closed?: boolean }>
-type SplineProps = CoordLineProps & Readonly<{ tension?: number }>
-type RoundedLineProps = CoordLineProps & Readonly<{ radius?: Length }>
+type PolylineProps = MarkProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; closed?: boolean }>
+type SplineProps = PolylineProps & Readonly<{ tension?: number }>
+type RoundedLineProps = PolylineProps & Readonly<{ radius?: Length }>
 type SegmentsProps = MarkProps & Readonly<{ segments?: readonly (readonly [CoordinatePosition, CoordinatePosition])[] }>
 type ArcProps = MarkProps & Readonly<{ center?: CoordinatePosition; radius?: Radius; start?: number; end?: number }>
 type FillProps = MarkProps & Readonly<{
@@ -129,11 +129,11 @@ function line_path(points: readonly Point[], closed = false): PathCommand[] {
   return path
 }
 
-class CoordLine extends Element<CoordLineProps> {
-  static data_bounds(props: CoordLineProps) {
+class Polyline extends Element<PolylineProps> {
+  static data_bounds(props: PolylineProps) {
     return mark_bounds(props, props.points ?? [])
   }
-  static layout(props: CoordLineProps, query: LayoutQuery) {
+  static layout(props: PolylineProps, query: LayoutQuery) {
     const { size, point, paint } = mark_context(props, query)
     const commands = projected_runs(props.points ?? [], point).flatMap(run => line_path(run, props.closed))
     return make_fragment({ size, draw: [draw_path(commands, paint)] })
@@ -200,7 +200,7 @@ class Arc extends Element<ArcProps> {
     if (!origin) return make_fragment({ size })
     function delta(value: Length, axis: 'x' | 'y'): number {
       if (coord && typeof value === 'number') {
-        if (coord.projection) throw new TypeError('Projected Arc radii need local lengths; use sampled CoordLine points for a data-space arc')
+        if (coord.projection) throw new TypeError('Projected Arc radii need local lengths; use sampled Polyline points for a data-space arc')
         nonnegative(value, 'radius')
         const lim = axis === 'x' ? coord.xlim : coord.ylim
         return value / (lim[1] - lim[0]) * (axis === 'x' ? size.width : size.height)
@@ -500,8 +500,8 @@ class Points<P extends CoordinatePosition = CoordinatePosition> extends Element<
   }
 }
 
-export { CoordLine, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
+export { Polyline, Spline, RoundedLine, Segments, Arc, Fill, HFill, VFill,
   Arrow, ArrowHead, Ray, Points, mark_context, mark_bounds, line_path, arrow_draw,
   head_scope, arrow_head_options, resolve_arrow_head }
-export type { MarkProps, CoordLineProps, SplineProps, RoundedLineProps, SegmentsProps,
+export type { MarkProps, PolylineProps, SplineProps, RoundedLineProps, SegmentsProps,
   ArcProps, FillProps, ArrowProps, ArrowBarbSide, ArrowHeadOptions, ArrowHeadStyle, ArrowHeadScope, ArrowHeadProps, RayProps, PointSize, PointsProps }

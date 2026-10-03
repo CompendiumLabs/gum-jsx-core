@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Box, CoordLine, Graph, LayoutPass, Rect, Svg, UnresolvedLengthError,
+  Box, Polyline, Graph, LayoutPass, Rect, Svg, UnresolvedLengthError,
   available, em, evaluate, make_measure, make_request, measure_length, normalize_length,
   prepare_request, px, render_element, render_svg, resolve_font_size, resolve_insets, resolve_length,
   resolve_line_height, resolve_sizing,
@@ -117,7 +117,7 @@ const tests: Record<string, () => void> = {
 
   'graph numbers retain data mapping while strings resolve in local length coordinates'() {
     const source = new Graph({ width: '200px', height: '100px', xlim: [0, 10], ylim: [0, 10],
-      children: new CoordLine({ points: [[2, 2], ['20%', '20%'], ['10px', '2em'], ['40%', '30%']] }) })
+      children: new Polyline({ points: [[2, 2], ['20%', '20%'], ['10px', '2em'], ['40%', '30%']] }) })
     const fragment = new LayoutPass().layout(source)
     const draw = fragment.children[0].fragment.draw[0]
     assert.equal(draw.kind, 'path')

@@ -32,7 +32,6 @@ type AxisLineProps = Omit<LineProps, 'from' | 'to'> & Readonly<{ lim?: readonly 
 type HLineProps = AxisLineProps & Readonly<{ y?: Length }>
 type VLineProps = AxisLineProps & Readonly<{ x?: Length }>
 type PolygonProps = ElementProps & Readonly<{ points?: readonly PositionValue[] }>
-type PolylineProps = ElementProps & Readonly<{ points?: readonly (CoordinatePosition | null)[]; space?: GeometrySpace }>
 type PathProps = ElementProps & Readonly<{ commands?: readonly PathSegment[] }>
 
 // Only shapes with an intrinsic ratio supply a default aspect. Geometry references
@@ -177,35 +176,15 @@ class Line extends Element<LineProps> {
   }
 }
 
-// Closing is a path command, so the same point handling serves both primitives.
-function poly_layout(props: PolylineProps, query: LayoutQuery, closed = false, space: GeometrySpace = 'local') {
-  const { size, paint } = shape_context(props, query)
-  const point = line_point(query, size, space)
-  const commands: PathCommand[] = []
-  let started = false
-  for (const [index, value] of (props.points ?? []).entries()) {
-    const projected = closed ? resolve_position(value as PositionValue, size, query.measure, `points[${index}]`)
-      : point(value, `points[${index}]`)
-    if (!projected) { started = false; continue; }
-    commands.push({ kind: started ? 'L' : 'M', ...projected })
-    started = true
-  }
-  if (closed && commands.length > 1) commands.push({ kind: 'Z' })
-  return make_fragment({ size, draw: [draw_path(commands, paint)] })
-}
-
-class Polyline extends Element<PolylineProps> {
-  static data_bounds(props: PolylineProps) {
-    return line_bounds(props.space, props.points ?? [])
-  }
-  static layout(props: PolylineProps, query: LayoutQuery) {
-    return poly_layout(props, query, false, props.space)
-  }
-}
-
 class Polygon extends Element<PolygonProps> {
   static layout(props: PolygonProps, query: LayoutQuery) {
-    return poly_layout(props, query, true)
+    const { size, paint } = shape_context(props, query)
+    const commands: PathCommand[] = (props.points ?? []).map((value, index) => ({
+      kind: index ? 'L' : 'M',
+      ...resolve_position(value, size, query.measure, `points[${index}]`),
+    }))
+    if (commands.length > 1) commands.push({ kind: 'Z' })
+    return make_fragment({ size, draw: [draw_path(commands, paint)] })
   }
 }
 
@@ -244,8 +223,8 @@ const Triangle = define_component<PolygonProps>('Triangle', props => new Polygon
   points: [{ x: 0.5, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], ...props,
 }))
 
-export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polyline, Polygon, Path,
+export { Rect, RoundedRect, Square, Circle, Ellipse, Line, Polygon, Path,
   resolve_radius, resolve_rect_radius, is_position,
   UnitLine, HLine, VLine, Dot, Triangle }
 export type { Position, PositionValue, Radius, RadiusSides, RectRadius, RectProps, CircleProps, EllipseProps,
-  LineProps, HLineProps, VLineProps, PolylineProps, PolygonProps, PathProps }
+  LineProps, HLineProps, VLineProps, PolygonProps, PathProps }

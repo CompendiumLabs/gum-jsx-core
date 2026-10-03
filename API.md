@@ -1115,7 +1115,8 @@ ordinary shape sizing policy.
 | `Line` | `from: {x: 0, y: 0}`, `to: {x: 1, y: 1}`. Fill is ignored. |
 | `HLine` | `y: 0.5`, `lim: [0, 1]` along x. Position and span accept lengths. |
 | `VLine` | `x: 0.5`, `lim: [0, 1]` along y. Position and span accept lengths. |
-| `Polyline` / `Polygon` | `points: [{x,y}, ...]`; Polygon closes the path. |
+| `Polyline` | `points: [{x,y}, ...]`; ambient coordinates by default; `closed: true` closes each finite run. |
+| `Polygon` | `points: [{x,y}, ...]`; local coordinates; closes the path. |
 | `Path` | `commands` from the absolute path helpers below. |
 
 HLine and VLine share Line's sizing, stroke, and `space` behavior. Geometry is local
@@ -1209,10 +1210,10 @@ limits can reverse either axis; explicit limits remain exact. Empty data uses
 [0,1]; constant data expands to a finite span. Both fill finite offers, naturally
 measure 480×320, and derive a missing axis from a 1.5 default aspect.
 
-New marks interpret numeric geometry as data inside Graph/Plot and as fractions
-outside. `space="local"` opts out; `space="data"` requires a graph. Existing
-Line and Polyline default to local geometry and accept `space="data"` to opt
-into coordinate mapping, including GeoMap projections. In data space
+Polyline and the other marks interpret numeric geometry as data inside
+Graph/Plot/GeoMap and as fractions outside. `space="local"` opts out;
+`space="data"` requires a coordinate context. Line defaults to local geometry
+and accepts `space="data"` to opt into coordinate mapping. In data space
 their numeric points contribute to Graph/Plot limit inference. A hidden endpoint
 omits a Line; hidden vertices split a Polyline into separate runs. They project
 only supplied points. Path retains local geometry. px/em
@@ -1293,8 +1294,8 @@ visibility and child drawing order; they do not add segment clipping or depth
 sorting.
 
 Projected marks preserve arbitrary numeric records in `points`, `from`, `to`,
-`segments`, `tip`, `origin`, and Arc's `center`. This includes Line and Polyline
-with `space="data"`. A nonfinite value in any dimension creates a sample gap.
+`segments`, `tip`, `origin`, and Arc's `center`. This includes Polyline by
+default and Line with `space="data"`. A nonfinite value in any dimension creates a sample gap.
 Fill accepts named coordinates on both explicit boundary arrays and splits the
 region if either side has a gap or projects to null. A scalar Fill boundary
 requires exactly Cartesian `x` and `y`, because it replaces one source axis.
@@ -1312,7 +1313,7 @@ projections. Plot and Network retain Cartesian coordinate policies. See the
 
 | Capability | Elements / reference |
 |---|---|
-| Curves, points, fills, arrows | CoordLine, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
+| Curves, points, fills, arrows | Polyline, Points, Spline, RoundedLine, Segments, Arc, Ray, Fill/HFill/VFill, Arrow, ArrowHead |
 | Plot composition | [Plot](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Plot.md), Graph, Legend, OuterLabel |
 | Axes and grid | Axis/HAxis/VAxis, Scale, Label/Labels, Mesh/Mesh2D and directional variants |
 | Bars | Bar/VBar/HBar, Bars/VBars/HBars, BarPlot |

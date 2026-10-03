@@ -1,8 +1,8 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Arc, Arrow, ArrowHead, Bars, CoordLine, Field, Fill, Graph, LayoutPass, Line, Points,
-  Polyline, Ray, Rect, RoundedLine, Segments, Spline, SymArrow, SymField, SymLine, SymPoints,
+  Arc, Arrow, ArrowHead, Bars, Polyline, Field, Fill, Graph, LayoutPass, Line, Points,
+  Ray, Rect, RoundedLine, Segments, Spline, SymArrow, SymField, SymLine, SymPoints,
   SymPoly, SymSpline, data_bounds, evaluate, exact, make_request, px, sample_points,
 } from '../src/index'
 import type { Coordinate, CoordinatePosition, Element, PathDraw, ProjectionFunction } from '../src/index'
@@ -38,7 +38,7 @@ const tests: Record<string, () => void> = {
         [new Line({ space: 'data', from: input[0], to: input[1] }),
           new Line({ space: 'data', from: output[0], to: output[1] })],
         [new Polyline({ space: 'data', points: input }), new Polyline({ space: 'data', points: output })],
-        [new CoordLine({ points: input }), new CoordLine({ points: output })],
+        [new Polyline({ points: input }), new Polyline({ points: output })],
         [new Spline({ points: input }), new Spline({ points: output })],
         [new RoundedLine({ points: input }), new RoundedLine({ points: output })],
         [new Arrow({ points: input, start_head: true }), new Arrow({ points: output, start_head: true })],
@@ -112,7 +112,7 @@ const tests: Record<string, () => void> = {
       return t === 2 ? null : { x: t, y: z }
     }
     const expected = points.map(({ t, z }) => t === 2 || t === 5 ? null : { x: t, y: z })
-    for (const Mark of [CoordLine, Spline, RoundedLine, Polyline]) {
+    for (const Mark of [Polyline, Spline, RoundedLine]) {
       const mark = new Mark({ points, space: 'data' })
       equivalent(mark, new Mark({ points: expected, space: 'data' }), project)
       const fragment = new LayoutPass().layout(graph(mark, project), fixed).children[0].fragment
@@ -175,7 +175,7 @@ const tests: Record<string, () => void> = {
     const project: ProjectionFunction = () => { throw new Error('unexpected projection') }
     const points = [[px(4), px(8)], { x: px(8), y: px(16) }] as const
     const pass = new LayoutPass()
-    for (const mark of [new CoordLine({ points }), new Points({ points }), new Polyline({ space: 'data', points })]) {
+    for (const mark of [new Polyline({ points }), new Points({ points }), new Polyline({ space: 'data', points })]) {
       assert.deepEqual(pass.layout(graph(mark, project), fixed).children[0].fragment,
         pass.layout(graph(mark), fixed).children[0].fragment)
     }
@@ -197,9 +197,9 @@ const tests: Record<string, () => void> = {
           && error.cause instanceof TypeError)
       assert.throws(() => new Points({ points: [value as never] }))
     }
-    const line = new CoordLine({ points: [{ x: 100, y: 100, z: Infinity }, { x: 1, y: 2, z: 0 }, { x: 3, y: 4, z: 0 }] })
+    const line = new Polyline({ points: [{ x: 100, y: 100, z: Infinity }, { x: 1, y: 2, z: 0 }, { x: 3, y: 4, z: 0 }] })
     assert.deepEqual(data_bounds(line), { xlim: [1, 3], ylim: [2, 4] })
-    assert.throws(() => data_bounds(new CoordLine({ points: [{ theta: 0, r: 1 }] })), /projection with explicit limits/)
+    assert.throws(() => data_bounds(new Polyline({ points: [{ theta: 0, r: 1 }] })), /projection with explicit limits/)
   },
 
   'JSX forwards complete coordinates and expands tuples to x and y'() {
@@ -242,7 +242,7 @@ function named_mark_types() {
     return new Rect({ width: px(point.z) })
   } })
   // @ts-expect-error Named dimensions must be numeric.
-  new CoordLine({ points: [{ theta: 1, r: px(2) }] })
+  new Polyline({ points: [{ theta: 1, r: px(2) }] })
   // @ts-expect-error Parametric data samples cannot use local lengths.
   new SymLine({ f: t => ({ t, r: px(2) }) })
   const position: CoordinatePosition = { x: 1, y: 2, z: 3 }
