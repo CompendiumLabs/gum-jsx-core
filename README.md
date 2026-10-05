@@ -1,12 +1,11 @@
 # @gum-jsx/core
 
+[Gum](https://github.com/CompendiumLabs/gum-jsx) — installation, quickstart, and user documentation.
+
 Gum's JSX evaluator, layout engine, and SVG renderer. It includes shapes, measured
 text, boxes and stacks, plots, network diagrams, and reusable element components.
 Elements describe a figure; layout produces immutable pixel fragments; rendering
 serializes those fragments to SVG.
-
-See the [Gum project](https://github.com/CompendiumLabs/gum-jsx#readme) for
-getting started, command-line rendering, and the package overview.
 
 ## JSX to SVG
 
