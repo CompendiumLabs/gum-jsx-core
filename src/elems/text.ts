@@ -17,7 +17,7 @@ import type { LayoutQuery } from '../engine/pass'
 import { transform_path } from '../engine/path'
 import { resolve_style } from '../engine/style'
 import type { Style, StyleSpec } from '../engine/style'
-import { make_measure, resolve_line_height } from '../engine/units'
+import { make_measure, resolve_length, resolve_line_height } from '../engine/units'
 import type { LengthContext } from '../engine/units'
 
 type TextProps = ElementProps & Readonly<{
@@ -284,21 +284,37 @@ function text_layout(props: TextProps, query: LayoutQuery) {
   const width = Math.max(0, ...lines.map(line => line.width))
   const height = lines.reduce((sum, line) => sum + line.above + line.below, 0)
   const size = finish_size(make_size(width, height), query.request, query.sizing)
+  // Paint every halo beneath the whole paragraph, including overlapping lines
+  // and inline content. Foreground fragments retain their original source order.
+  const halos: Drawing[] = []
   let y = 0
   const children = lines.map(line => {
-    const glyph = ({ shape, style, font, text }: GlyphPart, x: number): Drawing[] => {
+    const x = (size.width - line.width) * alignment
+    const glyph = (part: GlyphPart & { x: number }, offset: number): Drawing[] => {
+      const { shape, style, font, text } = part
       const scale = style.font_size
-      const matrix = [scale, 0, 0, scale, x, line.above] as const
+      const matrix = [scale, 0, 0, scale, offset, line.above] as const
       const paint = { fill: style.color, opacity: style.opacity }
       // A color face has no outline to transform; its clusters stay live text.
       if (shape.live) {
         const font = { family: shape.live.family, size: scale }
         return shape.live.clusters.filter(cluster => cluster.ink).map(cluster => draw_text(
-          cluster.text, make_point(x + cluster.x * scale, line.above), cluster.advance * scale,
+          cluster.text, make_point(offset + cluster.x * scale, line.above), cluster.advance * scale,
           font, paint, transform_rect(cluster.ink, make_point(), matrix)))
       }
+      // Width is the outward extent, so the centered stroke is twice as wide.
+      // Live foreground text uses the same shaped outline for its halo.
+      if (scale > 0 && shape.ink && style.halo_color !== 'none' && style.halo_width.value > 0) {
+        const measure = make_measure(query.measure, { font_size: scale })
+        const width = resolve_length(style.halo_width, measure, scale, 'halo_width')
+        const matrix = [scale, 0, 0, scale, x + part.x, y + line.above] as const
+        halos.push(draw_path(transform_path(shape.commands, matrix), {
+          fill: 'none', stroke: style.halo_color, stroke_width: 2 * width,
+          stroke_linecap: 'round', stroke_linejoin: 'round', opacity: style.opacity,
+        }, transform_rect(shape.ink, make_point(), matrix)))
+      }
       if (live && font.face) {
-        return [draw_text(text, make_point(x, line.above), shape.advance * scale,
+        return [draw_text(text, make_point(offset, line.above), shape.advance * scale,
           { ...font.face, size: scale, color: false }, paint, transform_rect(shape.ink, make_point(), matrix), 'start', shape.glyphs)]
       }
       const commands = transform_path(shape.commands, matrix)
@@ -307,7 +323,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
     }
     const height = line.above + line.below
     const inline = line.parts.some(part => 'fragment' in part)
-    const draw = inline ? [] : line.parts.flatMap(part => glyph(part as GlyphPart, part.x))
+    const draw = inline ? [] : line.parts.flatMap(part => glyph(part as GlyphPart & { x: number }, part.x))
     // Keep source painting order when glyphs and elements overlap. Pure prose
     // retains its compact line drawing, with no additional run fragments.
     const content = inline ? line.parts.map(part => 'fragment' in part
@@ -317,7 +333,6 @@ function text_layout(props: TextProps, query: LayoutQuery) {
     const fragment = make_fragment({
       name: 'Line', size: make_size(Math.max(0, line.width), height), guides: { baseline: line.above }, draw, children: content,
     })
-    const x = (size.width - line.width) * alignment
     const placement = place_fragment(fragment, make_point(x, y))
     y += height
     return placement
@@ -327,7 +342,7 @@ function text_layout(props: TextProps, query: LayoutQuery) {
     baseline: first.fragment.guides.baseline,
     last_baseline: last.offset.y + last.fragment.guides.baseline!,
   } : {}
-  return make_fragment({ size, guides, label: prepared.text, children })
+  return make_fragment({ size, guides, label: prepared.text, draw: halos, children })
 }
 
 class Text extends Element<TextProps> {

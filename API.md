@@ -914,7 +914,7 @@ Grid supplies shared columns across rows.
 
 `Text` accepts strings, numbers, nested arrays, conditional children, and inline
 `Span` elements, formulas, and other elements. Use string expression children to preserve exact whitespace. Spans inherit
-font family, weight, style, size, line height, and `color`; they introduce no boxes
+font family, weight, style, size, line height, `color`, and halo styles; they introduce no boxes
 or word breaks. A standalone `Span` can also be measured as text. Inline elements
 are indivisible, align by baseline (or their bottom edge), and enlarge the line
 using their logical height and depth. Give figures concrete dimensions; an
@@ -936,6 +936,20 @@ An inherited `line-height={px(20)}` remains 20px even in a larger span.
 | `font_family` | `IBM Plex Sans`, `IBM Plex Mono`, or a registered family. |
 | `font_weight` | Numeric 1–1000 or `"light"` (300), `"regular"`/`"normal"` (400), `"bold"` (700); choose the nearest available weight, lower on ties. |
 | `font_style` | `normal` or `italic`; a registered italic face is preferred, otherwise synthesize a 12° oblique outline. |
+| `halo_color` | Inherited outline color; defaults to `none`. Accepts ordinary and semantic theme paints. |
+| `halo_width` | Inherited outward extent; defaults to `em(0.08)`. Pixels stay fixed; em/fractions use the local font size. Zero disables it. |
+
+Text halos use rounded glyph outlines beneath the entire paragraph's foreground,
+so neighboring spans and tightly spaced lines do not obscure each other's text.
+They expand ink and overflow without changing advances, wrapping, line heights,
+or baselines. Keep padding around labels near clipped viewport edges. An inherited
+halo can be disabled with `halo_color: 'none'`, and scoped options such as
+`label-halo-color` and `title-halo-width` configure generated text.
+
+Live and mixed modes retain selectable foreground text with path halos. Color
+emoji have no outline and receive no halo. Math glyphs and rules do not yet
+support halos. Opacity follows the existing per-drawing semantics: overlapping
+translucent halos and foregrounds can accumulate alpha.
 
 Newlines include CRLF/CR and Unicode line/paragraph separators. A trailing newline
 adds a blank line; empty normal text is 0×0. Nonbreaking spaces remain nonbreaking;

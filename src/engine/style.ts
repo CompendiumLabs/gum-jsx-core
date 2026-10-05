@@ -14,6 +14,7 @@ const FONT_WEIGHTS = freeze_owned({ light, regular, normal: regular, bold })
 type FontWeight = number | keyof typeof FONT_WEIGHTS
 type LineCap = 'butt' | 'round' | 'square'
 type LineJoin = 'miter' | 'round' | 'bevel'
+type PaintKey = 'color' | 'fill' | 'stroke' | 'halo_color'
 type StyleSpec = Readonly<{
   theme?: ThemeName
   font_size?: Length
@@ -22,6 +23,8 @@ type StyleSpec = Readonly<{
   font_style?: FontStyle
   line_height?: Length
   color?: string
+  halo_color?: string
+  halo_width?: Length
   fill?: string
   stroke?: string
   stroke_width?: Length
@@ -34,13 +37,15 @@ type StyleSpec = Readonly<{
 type Style = Readonly<{
   theme: ThemeName
   // Keep semantic paints so a nested theme can re-resolve inherited defaults.
-  theme_paints?: Readonly<Partial<Record<'color' | 'fill' | 'stroke', string>>>
+  theme_paints?: Readonly<Partial<Record<PaintKey, string>>>
   font_size: number
   font_family: string
   font_weight: number
   font_style: FontStyle
   line_height: NormalizedLength
   color: string
+  halo_color: string
+  halo_width: NormalizedLength
   fill: string
   stroke: string
   stroke_width: NormalizedLength
@@ -65,6 +70,8 @@ const DEFAULT_STYLE: Style = freeze_owned({
   font_style: 'normal',
   line_height: normalize_length(em(DEFAULTS.line_height)),
   color: DEFAULTS.color,
+  halo_color: DEFAULTS.halo_color,
+  halo_width: normalize_length(em(DEFAULTS.halo_width)),
   fill: DEFAULTS.fill,
   stroke: DEFAULTS.stroke,
   stroke_width: normalize_length(px(DEFAULTS.stroke_width)),
@@ -79,8 +86,8 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const measure = make_measure(context, { font_size: inherited.font_size })
   const path = measure.path || 'root'
   const theme = resolve_theme(spec.theme ?? inherited.theme)
-  const theme_paints: Partial<Record<'color' | 'fill' | 'stroke', string>> = {}
-  const paint = (key: 'color' | 'fill' | 'stroke') => {
+  const theme_paints: Partial<Record<PaintKey, string>> = {}
+  const paint = (key: PaintKey) => {
     const token = inherited.theme_paints?.[key]
     // A caller may supply a resolved style with an explicitly replaced paint.
     const source = spec[key] ?? (token && theme_color(token, inherited.theme) === inherited[key]
@@ -99,9 +106,10 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const font_style = spec.font_style ?? inherited.font_style
   const line_height = normalize_length(spec.line_height ?? inherited.line_height, `${path}.line_height`)
   const color = paint('color')
+  const halo_color = paint('halo_color')
   const fill = paint('fill')
   const stroke = paint('stroke')
-  if ([font_family, color, fill, stroke].some(value => typeof value !== 'string')) {
+  if ([font_family, color, halo_color, fill, stroke].some(value => typeof value !== 'string')) {
     throw new TypeError(`${path}: font family and paints must be strings`)
   }
   if (!font_family || font_weight < 1 || font_weight > 1000) {
@@ -111,6 +119,8 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
     throw new TypeError(`${path}: font_style must be normal or italic`)
   }
   nonnegative(line_height.value, `${path}.line_height`)
+  const halo_width = normalize_length(spec.halo_width ?? inherited.halo_width, `${path}.halo_width`)
+  nonnegative(halo_width.value, `${path}.halo_width`)
   const stroke_width = normalize_length(spec.stroke_width ?? inherited.stroke_width, `${path}.stroke_width`)
   const opacity = finite(spec.opacity ?? inherited.opacity, 'opacity')
   if (opacity < 0 || opacity > 1) throw new RangeError('opacity must be between 0 and 1')
@@ -125,7 +135,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const style: Style = freeze_owned({
     theme, theme_paints: freeze_owned(theme_paints),
     font_size, font_family, font_weight, font_style, line_height, color,
-    fill, stroke, stroke_width,
+    halo_color, halo_width, fill, stroke, stroke_width,
     stroke_linecap: spec.stroke_linecap ?? inherited.stroke_linecap,
     stroke_linejoin: spec.stroke_linejoin ?? inherited.stroke_linejoin,
     stroke_miterlimit: spec.stroke_miterlimit ?? inherited.stroke_miterlimit,
