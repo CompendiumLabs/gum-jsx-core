@@ -1,4 +1,3 @@
-import type { ElementProps } from '../engine/element'
 import { make_measure } from '../engine/units'
 import { finite, nonnegative } from '../lib/checks'
 import { Element } from '../engine/element'

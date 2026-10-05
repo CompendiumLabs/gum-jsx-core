@@ -61,16 +61,24 @@ type Face = {
 const EMOJI_FAMILY = 'Noto Color Emoji'
 
 class FontNotLoadedError extends Error {
-  constructor(readonly family: string) {
+  readonly family: string
+
+  constructor(family: string) {
     super(`Load ${family} with fonts.load() before layout`)
+    this.family = family
     this.name = 'FontNotLoadedError'
   }
 }
 
 class MissingGlyphError extends Error {
-  constructor(readonly family: string, readonly code_point: number) {
+  readonly family: string
+  readonly code_point: number
+
+  constructor(family: string, code_point: number) {
     const code = code_point.toString(16).toUpperCase().padStart(4, '0')
     super(`${family} has no glyph for U+${code}`)
+    this.family = family
+    this.code_point = code_point
     this.name = 'MissingGlyphError'
   }
 }

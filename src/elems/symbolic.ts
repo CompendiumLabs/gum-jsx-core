@@ -1,6 +1,5 @@
 import { freeze_owned } from '../lib/immutable'
 import type { LayoutQuery } from '../engine/pass'
-import type { ElementProps } from '../engine/element'
 import { finite } from '../lib/checks'
 import { Element, define_component } from '../engine/element'
 import { make_fragment, place_fragment } from '../engine/fragment'
