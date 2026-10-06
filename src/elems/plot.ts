@@ -114,7 +114,7 @@ function plot_data(input: PlotProps): PlotData {
     'grid', 'xgrid', 'ygrid'], ['label_gap'])
   const { title, xlabel, ylabel, legend, xaxis, yaxis, axis_style, tick_style, label_style,
     title_style, xlabel_style, ylabel_style, grid_style, xgrid_style, ygrid_style, legend_style, ...props } = scoped
-  const coordinates = infer_coordinates(props.children, { padding: 0.05, ...props })
+  const coordinates = infer_coordinates(props.children, { padding: 0, ...props })
   const axes: Element[] = [], meshes: Element[] = []
   const common = merge_axis_props({
     ...(Object.hasOwn(scoped, 'tick_style') ? { tick_style } : {}),
