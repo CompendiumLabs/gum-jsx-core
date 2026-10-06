@@ -300,7 +300,7 @@ function fill_layout(props: FillProps, query: LayoutQuery) {
 }
 
 class Fill extends Element<FillProps> {
-  static defaults: Partial<FillProps> = { fill: 'theme:area', stroke: 'none' }
+  static defaults: Partial<FillProps> = { fill: 'theme:accent', stroke: 'none' }
   static data_bounds(props: FillProps) {
     return mark_bounds(props,
       fill_pairs(props).flatMap(pair => pair ? [...pair] : []))

@@ -234,7 +234,7 @@ class BarPlot extends Element<PlotData, BarPlotProps> {
   static normalize({ values, positions, bases, bar_width, styles, direction, border_radius, children, ...props }: BarPlotProps): PlotData {
     return plot_data({
       ...props, children: [new Bars({ values, positions, bases, bar_width, styles, direction, border_radius,
-        fill: props.fill ?? 'theme:area' }),
+        fill: props.fill ?? 'theme:accent' }),
         ...element_children(children)],
     })
   }

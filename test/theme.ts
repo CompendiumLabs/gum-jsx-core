@@ -49,17 +49,17 @@ const tests: Record<string, () => void> = {
     assert.notEqual(named(a, 'Text'), named(b, 'Text'))
     assert.equal(drawings(named(a, 'Text'))[0]?.fill, THEMES.dark.foreground)
     assert.equal(drawings(named(b, 'Text'))[0]?.fill, THEMES.light.foreground)
-    assert.equal(named(a, 'HMesh').draw[0]?.stroke, THEMES.dark.grid)
-    assert.equal(named(b, 'HMesh').draw[0]?.stroke, THEMES.light.grid)
+    assert.equal(named(a, 'HMesh').draw[0]?.stroke, THEMES.dark.neutral)
+    assert.equal(named(b, 'HMesh').draw[0]?.stroke, THEMES.light.neutral)
     assert.equal(pass.layout(dark), a)
     assert.equal(pass.layout(light), b)
     // Different palettes still matter when all inherited paints are explicit.
-    const box = new Box({ background: 'theme:area', children: new Rect() })
+    const box = new Box({ background: 'theme:accent', children: new Rect() })
     const style = { color: 'red', fill: 'none', stroke: 'blue' }
     const c = pass.layout(box, undefined, { style: resolve_style({ ...style, theme: 'dark' }) })
     const d = pass.layout(box, undefined, { style: resolve_style({ ...style, theme: 'light' }) })
-    assert.equal(c.draw[0]?.fill, THEMES.dark.area)
-    assert.equal(d.draw[0]?.fill, THEMES.light.area)
+    assert.equal(c.draw[0]?.fill, THEMES.dark.accent)
+    assert.equal(d.draw[0]?.fill, THEMES.light.accent)
   },
 
   'nested theme scopes re-resolve semantic paints and retain explicit colors'() {
@@ -88,9 +88,9 @@ const tests: Record<string, () => void> = {
         }) }),
       }))
       assert.equal(named(fragment, 'Slide').draw.length, 0)
-      assert.equal(named(fragment, 'HMesh').draw[0]?.stroke, colors.grid)
+      assert.equal(named(fragment, 'HMesh').draw[0]?.stroke, colors.neutral)
       assert.equal(named(fragment, 'HAxis').draw[0]?.stroke, colors.foreground)
-      assert.equal(named(fragment, 'Bars').draw[0]?.fill, colors.area)
+      assert.equal(named(fragment, 'Bars').draw[0]?.fill, colors.accent)
       assert.equal(named(fragment, 'PlotBorder').draw[0]?.stroke, colors.border)
       assert.equal(named(fragment, 'Legend').draw.length, 0)
       assert.equal(named(named(fragment, 'Legend'), 'Border').draw[0]?.stroke, colors.border)
@@ -101,7 +101,7 @@ const tests: Record<string, () => void> = {
         assert.ok(nodes(mark).slice(1).flatMap(node => node.draw).some(draw => draw.fill === colors.foreground))
       }
       const area = pass.layout(new Svg({ theme, children: new Fill({ points: [[0, 0], [1, 1]] }) }))
-      assert.equal(named(area, 'Fill').draw[0]?.fill, colors.area)
+      assert.equal(named(area, 'Fill').draw[0]?.fill, colors.accent)
     }
   },
 

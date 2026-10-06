@@ -231,7 +231,7 @@ function mesh_layout(props: MeshData, query: LayoutQuery) {
 }
 
 class Mesh extends Element<MeshData, MeshProps> {
-  static defaults: Partial<MeshData> = { stroke: 'theme:grid', stroke_width: em(1 / 16) }
+  static defaults: Partial<MeshData> = { stroke: 'theme:neutral', stroke_width: em(1 / 16) }
   static normalize = mesh_data
   static data_bounds = Axis.data_bounds
   static layout = mesh_layout
@@ -250,7 +250,7 @@ class Mesh2D extends Element<ElementProps, Mesh2DProps> {
     return null
   }
   static normalize({ xlim, ylim, xticks, yticks, ...props }: Mesh2DProps): ElementProps {
-    const style = { stroke: props.stroke ?? 'theme:grid', stroke_width: props.stroke_width ?? em(1 / 16) }
+    const style = { stroke: props.stroke ?? 'theme:neutral', stroke_width: props.stroke_width ?? em(1 / 16) }
     return { ...props,
       children: [new HMesh({ lim: xlim, ticks: xticks, ...style }),
         new VMesh({ lim: ylim, ticks: yticks, ...style })],

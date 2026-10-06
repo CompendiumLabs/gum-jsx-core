@@ -7,9 +7,8 @@ type ThemePalette = Readonly<{
   text: string
   muted: string
   border: string
-  grid: string
+  neutral: string
   accent: string
-  area: string
 }>
 
 const THEMES: Readonly<Record<ThemeName, ThemePalette>> = freeze_owned({
@@ -18,18 +17,16 @@ const THEMES: Readonly<Record<ThemeName, ThemePalette>> = freeze_owned({
     text: black,
     border: black,
     muted: darkgray,
-    grid: gray,
+    neutral: gray,
     accent: blue,
-    area: blue,
   }),
   dark: freeze_owned({
     foreground: white,
     text: white,
     border: white,
     muted: lightgray,
-    grid: darkgray,
+    neutral: darkgray,
     accent: blue,
-    area: blue,
   }),
 })
 
