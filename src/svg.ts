@@ -2,6 +2,7 @@ import type { Drawing, TextDraw } from './engine/drawing'
 import type { Fragment } from './engine/fragment'
 import type { Point, Rect, RectRadii } from './engine/geometry'
 import { path_data } from './engine/path'
+import { prepare_render } from './engine/output'
 import { output_number_formatter } from './engine/output_number'
 import type { OutputPrecision } from './engine/output_number'
 
@@ -113,16 +114,6 @@ function render_drawing(draw: Drawing, number: (value: number) => string): strin
   }
 }
 
-// Keep diagnostic strokes legible through fitting, including zero-sized allocations.
-function render_debug_box(rect: Rect, kind: 'allocated' | 'content', number: (value: number) => string): string {
-  const paint = `data-gum-debug-box="${kind}" stroke="${kind === 'allocated' ? '#e11d48' : '#2563eb'}"`
-    + ' vector-effect="non-scaling-stroke"' + (kind === 'content' ? ' stroke-dasharray="4 3"' : '')
-  if (rect.width === 0 || rect.height === 0) {
-    return `<path d="M${number(rect.x)} ${number(rect.y)}l${number(rect.width)} ${number(rect.height)}" ${paint} stroke-linecap="round"/>`
-  }
-  return render_rect(rect, number, undefined, paint)
-}
-
 // Render an immutable result, allocating definition IDs only within this document.
 function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   const { width, height } = fragment.size
@@ -134,15 +125,9 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   const definitions: string[] = []
   const clips = new Map<Fragment, string>()
   const path_clips = new Map<Fragment, string>()
-  const debug: string[] = []
 
   // Shared fragments reuse their local clip definition across placements.
-  function render_fragment(node: Fragment, transform = ''): string {
-    if (node.debug) {
-      const boxes = render_debug_box({ x: 0, y: 0, ...node.size }, 'allocated', number)
-        + (node.content ? render_debug_box(node.content, 'content', number) : '')
-      debug.push(transform ? `<g transform="${transform}">${boxes}</g>` : boxes)
-    }
+  function render_fragment(node: Fragment): string {
     let clip = ''
     if (node.clip) {
       let id = clips.get(node)
@@ -173,7 +158,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
         transforms.push(`matrix(${child.transform.map(number).join(' ')})`)
       }
       const placement_transform = transforms.join(' ')
-      const body = render_fragment(child.fragment, [transform, placement_transform].filter(Boolean).join(' '))
+      const body = render_fragment(child.fragment)
       return placement_transform ? `<g transform="${placement_transform}">${body}</g>` : body
     })
 
@@ -183,7 +168,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
     return clip ? `<g${clip}>${body}</g>` : body
   }
 
-  const body = render_fragment(fragment)
+  const body = render_fragment(prepare_render(fragment))
   const image_namespace = body.includes('<image ') ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ''
   // Establish inherited text settings once, including when embedded in a styled page.
   const text_defaults = body.includes('<text ')
@@ -195,10 +180,7 @@ function render_svg(fragment: Fragment, options: SvgOptions = {}): string {
   if (background !== undefined) {
     parts.push(`<rect width="${number(width)}" height="${number(height)}" fill="${escape_xml(background)}"/>`)
   }
-  // Diagnostics sit above all paint and outside content clips; the viewport still clips.
-  const overlay = debug.length ? '<g data-gum-debug="" fill="none" stroke-width="1"'
-    + ` pointer-events="none" aria-hidden="true">${debug.join('')}</g>` : ''
-  return [...parts, body, overlay, '</svg>'].join('')
+  return [...parts, body, '</svg>'].join('')
 }
 
 export { render_svg }

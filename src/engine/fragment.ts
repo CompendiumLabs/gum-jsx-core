@@ -23,7 +23,7 @@ const owned_fragments = new WeakSet<Fragment>()
 interface Fragment<Draw = Drawing> {
   readonly name?: string
   readonly label?: string
-  // Rendering diagnostics do not contribute to drawings, ink, or overflow.
+  // Diagnostics become ordinary overlay drawings only after layout, during output preparation.
   readonly debug?: boolean
   readonly size: Size
   readonly guides: Guides

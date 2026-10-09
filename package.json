@@ -4,7 +4,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./output": "./src/engine/output_number.ts"
+    "./output": "./src/engine/output.ts"
   },
   "type": "module",
   "devDependencies": {

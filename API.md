@@ -413,10 +413,19 @@ do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
 Set `debug` on an element to outline its allocated box in solid red and its
 content box, when provided, in dashed blue. The flag applies only to that element;
-children can opt in separately. SVG, PNG, and terminal output draw the boxes above the artwork,
+children can opt in separately. All graphical outputs draw the boxes above the artwork,
 following placement transforms and bypassing content clips within the viewport.
 These diagnostics do not change layout, ink, or overflow. See
 [Debugging layout](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/rendering.md#debugging-layout).
+
+`prepare_render(fragment)` converts debug metadata into ordinary path drawings
+in a final overlay fragment. It runs after layout, preserves measured geometry,
+and leaves the original tree unchanged. Paths use viewport coordinates so
+placement transforms do not scale their strokes. SVG, PNG (including terminal
+and video frames), PDF, and PPTX call it before traversing drawings. Custom
+renderers can use the same step; repeated preparation does not duplicate overlays.
+Export backends can import it from `@gum-jsx/core/output` without loading the
+layout engine or bundled fonts.
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
