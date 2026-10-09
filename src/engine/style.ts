@@ -19,6 +19,7 @@ type StyleSpec = Readonly<{
   theme?: ThemeName
   font_size?: Length
   font_family?: string
+  math_font?: string
   font_weight?: FontWeight
   font_style?: FontStyle
   line_height?: Length
@@ -40,6 +41,7 @@ type Style = Readonly<{
   theme_paints?: Readonly<Partial<Record<PaintKey, string>>>
   font_size: number
   font_family: string
+  math_font?: string
   font_weight: number
   font_style: FontStyle
   line_height: NormalizedLength
@@ -98,6 +100,10 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   }
   const font_size = resolve_font_size(spec.font_size, measure)
   const font_family = spec.font_family ?? inherited.font_family
+  const math_font = spec.math_font ?? inherited.math_font
+  if (math_font !== undefined && (typeof math_font !== 'string' || !math_font.trim())) {
+    throw new TypeError(`${path}.math_font must be a nonempty font family`)
+  }
   const weight = spec.font_weight ?? inherited.font_weight
   if (typeof weight === 'string' && !Object.hasOwn(FONT_WEIGHTS, weight)) {
     throw new TypeError(`${path}.font_weight must be a number, light, regular, normal, or bold; received ${weight}`)
@@ -109,7 +115,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const halo_color = paint('halo_color')
   const fill = paint('fill')
   const stroke = paint('stroke')
-  if ([font_family, color, halo_color, fill, stroke].some(value => typeof value !== 'string')) {
+  if ([font_family, math_font, color, halo_color, fill, stroke].some(value => typeof value !== 'string')) {
     throw new TypeError(`${path}: font family and paints must be strings`)
   }
   if (!font_family || font_weight < 1 || font_weight > 1000) {
@@ -135,6 +141,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const style: Style = freeze_owned({
     theme, theme_paints: freeze_owned(theme_paints),
     font_size, font_family, font_weight, font_style, line_height, color,
+    ...(math_font === undefined ? {} : { math_font }),
     halo_color, halo_width, fill, stroke, stroke_width,
     stroke_linecap: spec.stroke_linecap ?? inherited.stroke_linecap,
     stroke_linejoin: spec.stroke_linejoin ?? inherited.stroke_linejoin,

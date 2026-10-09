@@ -938,6 +938,7 @@ An inherited `line-height={px(20)}` remains 20px even in a larger span.
 | `whitespace="pre"` | Preserve spaces and expand tabs at `tab_size` column stops (default 4). Wrapping remains independently controlled by `wrap`. |
 | `justify` | `start` (default), `center`, `end`, or a fraction from 0 to 1, inside the final allocated width. |
 | `font_family` | `IBM Plex Sans`, `IBM Plex Mono`, or a registered family. |
+| `math_font` | Inherited math family, independent of prose. Consumed by `@gum-jsx/math`; nested values override the provider default. |
 | `font_weight` | Numeric 1–1000 or `"light"` (300), `"regular"`/`"normal"` (400), `"bold"` (700); choose the nearest available weight, lower on ties. |
 | `font_style` | `normal` or `italic`; a registered italic face is preferred, otherwise synthesize a 12° oblique outline. |
 | `halo_color` | Inherited outline color; defaults to `none`. Accepts ordinary and semantic theme paints. |

@@ -11,6 +11,18 @@ import type { ElementProps } from '../src/index'
 import { Fixed, Expanding, Wrapping } from './fixtures/leaves'
 
 const tests: Record<string, () => void> = {
+  'math font families inherit independently of prose fonts'() {
+    const parent = resolve_style({ font_family: 'Prose', math_font: 'Math A' })
+    const child = resolve_style({ color: 'red' }, parent)
+    assert.equal(child.math_font, 'Math A')
+    assert.equal(resolve_style({ math_font: 'Math B' }, child).math_font, 'Math B')
+    assert.equal(resolve_style({ math_font: 'Math B' }, child).font_family, 'Prose')
+    assert.equal(resolve_style().math_font, undefined)
+    for (const math_font of ['', '   ', 5, false]) {
+      assert.throws(() => resolve_style({ math_font: math_font as string }), /math_font.*nonempty/)
+    }
+  },
+
   'optional resources use a fallback until the pass installs a value'() {
     const pass = new LayoutPass()
     const Probe = define_element('OptionalResource', (_, query) =>
