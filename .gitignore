@@ -1,5 +1,7 @@
 # dependencies (bun install)
 node_modules
+# The parent workspace owns dependency resolution.
+bun.lock
 
 # output
 out
