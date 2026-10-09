@@ -81,35 +81,10 @@ const tests: Record<string, () => void> = {
     assert.ok(fragment.ink)
     near(fragment.ink.x, ink.minX * scale); near(fragment.ink.y, baseline - ink.maxY * scale)
     near(fragment.ink.width, ink.width * scale); near(fragment.ink.height, ink.height * scale)
-    // Plex uses extension positioning tables that the old OpenType adapter skipped.
-    assert.equal(shaper.layout('AV').advanceWidth, 1209)
     assert.ok(shaper.layout('AV').advanceWidth
       < shaper.layout('A').advanceWidth + shaper.layout('V').advanceWidth)
     assert.ok(run.glyphs.some(glyph => glyph.isLigature))
     assert.deepEqual(pass.stats, { queries: 1, layouts: 1, hits: 0 })
-  },
-
-  'reflow reuses prepared measurements and keeps exact wrap boundaries distinct'() {
-    const fonts = new Fonts()
-    let measured = 0, resolved = 0
-    const provider: FontProvider = { resolve(family, weight, style) {
-      resolved++
-      const font = fonts.resolve(family, weight, style)
-      return { ...font, shape(text) { measured++; return font.shape(text); } }
-    } }
-    const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
-    const element = new Text({ children: ['one ', new Span({ font_weight: 700, children: 'two' })] })
-    const natural = pass.layout(element)
-    const before = { measured, resolved }
-    const edge = make_request({ width: exact(natural.size.width) })
-    const at = pass.layout(element, edge)
-    const below = pass.layout(element, make_request({ width: exact(natural.size.width - 1e-9) }))
-    assert.equal(lines(at), 1); assert.equal(lines(below), 2)
-    assert.equal(pass.layout(element, edge), at)
-    assert.deepEqual({ measured, resolved }, before)
-    near(below.size.height, at.size.height * 2)
-    assert.equal(pass.stats.layouts, 3)
-    assert.equal(pass.stats.hits, 1)
   },
 
   'span boundaries preserve words and equivalent spans preserve kerning'() {

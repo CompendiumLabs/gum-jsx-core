@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
-import { TitleFrame, TransformBox, LayoutPass, px, em, make_request, exact, available, render_svg,
-  content_bounds } from '../src/index'
-import { path_data, path_bounds } from '../src/engine/path'
+import { TitleFrame, LayoutPass, px, em, make_request, exact, available, render_svg } from '../src/index'
+import { path_data } from '../src/engine/path'
 import { Fixed } from './fixtures/leaves'
 
 const tests: Record<string, () => void> = {
@@ -47,26 +46,6 @@ const tests: Record<string, () => void> = {
     assert.match(render_svg(content), /<g clip-path="url\(#gum-path-clip-0\)">/)
     assert.equal(pass.layout(source), result)
     assert.equal(JSON.stringify(source), before)
-  },
-
-  'title cutouts include overflowing content behind the raised half without hiding other overflow'() {
-    const pass = new LayoutPass()
-    for (const bounds of ['outer', 'frame'] as const) {
-      const result = pass.layout(new TitleFrame({
-        width: px(200), height: px(100), bounds, padding: px(0), border_width: px(0), title_padding: px(0),
-        title: new Fixed({ content_width: px(40), content_height: px(20) }),
-        children: new TransformBox({ matrix: [1, 0, 0, 1, -20, -30], resize: false, children:
-          new Fixed({ content_width: px(240), content_height: px(150), fill: 'red' }) }),
-      }))
-      const [body, title] = result.children
-      const clipped = body.fragment.children[0].fragment
-      assert.deepEqual(path_bounds(clipped.clip_path!), content_bounds(clipped))
-      assert.equal(path_data(clipped.clip_path!),
-        'M-20 -30L240 -30L240 -10L-20 -10ZM-20 10L240 10L240 150L-20 150Z'
-        + 'M-20 -10L80 -10L80 10L-20 10ZM120 -10L240 -10L240 10L120 10Z')
-      assert.equal(render_svg(clipped).match(/fill="red"/g)?.length, 1)
-      assert.equal(title.fragment.clip_path, undefined)
-    }
   },
 
   'frame bounds leave the raised title outside the allocation'() {

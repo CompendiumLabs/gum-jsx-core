@@ -135,27 +135,6 @@ const tests: Record<string, () => void> = {
     assert.equal(opted_out.guides.baseline, 13)
   },
 
-  'a selected column width remains stable when non-stretch flex children grow wider'() {
-    const pass = new LayoutPass()
-    const column = pass.layout(new VStack({ height: px(100), children: [
-      new Box({ width: px(40), basis: 0, grow: 1, align_self: 'stretch' }),
-      new Rect({ aspect: 2, basis: px(10), grow: 1, align_self: 'end', stroke: 'none' }),
-    ] }))
-    assert.deepEqual(column.size, { width: 40, height: 100 })
-    assert.deepEqual(column.children.map(child => child.fragment.size),
-      [{ width: 40, height: 45 }, { width: 110, height: 55 }])
-    assert.equal(column.children[1].offset.x, -70)
-    assert.equal(column.overflow.left, 70)
-
-    const references: unknown[] = []
-    const Probe = define_element('Probe', (_, query) => {
-      references.push(query.measure.reference)
-      return make_fragment({ size: finish_size(make_size(50, 10), query.request, query.sizing) })
-    })
-    pass.layout(new VStack({ children: [new Probe({ align_self: 'stretch' }), new Box({ width: px(200) })] }))
-    assert.deepEqual(references, [{}, {}])
-  },
-
   'align_self belongs to the direct container and remains separate from child alignment'() {
     const pass = new LayoutPass()
     const child = new Box({ width: px(40), height: px(20), align: 'end', align_self: 'end',

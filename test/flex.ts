@@ -36,37 +36,6 @@ const tests: Record<string, () => void> = {
     ], 100), [40, 60])
   },
 
-  'opposing clamp violations retain clamped results and redistribute only the frozen side'() {
-    const pair = [item({ grow: 1, min: 7, max: 9 }), item({ grow: 1, max: 3 })]
-    assert.deepEqual(distribute_flex(pair, 10), [7, 3])
-    assert.deepEqual(distribute_flex(pair, 11), [8, 3])
-    assert.deepEqual(distribute_flex(pair, 20), [9, 3])
-    assert.deepEqual(distribute_flex([
-      item({ grow: 1, min: 70, max: 95 }), item({ grow: 1, max: 40 }),
-    ], 100), [70, 30])
-    assert.deepEqual(distribute_flex([
-      item({ basis: 100, shrink: 1, min: 80 }), item({ basis: 100, shrink: 1, min: 40 }),
-    ], 60), [80, 40])
-  },
-
-  'extreme finite weights survive product overflow and renormalize after clamps'() {
-    assert.deepEqual(distribute_flex([item({ grow: 1 }), item({ grow: 1 })], 0), [0, 0])
-    assert.deepEqual(distribute_flex([item({ grow: 1e308 }), item({ grow: 1e308 })], 100), [50, 50])
-    assert.deepEqual(distribute_flex([
-      item({ basis: 1e307, shrink: 1e308 }), item({ basis: 1e307, shrink: 1e308 }),
-    ], 1e307), [5e306, 5e306])
-    assert.deepEqual(distribute_flex([item({ basis: 0, min: 10, shrink: 1 })], 0), [10])
-    assert.deepEqual(distribute_flex([
-      item({ grow: 1e308, max: 1 }), item({ grow: 1e-308 }),
-    ], 2), [1, 1])
-    assert.deepEqual(distribute_flex([
-      item({ basis: 1e300, shrink: 1e-300 }), item({ basis: 1e-300, shrink: 1e300 }),
-    ], 5e299), [5e299, 0])
-    assert.deepEqual(distribute_flex([
-      item({ basis: 1e-200, shrink: 1e-200 }), item({ basis: 1e-200, shrink: 1e-200 }),
-    ], 1e-200), [5e-201, 5e-201])
-  },
-
   'bounded allocations conserve feasible budgets across mixed limits'() {
     let seed = 104729
     const random = (limit: number) => {

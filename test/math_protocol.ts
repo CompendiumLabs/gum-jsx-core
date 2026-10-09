@@ -48,4 +48,4 @@ assert.throws(() => copy_math_metrics({ ...a.math!, advance: Infinity }), /finit
 assert.throws(() => copy_math_metrics({ ...a.math!, left: 'invalid' } as any), /class/)
 assert.throws(() => make_fragment({ size: make_size(-1, 0) }), /nonnegative/)
 assert.equal(pass.layout(source, make_request({ width: exact(0) }), { math: input }).size.width, 0)
-console.log('Math protocol: passive metrics, context caching, inheritance, and validation passed.')
+console.log('ok - math protocol: passive metrics, context caching, inheritance, and validation')

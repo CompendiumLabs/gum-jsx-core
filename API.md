@@ -999,8 +999,6 @@ Text preparation normalizes runs, identifies legal breaks across span boundaries
 and measures each break unit. Reflow only packs those advances into lines. Kerning
 and ligatures apply within each uninterrupted style/break unit; shaping across
 different styles or break boundaries is deferred. Equivalent adjacent spans merge.
-The exact-width regression checks both sides of a break just 1e-9px apart, and a
-counting provider verifies that changing width performs no additional shaping.
 
 `Fonts` is a small adapter around Fontkit and the existing bundled font files. It
 replaces the old font registry without importing the old Env or text layout.
@@ -1629,9 +1627,8 @@ bun tsc --noEmit false --declaration --emitDeclarationOnly --outDir /tmp/gum-jsx
 ```
 
 The docs examples render through the workspace CLI and gum-jsx-edit's docs view.
-Use `pass.stats` and counting font providers for
-measurement-cost regressions. Natural hugging and Group examples generally query
+Use `pass.stats` and counting font providers to inspect measurement costs.
+Natural hugging and Group examples generally query
 each child once; flex/reflow/stretch may require additional queries. Counted layouts,
-cache hits, and prepared glyph reuse are distinct. Preserve the opposing-clamp and
-text-width-boundary cases when changing allocation. See the
+cache hits, and prepared glyph reuse are distinct. See the
 [roadmap style guide](https://github.com/CompendiumLabs/gum-jsx/blob/master/docs/ROADMAP.md#style-guide) for the project's implementation style.

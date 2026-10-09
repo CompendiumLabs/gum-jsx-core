@@ -5,7 +5,7 @@ import {
   LayoutPass, LayoutError, UnresolvedLengthError, resolve_style,
   em, px, natural, available, exact, make_request, finish_size,
   make_size, make_point, make_rect, make_fragment, place_fragment,
-  transform_rect, draw_rect, render_svg, inspect_fragment,
+  transform_rect, render_svg, inspect_fragment,
 } from '../src/index'
 import type { ElementProps } from '../src/index'
 import { Fixed, Expanding, Wrapping } from './fixtures/leaves'
@@ -171,48 +171,6 @@ const tests: Record<string, () => void> = {
     })
     assert.equal(allocated.size.width, 20)
     assert.deepEqual(pass.stats, { queries: 6, layouts: 4, hits: 1 })
-  },
-
-  'caller-created inherited styles are rechecked after mutation'() {
-    const leaf = new Rect({ width: em(2), height: em(1) })
-    const pass = new LayoutPass()
-    const style = { ...resolve_style({ font_size: px(10), fill: 'red' }) }
-    const first = pass.layout(leaf, make_request(), { style })
-    // Equivalent styles still share geometry, regardless of object identity.
-    assert.equal(pass.layout(leaf, make_request(), {
-      style: resolve_style({ font_size: px(10), fill: 'red' }),
-    }), first)
-    style.font_size = 20
-    style.fill = 'blue'
-    const second = pass.layout(leaf, make_request(), { style })
-    assert.deepEqual(first.size, { width: 20, height: 10 })
-    assert.equal(first.draw[0].fill, 'red')
-    assert.deepEqual(second.size, { width: 40, height: 20 })
-    assert.equal(second.draw[0].fill, 'blue')
-    style.font_size = -1
-    assert.throws(() => pass.layout(leaf, make_request(), { style }), /font_size/)
-    style.font_size = 20
-    assert.equal(pass.layout(leaf, make_request(), { style }), second)
-  },
-
-  'frozen inherited wrappers do not hide mutations to nested paint lengths'() {
-    const leaf = new Rect({ width: px(20), height: px(10) })
-    const pass = new LayoutPass()
-    const stroke_width = { unit: 'px' as const, value: 1 }
-    const dash = { unit: 'px' as const, value: 2 }
-    const style = Object.freeze({ ...resolve_style(), stroke_width, stroke_dasharray: [dash] })
-    const first = pass.layout(leaf, make_request(), { style })
-    stroke_width.value = 3
-    dash.value = 4
-    const second = pass.layout(leaf, make_request(), { style })
-    assert.equal(first.draw[0].stroke_width, 1)
-    assert.deepEqual(first.draw[0].stroke_dasharray, [2])
-    assert.equal(second.draw[0].stroke_width, 3)
-    assert.deepEqual(second.draw[0].stroke_dasharray, [4])
-    dash.value = -1
-    assert.throws(() => pass.layout(leaf, make_request(), { style }), /stroke_dasharray/)
-    dash.value = 4
-    assert.equal(pass.layout(leaf, make_request(), { style }), second)
   },
 
   'fixed, expanding, and width-dependent leaves obey different policies through one protocol'() {

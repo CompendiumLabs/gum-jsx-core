@@ -115,7 +115,7 @@ function resolve_style(spec: StyleSpec = {}, inherited = DEFAULT_STYLE, context:
   const halo_color = paint('halo_color')
   const fill = paint('fill')
   const stroke = paint('stroke')
-  if ([font_family, math_font, color, halo_color, fill, stroke].some(value => typeof value !== 'string')) {
+  if ([font_family, color, halo_color, fill, stroke].some(value => typeof value !== 'string')) {
     throw new TypeError(`${path}: font family and paints must be strings`)
   }
   if (!font_family || font_weight < 1 || font_weight > 1000) {

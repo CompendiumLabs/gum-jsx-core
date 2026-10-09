@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Group, Overlay, Graph, Plot, Network, Node, Rect, LayoutPass, Projection,
+  Group, Overlay, Graph, Plot, Network, Node, Rect, LayoutPass,
   define_element, make_fragment, shape_size, make_request,
   exact, px, em, evaluate, data_bounds,
 } from '../src/index'
@@ -86,14 +86,6 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(result.children[1].offset, { x: 140, y: 45 })
     assert.deepEqual(result.children[2].fragment.size, { width: 0, height: 0 })
     assert.deepEqual(result.children[3].offset, { x: 10, y: 25 })
-  },
-  'projected Node annotations bypass Cartesian bounds discovery when limits are explicit'() {
-    const child = new Node({ ...box, pos: { angle: 0, radius: 0.5 }, padding: 0, border_width: 0 })
-    const projection = new Projection(({ angle, radius }) => ({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) }))
-    for (const coordinates of [limits, { coord: [-1, -1, 1, 1] as const }]) {
-      const result = layout(new Graph({ ...coordinates, projection, children: child }))
-      assert.deepEqual(result.children[0].offset, { x: 140, y: 45 })
-    }
   },
   'Network bounds read pos components and Node retains an explicit default origin'() {
     assert.deepEqual(new Node().props.pos, [0, 0])

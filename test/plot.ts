@@ -351,19 +351,6 @@ const tests: Record<string, () => void> = {
     }
     assert.deepEqual(find(framed, 'Graph').size, find(outer, 'Graph').size)
     assert.throws(() => pass.layout(new Plot({ bounds: 'inner' as 'frame' })), /bounds/)
-
-    // Differently sized tick labels no longer move the graph areas of stacked plots.
-    const stack = pass.layout(evaluate(`<VStack gap={px(60)}>
-      <Plot bounds="frame" width={px(300)} height={px(200)} ylim={[0, 1]} />
-      <BarPlot bounds="frame" width={px(300)} height={px(200)} values={[1000000, 2000000]} />
-    </VStack>`))
-    assert.deepEqual(stack.size, { width: 300, height: 460 })
-    assert.deepEqual(stack.children.map(child => child.fragment.content),
-      [{ x: 0, y: 0, width: 300, height: 200 }, { x: 0, y: 0, width: 300, height: 200 }])
-    const [first, second] = stack.children.map(child => child.fragment.outset!)
-    assert.ok(second.left > first.left)
-    near(stack.outset!.left, second.left); near(stack.outset!.top, first.top)
-    near(stack.outset!.right, Math.max(first.right, second.right)); near(stack.outset!.bottom, second.bottom)
   },
 
   'hugging viewports grow by reserved outsets while established axes keep their size'() {

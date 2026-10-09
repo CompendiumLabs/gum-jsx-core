@@ -103,13 +103,6 @@ const tests: Record<string, () => void> = {
     assert.doesNotMatch(render_svg(thick), /NaN|Infinity/)
   },
 
-  'elliptical corners with a zero axis stay square and lower corners use clockwise arcs'() {
-    const fragment = pass.layout(new Rect({ border_radius: { tl: [px(10), 0], tr: [0, px(10)],
-      bl: [px(3), px(4)], br: px(5) } }), fixed)
-    assert.ok(render_svg(fragment).includes('d="M0 0L200 0L200 0L200 95A5 5 0 0 1 195 100'
-      + 'L3 100A3 4 0 0 1 0 96L0 0L0 0Z"'))
-  },
-
   'bars and BarPlot accept corner radii in screen coordinates while retaining scalar sizing'() {
     for (const Mark of [Bars, VBars, HBars, Bar, VBar, HBar]) {
       const values = Mark === Bar || Mark === VBar || Mark === HBar

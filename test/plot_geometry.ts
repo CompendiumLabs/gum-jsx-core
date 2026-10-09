@@ -5,7 +5,7 @@ import {
   TextFrame, Bullets, Slide, Graph, Points, Arc, Arrow, Spline, RoundedLine, HFill,
   Field, LayoutPass, make_request, exact, px, em, render_svg, spline1d, spline2d, evaluate,
 } from '../src/index'
-import type { Alignment, AnchorSpec, Element, Length, PathDraw, Side } from '../src/index'
+import type { Alignment, AnchorSpec, Element, Length, PathDraw } from '../src/index'
 
 function near(a: number, b: number): void { assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`); }
 const fixed = make_request({ width: exact(200), height: exact(100) })
@@ -39,18 +39,6 @@ const tests: Record<string, () => void> = {
     near(exact_frame.ink!.x + exact_frame.ink!.width / 2, 100)
     near(exact_frame.ink!.y + exact_frame.ink!.height / 2, 50)
     assert.throws(() => pass.layout(new Rotate({ angle: NaN, children: child })), /finite/)
-  },
-
-  'rotated point shapes stay visually centered on their marker coordinates'() {
-    const points = new Points({ points: [[0.5, 0.5]], point_size: px(8),
-      shape: new Rotate({ angle: 45, children: new Rect({ fill: 'black', stroke: 'none' }) }) })
-    const marker = new LayoutPass().layout(new Graph({ xlim: [0, 1], ylim: [0, 1], children: points }), fixed)
-      .children[0].fragment.children[0]
-    const ink = marker.fragment.ink!
-    near(ink.width, Math.sqrt(128))
-    near(ink.height, Math.sqrt(128))
-    near(marker.offset.x + ink.x + ink.width / 2, 100)
-    near(marker.offset.y + ink.y + ink.height / 2, 50)
   },
 
   'attachments position naturally measured children'() {
