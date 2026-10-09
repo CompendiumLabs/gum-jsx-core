@@ -168,7 +168,7 @@ unoffered axis uses the 16px natural fallback, independently of the other axis.
 Preferred dimensions and min/max limits apply through the shared sizing policy.
 
 `aspect` is a shared Element sizing property: a positive finite width/height
-ratio of the complete allocated box. Text, stacks, Svg, math, and custom elements
+ratio of the complete allocated box. Text, stacks, Page, math, and custom elements
 use the same `prepare_request`/`finish_size` rules as frames and shapes. A known
 axis derives the other before reflow and child allocation; a wholly content-sized
 element grows its measured allocation to the ratio. Contents are not scaled.
@@ -213,7 +213,7 @@ The [fragment schema](./src/engine/fragment.ts) contains only the result for one
 - `overflow`: nonnegative excess content on each side, recorded before clipping.
 - `outset`: optional space reserved outside the allocation by frame-bounded elements, such as
   a `bounds="frame"` plot's labels. It is declared rather than measured from ink, propagates
-  through placements up to a clip, and a hugging `Svg` viewport grows to include it.
+  through placements up to a clip, and a hugging `Page` viewport grows to include it.
 - `draw`: resolved rectangle, ellipse, and path drawing records, including glyph outlines.
 - `children`: child fragments with local offsets and optional affine transforms.
 - `clip`: an optional local rectangle with optional rounded corners, clipping the fragment and its descendants.
@@ -240,9 +240,9 @@ the element constructor.
 JSX creates descriptions without doing layout:
 
 ```jsx
-<Svg width={px(240)} height={px(120)} font-size={px(20)}>
+<Page width={px(240)} height={px(120)} font-size={px(20)}>
   <Rect width={0.75} height={em(3)} fill="#49a895" stroke="none" />
-</Svg>
+</Page>
 ```
 
 Named constants are available both in evaluated JSX and as imports from
@@ -311,14 +311,14 @@ Standalone evaluation functions delegate to a private, core-only evaluator.
 Creating an evaluator or importing an extension package does not change their
 bindings. Evaluators perform no font loading, layout, or rendering.
 
-`Svg` accepts one content element and optional pixel width and height, written as
+`Page` accepts one content element and optional pixel width and height, written as
 `px(800)` or `"800px"`. Each
 omitted axis hugs the child's measured allocation, including any surrounding Boxes.
 A fixed width with an omitted height supports reflowing documents; omitting both supports
 fully natural composition. An exact request can resize either axis. Established
 axes become child percentage references and available-space offers. A hugging
 axis remains indefinite during measurement; its final size is never fed back as
-a percentage basis. An empty unsized Svg is 0×0.
+a percentage basis. An empty unsized Page is 0×0.
 
 On hugging axes, `max_width` and `max_height` first provide layout offers, then
 uniformly scale down the completed figure if it exceeds either maximum. Both
@@ -338,11 +338,11 @@ instead consume layout space and stay entirely inside their border box.
 The same source can answer different allocations without being rebuilt:
 
 ```ts
-import { Rect, Svg, px, em, LayoutPass, make_request, exact, render_svg }
+import { Rect, Page, px, em, LayoutPass, make_request, exact, render_svg }
   from '@gum-jsx/core'
 
 const tile = new Rect({ width: 0.5, height: em(2), stroke_width: px(2) })
-const scene = new Svg({ width: px(160), height: px(80), children: tile })
+const scene = new Page({ width: px(160), height: px(80), children: tile })
 const pass = new LayoutPass()
 const first = pass.layout(scene) // child: 80×32, 2px stroke
 const second = pass.layout(scene, make_request({
@@ -458,14 +458,14 @@ Installing a resource later invalidates any layouts that used the fallback.
 This is a complete 100×100 document, with no manual placement or root dimensions:
 
 ```jsx
-<Svg>
+<Page>
   <Box padding={em(1)} border-width={px(2)}>
     <Square width={px(64)} fill="#63b49d" stroke="none" />
   </Box>
-</Svg>
+</Page>
 ```
 
-Square reports 64×64. Box adds 16px padding and a 2px border on each side; Svg
+Square reports 64×64. Box adds 16px padding and a 2px border on each side; Page
 adopts its 100×100 result. Each element receives one layout query. See the
 [Box](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Box.md) and
 [Frame](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Frame.md) examples for related composition.
@@ -475,7 +475,7 @@ hugs measured content unless its own sizing or an exact request fixes an axis.
 An available width is passed inward for reflow, without scaling glyphs or strokes.
 The shared `layout_content` operation deflates the request, queries the child,
 inflates its answer, selects the final size, and aligns the completed fragment.
-Svg uses the same operation with no insets. Neither reconstructs source elements.
+Page uses the same operation with no insets. Neither reconstructs source elements.
 
 | Prop | Meaning |
 |---|---|
@@ -526,9 +526,9 @@ for border width in a naturally sized tree.
 
 An exact axis, equal min/max limits, or an axis derived from one of these by an
 explicit aspect establishes a content reference before measurement.
-For example, `<Svg width={px(360)}><Box width={1}>…</Box></Svg>`
+For example, `<Page width={px(360)}><Box width={1}>…</Box></Page>`
 gives Box a definite width, then gives its child that width minus padding and
-border. Box and Svg can both hug height. A nonzero fractional child height on
+border. Box and Page can both hug height. A nonzero fractional child height on
 that unresolved axis produces a property-path error, without iteration.
 
 Alignment positions the child's allocated box. Numeric alignment is dimensionless:
@@ -552,7 +552,7 @@ and flexible row children still require explicit flex weights.
 `text_wrap` set the corresponding `Text` props.
 
 ```jsx
-<Svg width={px(400)}>
+<Page width={px(400)}>
   <TextBox width="fill" padding={em(1)}>
     <TextCol gap={0}>
       <HStack>
@@ -565,7 +565,7 @@ and flexible row children still require explicit flex weights.
       </Frame>
     </TextCol>
   </TextBox>
-</Svg>
+</Page>
 ```
 
 Use `align-self="start"` for a compact child inside a fill-aligned container.
@@ -639,7 +639,7 @@ including arrays, JSX fragments, and conditional children. Empty stacks are 0×0
 unless their own sizing or an exact request requires more space.
 
 ```jsx
-<Svg width={px(400)}>
+<Page width={px(400)}>
   <HStack width={1} gap={px(12)} align="center">
     <Text width={px(80)}>Label</Text>
     <Text grow={1} shrink={1}>
@@ -647,27 +647,27 @@ unless their own sizing or an exact request requires more space.
     </Text>
     <Square width={px(40)} fill="#317969" stroke="none" />
   </HStack>
-</Svg>
+</Page>
 ```
 
 The paragraph receives 256px: 400 minus the 80px label, 40px Square, and two
 12px gaps. Its font keeps its size. The row takes the tallest resulting allocation,
-and Svg hugs the row's height. See [HStack](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/HStack.md)
+and Page hugs the row's height. See [HStack](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/HStack.md)
 for a runnable mixed row; try different viewport widths. For plain JSX text,
 outer blank lines and common indentation are removed automatically. Internal
 text newlines still become line breaks; keep each paragraph on one content line
 or use a string expression child when source formatting should not introduce breaks.
 
 Without dimensions or flex weights, stacks hug natural content. This 52×32 row
-needs one query per element, including Svg:
+needs one query per element, including Page:
 
 ```jsx
-<Svg>
+<Page>
   <HStack gap={px(4)}>
     <Square width={px(32)} stroke="none" />
     <Square width={px(16)} stroke="none" />
   </HStack>
-</Svg>
+</Page>
 ```
 
 | Stack prop | Meaning |
@@ -731,7 +731,7 @@ main-axis limit follows the same rule.
 Length bases, preferred sizes, and limits resolve using the child's local font size;
 the gap uses the stack's font size. A fractional gap uses the stack's established
 main-axis length. Those references stay fixed across every probe and allocation.
-For example, `HStack width={1}` under a fixed-width Svg establishes that width.
+For example, `HStack width={1}` under a fixed-width Page establishes that width.
 An unsized HStack may still hug under a finite available offer; that offer alone
 does not establish a reference for nonzero fractional child widths or gaps.
 
@@ -845,7 +845,7 @@ width/height and min/max sizing props. A preferred `aspect` can derive an omitte
 axis or fit within two available axes; exact axes take precedence, as for shapes.
 
 ```jsx
-<Svg width={px(400)}>
+<Page width={px(400)}>
   <Group aspect={2}>
     <Rect fill="#edf4f1" stroke="none" />
     <Circle pos={[0.25, 0.5]} anchor="center" width={px(60)}
@@ -854,7 +854,7 @@ axis or fit within two available axes; exact axes take precedence, as for shapes
       A label in its own region.
     </Text>
   </Group>
-</Svg>
+</Page>
 ```
 
 This SVG is 400×200. The Circle's center is `(100,100)`, its diameter is 60px,
@@ -878,9 +878,9 @@ axes in an anchor object still default to start. Graph, Plot, Network, GeoMap, a
 Overlay decorations follow the same anchor defaults.
 
 The canvas must have both axes supplied by dimensions or finite offers, or one
-axis plus an aspect. For example, `<Svg width={px(200)} height={px(100)}><Group>…`
+axis plus an aspect. For example, `<Page width={px(200)} height={px(100)}><Group>…`
 needs no Group dimensions. A bare `<Group width={px(200)} height={px(100)}>`
-can be hugged by its enclosing Svg. A Group with unresolved axes reports an error
+can be hugged by its enclosing Page. A Group with unresolved axes reports an error
 before querying children, including when empty. Explicit zero is valid. Group
 does not infer a viewport from positioned children or fall back to a shape's 16px
 natural size. Use Box and stacks for composition whose size comes from content.
@@ -921,11 +921,11 @@ Grid supplies shared columns across rows.
 ## Text and fonts
 
 ```jsx
-<Svg width={px(360)} height={px(200)} font-size={px(18)} color="#203746">
+<Page width={px(360)} height={px(200)} font-size={px(18)} color="#203746">
   <Text width={px(320)} line-height={em(1.4)}>
     A paragraph with <Span font-weight={bold}>bold words</Span> and <Span font-style="italic">italic words.</Span>
   </Text>
-</Svg>
+</Page>
 ```
 
 `Text` accepts strings, numbers, nested arrays, conditional children, and inline
@@ -1133,9 +1133,9 @@ limit specifies otherwise. Square and Circle instead prefer 1:1. Any shape can
 specify an explicit preferred `aspect`.
 
 ```jsx
-<Svg width={px(200)} height={px(100)}>
+<Page width={px(200)} height={px(100)}>
   <Rect />
-</Svg>
+</Page>
 ```
 
 Rect fills the full 200×100 viewport; Ellipse does the same with radii 100×50.
@@ -1238,13 +1238,13 @@ differences from the original helpers.
 ## Graphs and plotting
 
 ```jsx
-<Svg width={px(640)} height={px(400)}>
+<Page width={px(640)} height={px(400)}>
   <Plot title="A sampled curve" xlabel="x" ylabel="sin(x)"
     xlim={[0, tau]} ylim={[-1.2, 1.2]} background="white">
     <SymLine fy={sin} xlim={[0, tau]}
       stroke={blue} stroke-width={px(2)} />
   </Plot>
-</Svg>
+</Page>
 ```
 
 Graph infers linear data limits from graphable children. Plot adds axes, a grid,
@@ -1424,7 +1424,7 @@ examples, and current limits.
 ## Networks
 
 ```jsx
-<Svg width={px(480)} height={px(200)}>
+<Page width={px(480)} height={px(200)}>
   <Network>
     <Edge start="input" end="output" stroke={blue} />
     <Node id="input" pos={[0, 0]}>
@@ -1434,7 +1434,7 @@ examples, and current limits.
       Output
     </Node>
   </Network>
-</Svg>
+</Page>
 ```
 
 Any element with an `id` is a node. Node is the conventional one: a compact
@@ -1542,10 +1542,10 @@ speculative layout queries cannot consume IDs. Supply distinct `id_prefix` value
 when embedding several generated documents inline in one page.
 
 `render_element(value, options)` is the host entry point above these stages. A
-bare element is wrapped in `Svg`; an existing `Svg` keeps its layout descriptor
+bare element is wrapped in `Page`; an existing `Page` keeps its layout descriptor
 and props, with `options.defaults` spread beneath them and `options.overrides`
 above them, while `options.wrap` props reach only a generated viewport, such as
-preview bounds an explicit `Svg` should not inherit (undefined entries are
+preview bounds an explicit `Page` should not inherit (undefined entries are
 ignored throughout). For example, `wrap: { max_width: px(640), max_height: px(480) }`
 reflows a bare element within those offers and scales down the whole figure if
 needed to satisfy the maxima. The viewport is laid out under
@@ -1557,6 +1557,47 @@ tagged: `{ kind: 'svg', svg, size, fragment, pass }` for an element, or
 instead. `layout_element` stops at the fragment and `make_viewport` performs only
 the wrapping. Both `render_element` and `layout_element` return the narrower
 element result when the argument is statically an `Element`.
+
+`Page` is the format-independent output boundary, replacing the former `Svg`
+element with the same sizing, background, and clipping behavior. A standalone
+Page or bare element remains sufficient for single-page output.
+
+`Document` is an immutable top-level collection of one or more Page children.
+Construct it with `{ children, title?, ...page_defaults }`, or use JSX:
+
+```jsx
+<Document title="My talk" width={px(960)} height={px(540)} font-size={px(28)}>
+  <Page>
+    <Slide width="fill" height="fill" title="Introduction">
+      <Text>One file, multiple pages.</Text>
+    </Slide>
+  </Page>
+  <Page>
+    <Slide width="fill" height="fill" title="Details">
+      <Text>Every page lays out independently.</Text>
+    </Slide>
+  </Page>
+</Document>
+```
+
+The document snapshots its `pages`, `defaults`, and `title` without layout.
+It is not an Element and cannot participate in a spatial layout; its children
+must be Pages. Arrays, JSX fragments, and conditional children flatten normally.
+Page props override document defaults. Host defaults sit beneath both; host
+overrides and layout requests apply to every page.
+
+`layout_document(document, options)` and `layout_element(document, options)`
+return `{ kind: 'document', pages, title, pass }`, with an ordered fragment array
+and a shared LayoutPass. Export that array through `render_pdf` or `render_pptx`
+with the same font provider. PDF supports different page sizes; PPTX requires
+matching sizes. `render_element(document, options)` instead puts an SVG result
+in each `pages` entry, assigning page-specific definition prefixes so all pages
+can be embedded together. The overloads return `DocumentLayoutResult` and
+`DocumentRenderResult` for a statically typed Document.
+
+`Slide` remains a title/body layout inside Page. Document does not paginate
+overflow or stack its pages. The CLI exports a single-file Document to PDF or
+PPTX; use `--page 2` to select one page for an image or a single-page export.
 
 Both entry points accept `text_mode`, which is applied during layout. A reused
 pass invalidates its cached fragments when the mode changes; omitting the option
@@ -1593,7 +1634,7 @@ inspection (`inspect.ts`). Package consumers should import from `@gum-jsx/core`.
 | Requests, shared sizing, and geometry | [layout.ts](./src/engine/layout.ts), [geometry.ts](./src/engine/geometry.ts), [composition.ts](./src/lib/composition.ts) |
 | Immutable descriptions and element factory | [element.ts](./src/engine/element.ts) |
 | Queries, caches, resources, and diagnostics | [pass.ts](./src/engine/pass.ts) |
-| Box, root Svg, and explicit fitting | [box.ts](./src/elems/box.ts), [Svg](./src/elems/svg.ts) |
+| Box, root Page, and explicit fitting | [box.ts](./src/elems/box.ts), [Page](./src/elems/page.ts) |
 | Stack queries versus pure flex allocation | [stack.ts](./src/elems/stack.ts), [flex.ts](./src/lib/flex.ts) |
 | Shared grid columns and content-sized rows | [grid.ts](./src/elems/grid.ts), [grid tests](./test/grid.ts) |
 | Positioned canvas and direct-child metadata | [group.ts](./src/elems/group.ts) |

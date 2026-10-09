@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Svg, Rect, Text, Fonts, LayoutPass, evaluate, make_viewport, layout_element, render_element,
+  Page, Document, Rect, Text, Fonts, LayoutPass, evaluate, make_viewport, layout_document, layout_element, render_element,
   make_request, exact, px, THEMES,
 } from '../src/index'
 import type { Fragment } from '../src/index'
@@ -18,20 +18,20 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass()
     const rect = new Rect({ width: px(40), height: px(30) })
     const wrapped = make_viewport(rect)
-    assert.ok(wrapped instanceof Svg)
+    assert.ok(wrapped instanceof Page)
     assert.equal(wrapped.props.children, rect)
     assert.deepEqual(pass.layout(wrapped).size, { width: 40, height: 30 })
 
     const custom = evaluate(`
-      class CustomSvg extends Svg {
+      class CustomPage extends Page {
         static layout(props, query) {
-          return Svg.layout({ ...props, background: props.surface }, query)
+          return Page.layout({ ...props, background: props.surface }, query)
         }
       }
-      return <CustomSvg surface="tomato"><Rect width={px(10)} height={px(10)} /></CustomSvg>
+      return <CustomPage surface="tomato"><Rect width={px(10)} height={px(10)} /></CustomPage>
     `)
     const kept = make_viewport(custom, { defaults: { theme: 'dark' } })
-    assert.equal(kept.type.name, 'CustomSvg')
+    assert.equal(kept.type.name, 'CustomPage')
     assert.equal(kept.type.layout, custom.type.layout)
     assert.equal((kept.props as { surface?: string }).surface, 'tomato')
     assert.equal(kept.props.theme, 'dark')
@@ -39,7 +39,7 @@ const tests: Record<string, () => void> = {
   },
 
   'defaults sit under source props and overrides above them, ignoring undefined entries'() {
-    const source = evaluate('<Svg theme="dark"><Rect width={px(10)} height={px(10)} /></Svg>')
+    const source = evaluate('<Page theme="dark"><Rect width={px(10)} height={px(10)} /></Page>')
     const bare = new Rect({ width: px(10), height: px(10) })
     const stroke = (result: ReturnType<typeof layout_element>) => {
       assert.equal(result.kind, 'fragment')
@@ -64,7 +64,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(render_element(new Rect(), { wrap: bounds }).size, { width: 500, height: 300 })
     assert.deepEqual(render_element(wide, { wrap: { max_width: undefined } }).size, { width: 2000, height: 100 })
 
-    const explicit = evaluate('<Svg width={px(800)}><Rect /></Svg>')
+    const explicit = evaluate('<Page width={px(800)}><Rect /></Page>')
     assert.equal(render_element(explicit, { wrap: bounds }).size.width, 800)
     assert.equal(make_viewport(explicit, { wrap: bounds }).props.max_width, undefined)
     assert.equal(render_element(explicit, { defaults: bounds }).size.width, 500)
@@ -125,6 +125,77 @@ const tests: Record<string, () => void> = {
       assert.equal(result.kind === 'value' && result.value, plain)
     }
     assert.equal(pass.stats.layouts, 0)
+  },
+
+  'documents snapshot page order and defaults without laying out content'() {
+    const page = new Page({ children: new Rect({ width: px(20), height: px(10) }) })
+    const children = [page]
+    const width = { value: 80, unit: 'px' } as const
+    const document = new Document({ children, width, title: 'Pages' })
+    children.push(new Page())
+    assert.deepEqual(document.pages, [page])
+    assert.equal(document.pages[0], page)
+    assert.notEqual(document.defaults.width, width)
+    assert.equal(page.props.width, undefined)
+    assert.equal(document.title, 'Pages')
+    assert.throws(() => new Document(), /at least one Page/)
+    assert.throws(() => new Document({ children: new Rect() }), /must be Page/)
+    assert.throws(() => new Document({ children: page, title: 42 as never }), /title must be a string/)
+    const source = evaluate(`<Document>
+      <><Page width="20px" height="10px" />{false}{null}</>
+      {[<Page width="40px" height="30px" />]}
+    </Document>`)
+    assert.ok(source instanceof Document)
+    assert.deepEqual(layout_document(source).pages.map(page => page.size), [
+      { width: 20, height: 10 }, { width: 40, height: 30 },
+    ])
+  },
+
+  'document pages lay out independently with source and host precedence'() {
+    const document = new Document({ width: px(100), theme: 'dark', background: 'red', children: [
+      new Page({ width: undefined, theme: undefined, children: new Rect({ height: px(20) }) }),
+      new Page({ width: px(200), theme: 'light', background: 'blue',
+        children: new Rect({ height: px(40) }) }),
+    ] })
+    const result = layout_element(document, { defaults: { width: px(300), theme: 'light' } })
+    assert.equal(result.kind, 'document')
+    assert.deepEqual(result.pages.map(page => page.size), [
+      { width: 100, height: 20 }, { width: 200, height: 40 },
+    ])
+    assert.deepEqual(result.pages.map(page => page.draw[0]?.fill), ['red', 'blue'])
+    assert.ok(strokes(result.pages[0]).includes(THEMES.dark.foreground))
+    assert.ok(strokes(result.pages[1]).includes(THEMES.light.foreground))
+    const overridden = layout_document(document, { pass: result.pass,
+      overrides: { width: px(50), theme: 'light', background: undefined } })
+    assert.equal(overridden.pass, result.pass)
+    assert.deepEqual(overridden.pages.map(page => page.size), [
+      { width: 50, height: 20 }, { width: 50, height: 40 },
+    ])
+    assert.deepEqual(overridden.pages.map(page => page.draw[0]?.fill), ['red', 'blue'])
+    for (const page of overridden.pages) assert.ok(strokes(page).includes(THEMES.light.foreground))
+    const exact_pages = layout_document(document, { request: make_request({ width: exact(60), height: exact(30) }) })
+    for (const page of exact_pages.pages) assert.deepEqual(page.size, { width: 60, height: 30 })
+  },
+
+  'document SVG pages share resources and keep distinct definition IDs'() {
+    const document = new Document({ title: 'A & B', children: [
+      new Page({ children: new Text({ children: 'First' }) }),
+      new Page({ children: new Text({ children: 'Second' }) }),
+    ] })
+    const fonts = new Fonts()
+    const result = render_element(document, { fonts, text_mode: 'live', id_prefix: 'talk' })
+    assert.equal(result.kind, 'document')
+    assert.equal(result.title, 'A & B')
+    assert.equal(result.pass.resource('fonts'), fonts)
+    result.pages.forEach((page, index) => {
+      assert.equal(page.pass, result.pass)
+      assert.match(page.svg, /<title>A &amp; B<\/title>/)
+      assert.ok(page.svg.includes(`id="talk-page-${index + 1}-clip-`))
+      assert.ok(page.svg.includes(index === 0 ? '>First</text>' : '>Second</text>'))
+    })
+    const overridden = render_element(document, { title: 'Override' })
+    assert.equal(overridden.title, 'Override')
+    for (const page of overridden.pages) assert.match(page.svg, /<title>Override<\/title>/)
   },
 }
 

@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Element, define_element, element_children, Rect, Svg, evaluate,
+  Element, define_element, element_children, Rect, Page, evaluate,
   LayoutPass, LayoutError, UnresolvedLengthError, resolve_style,
   em, px, natural, available, exact, make_request, finish_size,
   make_size, make_point, make_rect, make_fragment, place_fragment,
@@ -47,7 +47,7 @@ const tests: Record<string, () => void> = {
     const data = { values: [1, 2] }
     const leaf = new Probe({ data })
     const children = [leaf]
-    const root = new Svg({ width: px(100), height: px(50), children })
+    const root = new Page({ width: px(100), height: px(50), children })
     data.values.push(3)
     children.length = 0
     assert.equal(calls, 0)
@@ -91,10 +91,10 @@ const tests: Record<string, () => void> = {
       function tile({ color }) { return <Rect width={0.5} height={em(2)} fill={color}/>; }
       const Tile = tile
       const sizes = { width: px(160), height: px(80) }
-      return <Svg {...sizes}>{false}<><Tile color={color}/></></Svg>
+      return <Page {...sizes}>{false}<><Tile color={color}/></></Page>
     `
     const root = evaluate(code, { scope: { color: '#e66b45' } })
-    assert.ok(root instanceof Svg)
+    assert.ok(root instanceof Page)
     assert.ok(root instanceof Element)
     const child = element_children(root.props.children)[0]
     assert.ok(child instanceof Rect)
@@ -112,7 +112,7 @@ const tests: Record<string, () => void> = {
   'one description lays out at two viewports with independent geometry and fixed strokes'() {
     const leaf = new Rect({ width: 0.5, height: em(2), fill: 'coral', stroke_width: px(2) })
     const source = JSON.stringify(leaf)
-    const root = new Svg({ width: px(160), height: px(80), children: leaf })
+    const root = new Page({ width: px(160), height: px(80), children: leaf })
     const pass = new LayoutPass()
     const first = pass.layout(root)
     const second = pass.layout(root, make_request({ width: exact(320), height: exact(120) }))
@@ -139,7 +139,7 @@ const tests: Record<string, () => void> = {
     assert.equal(a.guides.baseline, 8)
     assert.equal(b.guides.baseline, 16)
 
-    const root = new Svg({ width: px(160), height: px(80), font_size: px(12), children: leaf })
+    const root = new Page({ width: px(160), height: px(80), font_size: px(12), children: leaf })
     assert.deepEqual(pass.layout(root).children[0].fragment.size, { width: 48, height: 12 })
     const changed = new Rect({ width: em(2), height: em(1), font_size: em(2), stroke_width: em(0.1) })
     const result = pass.layout(changed, make_request(), { style: resolve_style({ font_size: px(10) }) })
@@ -200,7 +200,7 @@ const tests: Record<string, () => void> = {
     })
     const metric = { width: 12 }
     const pass = new LayoutPass({ metric: { value: metric, version: 1 } })
-    const root = new Svg({ width: px(100), height: px(50), children: new Measured() })
+    const root = new Page({ width: px(100), height: px(50), children: new Measured() })
     const first = pass.layout(root)
     assert.equal(pass.layout(root), first)
     metric.width = 24
@@ -291,8 +291,8 @@ const tests: Record<string, () => void> = {
       q.resource('ready')
       return make_fragment({ size: finish_size(make_size(), q.request, q.sizing) })
     })
-    const root = new Svg({ width: px(100), height: px(50), children: new NeedsResource() })
-    assert.throws(() => pass.layout(root), /Svg\/NeedsResource\[0\].*Missing layout resource/)
+    const root = new Page({ width: px(100), height: px(50), children: new NeedsResource() })
+    assert.throws(() => pass.layout(root), /Page\/NeedsResource\[0\].*Missing layout resource/)
     pass.set_resource('ready', true, 1)
     assert.deepEqual(pass.layout(root).size, { width: 100, height: 50 })
 

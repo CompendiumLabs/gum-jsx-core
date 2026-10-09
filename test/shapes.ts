@@ -1,17 +1,17 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  LayoutPass, Svg, Box, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Line, HLine, VLine, Polyline, Polygon, Path,
+  LayoutPass, Page, Box, Graph, Rect, RoundedRect, Square, Circle, Ellipse, Line, HLine, VLine, Polyline, Polygon, Path,
   px, em, make_request, available, exact, move_to, line_to, quad_to, curve_to, close_path, render_svg,
   data_bounds, infer_coordinates, evaluate,
 } from '../src/index'
 import type { HLineProps, VLineProps, Length, PathDraw } from '../src/index'
 
 const tests: Record<string, () => void> = {
-  'aspectless shapes fill available space from Svg, including through Box insets'() {
+  'aspectless shapes fill available space from Page, including through Box insets'() {
     const pass = new LayoutPass()
     for (const Shape of [Rect, RoundedRect, Ellipse, Line, Polyline, Polygon, Path]) {
-      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }))
+      const root = pass.layout(new Page({ width: px(200), height: px(100), children: new Shape() }))
       const shape = root.children[0].fragment
       assert.deepEqual(shape.size, { width: 200, height: 100 })
       if (shape.draw[0]?.kind === 'rect') {
@@ -23,7 +23,7 @@ const tests: Record<string, () => void> = {
     }
 
     // Box can hug a child that accepts its offer; it need not force an exact size.
-    const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Box({
+    const root = pass.layout(new Page({ width: px(200), height: px(100), children: new Box({
       padding: px(10), border_width: px(2),
       children: new Box({ padding: px(4), children: new Rect({ stroke_width: px(3) }) }),
     }) }))
@@ -54,9 +54,9 @@ const tests: Record<string, () => void> = {
       const zero = pass.layout(new Shape(), make_request({ width: available(0), height: available(100) }))
       assert.deepEqual(zero.size, { width: 0, height: 100 })
       assert.equal(zero.ink, null)
-      assert.deepEqual(pass.layout(new Svg({ width: px(200), children: new Shape() })).size,
+      assert.deepEqual(pass.layout(new Page({ width: px(200), children: new Shape() })).size,
         { width: 200, height: 16 })
-      assert.deepEqual(pass.layout(new Svg({ height: px(100), children: new Shape() })).size,
+      assert.deepEqual(pass.layout(new Page({ height: px(100), children: new Shape() })).size,
         { width: 16, height: 100 })
     }
   },
@@ -64,14 +64,14 @@ const tests: Record<string, () => void> = {
   'intrinsic and explicit shape aspects remain preferred under available offers'() {
     const pass = new LayoutPass()
     for (const Shape of [Square, Circle]) {
-      const root = pass.layout(new Svg({ width: px(200), height: px(100), children: new Shape() }))
+      const root = pass.layout(new Page({ width: px(200), height: px(100), children: new Shape() }))
       assert.deepEqual(root.children[0].fragment.size, { width: 100, height: 100 })
-      assert.deepEqual(pass.layout(new Svg({ children: new Shape({ width: px(64) }) })).size,
+      assert.deepEqual(pass.layout(new Page({ children: new Shape({ width: px(64) }) })).size,
         { width: 64, height: 64 })
     }
     for (const Shape of [Rect, Ellipse]) {
       const shape = new Shape({ aspect: 2 })
-      const root = pass.layout(new Svg({ width: px(200), height: px(80), children: shape }))
+      const root = pass.layout(new Page({ width: px(200), height: px(80), children: shape }))
       assert.deepEqual(root.children[0].fragment.size, { width: 160, height: 80 })
       assert.deepEqual(pass.layout(shape, make_request({ width: exact(200), height: exact(80) })).size,
         { width: 200, height: 80 })

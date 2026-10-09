@@ -27,9 +27,16 @@ if (result.kind === 'svg') {
 ```
 
 `evaluate` supplies the core elements, units, palette, and numeric helpers.
-`render_element` wraps a bare element in `Svg`, lays it out, and returns SVG,
+`render_element` wraps a bare element in `Page`, lays it out, and returns SVG,
 size, fragment, and layout pass. Sources returning ordinary JavaScript values
 produce a `{ kind: 'value', value }` result instead.
+
+`Page` is the format-independent output boundary, replacing `Svg`. For multiple
+pages, use `Document` with explicit Page children, shared page defaults, and an
+optional title. `layout_document` (or `layout_element`) returns
+`{ kind: 'document', pages, title, pass }`, where `pages` contains independently
+laid-out fragments ready for PDF or PPTX export. `render_element` instead returns
+an SVG result for each page. See the [Document reference](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/elements/text/Document.md).
 
 Evaluation executes JavaScript in the host environment. Use trusted source or
 provide a separate isolation boundary in your application.

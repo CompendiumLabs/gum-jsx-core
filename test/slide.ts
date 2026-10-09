@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Svg, Slide, Text, Box, Graph, Plot, LayoutPass, evaluate,
+  Page, Slide, Text, Box, Graph, Plot, LayoutPass, evaluate,
   px, em, exact, make_request, make_insets, render_svg,
 } from '../src/index'
 import type { Fragment } from '../src/index'
@@ -14,10 +14,10 @@ function near(actual: number, expected: number) {
 }
 
 const tests: Record<string, () => void> = {
-  'slides inherit the Svg font and honor local overrides at every viewport size'() {
+  'slides inherit the Page font and honor local overrides at every viewport size'() {
     for (const base of [12, 24]) {
       for (const [font_size, resolved] of [[undefined, base], [em(1.5), base * 1.5], [px(18), 18]] as const) {
-        const source = new Svg({ font_size: px(base), children: new Slide({
+        const source = new Page({ font_size: px(base), children: new Slide({
           ...(font_size === undefined ? {} : { font_size }), title: 'Title', children: 'Body',
         }) })
         const pass = new LayoutPass()

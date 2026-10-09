@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Svg, Box, Frame, Text, Span, VStack, Rect, Dot, Points, ArrowHead, Fill,
+  Page, Box, Frame, Text, Span, VStack, Rect, Dot, Points, ArrowHead, Fill,
   BarPlot, Slide, HMesh, LayoutPass, resolve_style, render_svg, evaluate, px, THEMES,
 } from '../src/index'
 import type { Fragment } from '../src/index'
@@ -20,7 +20,7 @@ function named(fragment: Fragment, name: string): Fragment {
 const tests: Record<string, () => void> = {
   'root themes reach text, shapes, frames, and inline theme scopes'() {
     const fragment = new LayoutPass().layout(evaluate(`
-      <Svg theme="dark">
+      <Page theme="dark">
         <Frame padding={px(8)}>
           <VStack>
             <Text>White <Span theme="light">black</Span> white</Text>
@@ -28,7 +28,7 @@ const tests: Record<string, () => void> = {
             <Text color="tomato">Override</Text>
           </VStack>
         </Frame>
-      </Svg>
+      </Page>
     `))
     assert.equal(fragment.draw.length, 0)
     assert.equal(named(fragment, 'Border').draw[0]?.stroke, THEMES.dark.foreground)
@@ -43,8 +43,8 @@ const tests: Record<string, () => void> = {
   'shared descriptions and prepared text are cached separately for each theme'() {
     const child = new VStack({ children: [new Text({ children: 'Reusable' }), new HMesh()] })
     const pass = new LayoutPass()
-    const dark = new Svg({ theme: 'dark', children: child })
-    const light = new Svg({ theme: 'light', children: child })
+    const dark = new Page({ theme: 'dark', children: child })
+    const light = new Page({ theme: 'light', children: child })
     const a = pass.layout(dark), b = pass.layout(light)
     assert.notEqual(named(a, 'Text'), named(b, 'Text'))
     assert.equal(drawings(named(a, 'Text'))[0]?.fill, THEMES.dark.foreground)
@@ -65,8 +65,8 @@ const tests: Record<string, () => void> = {
   'nested theme scopes re-resolve semantic paints and retain explicit colors'() {
     const source = new VStack({ children: [new Rect(), new Dot()] })
     const pass = new LayoutPass()
-    const fragment = pass.layout(new Svg({ theme: 'dark', color: 'red', stroke: 'navy',
-      children: new Svg({ theme: 'light', children: new VStack({ children: [
+    const fragment = pass.layout(new Page({ theme: 'dark', color: 'red', stroke: 'navy',
+      children: new Page({ theme: 'light', children: new VStack({ children: [
         new Text({ children: 'Explicit ancestor color' }), source,
       ] }) }),
     }))
@@ -82,7 +82,7 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass()
     for (const theme of ['light', 'dark'] as const) {
       const colors = THEMES[theme]
-      const fragment = pass.layout(new Svg({ theme, width: px(480), height: px(320),
+      const fragment = pass.layout(new Page({ theme, width: px(480), height: px(320),
         children: new Slide({ title: 'Results', children: new BarPlot({ values: [1, 3],
           grid: true, border_width: px(1), title: 'Counts', legend: [{ label: 'Series' }],
         }) }),
@@ -97,17 +97,17 @@ const tests: Record<string, () => void> = {
       assert.ok(nodes(named(fragment, 'BarPlot')).some(node => node.name === 'Text'
         && drawings(node).some(draw => draw.fill === colors.text)))
       for (const element of [new Dot(), new Points({ points: [[0, 0]] }), new ArrowHead()]) {
-        const mark = pass.layout(new Svg({ theme, children: element }))
+        const mark = pass.layout(new Page({ theme, children: element }))
         assert.ok(nodes(mark).slice(1).flatMap(node => node.draw).some(draw => draw.fill === colors.foreground))
       }
-      const area = pass.layout(new Svg({ theme, children: new Fill({ points: [[0, 0], [1, 1]] }) }))
+      const area = pass.layout(new Page({ theme, children: new Fill({ points: [[0, 0], [1, 1]] }) }))
       assert.equal(named(area, 'Fill').draw[0]?.fill, colors.accent)
     }
   },
 
   'explicit component paints and transparent viewports override theme defaults'() {
     const pass = new LayoutPass()
-    const fragment = pass.layout(new Svg({ theme: 'dark', background: 'none',
+    const fragment = pass.layout(new Page({ theme: 'dark', background: 'none',
       children: new BarPlot({ width: px(300), height: px(200), values: [1, 2],
         color: 'red', stroke: 'green', fill: 'orange', grid: true, grid_style: { stroke: 'purple' },
         border_width: px(1), border_color: 'pink', background: 'navy',
@@ -123,9 +123,9 @@ const tests: Record<string, () => void> = {
     assert.equal(named(fragment, 'BarPlot').draw[0]?.fill, 'navy')
     assert.equal(named(fragment, 'Legend').draw[0]?.fill, 'beige')
     assert.equal(named(named(fragment, 'Legend'), 'Border').draw[0]?.stroke, 'brown')
-    assert.equal(pass.layout(new Svg()).draw.length, 0)
-    assert.equal(pass.layout(new Svg({ theme: 'dark', background: 'tomato' })).draw[0]?.fill, 'tomato')
-    const plain = pass.layout(new Svg({ theme: 'dark', children: new Text({ children: 'Transparent' }) }))
+    assert.equal(pass.layout(new Page()).draw.length, 0)
+    assert.equal(pass.layout(new Page({ theme: 'dark', background: 'tomato' })).draw[0]?.fill, 'tomato')
+    const plain = pass.layout(new Page({ theme: 'dark', children: new Text({ children: 'Transparent' }) }))
     assert.equal(plain.draw.length, 0)
     assert.match(render_svg(plain, { background: 'navy' }), /<rect\b[^>]*fill="navy"/)
     assert.equal(plain.draw.length, 0)
@@ -133,10 +133,10 @@ const tests: Record<string, () => void> = {
 
   'invalid themes and semantic colors fail with the element path'() {
     const pass = new LayoutPass()
-    assert.throws(() => pass.layout(evaluate('<Svg theme="sepia" />')), /Svg: theme must be light or dark/)
-    assert.throws(() => pass.layout(new Svg({ children: new Rect({ fill: 'theme:missing' }) })),
-      /Svg\/Rect\[0\]: Unknown theme color/)
-    assert.equal(pass.layout(new Svg({ theme: 'dark' })).draw.length, 0)
+    assert.throws(() => pass.layout(evaluate('<Page theme="sepia" />')), /Page: theme must be light or dark/)
+    assert.throws(() => pass.layout(new Page({ children: new Rect({ fill: 'theme:missing' }) })),
+      /Page\/Rect\[0\]: Unknown theme color/)
+    assert.equal(pass.layout(new Page({ theme: 'dark' })).draw.length, 0)
   },
 }
 

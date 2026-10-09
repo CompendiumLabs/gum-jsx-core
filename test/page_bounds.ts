@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Svg, Box, Rect, Text, LayoutPass, define_element, make_fragment, make_size, make_rect,
+  Page, Box, Rect, Text, LayoutPass, define_element, make_fragment, make_size, make_rect,
   make_insets, draw_rect, render_element, render_svg, px, em, make_request, available, exact,
 } from '../src/index'
 import { Wrapping } from './fixtures/leaves'
@@ -14,7 +14,7 @@ const tests: Record<string, () => void> = {
       [{ max_width: px(200), max_height: px(100) }, { width: 50, height: 100 }, 0.125],
       [{ max_width: px(100), max_height: px(400) }, { width: 100, height: 200 }, 0.25],
     ] as const) {
-      const source = new Svg({ ...bounds, children: child, background: 'white' })
+      const source = new Page({ ...bounds, children: child, background: 'white' })
       const before = JSON.stringify(source), pass = new LayoutPass()
       const fragment = pass.layout(source)
       assert.deepEqual(fragment.size, size)
@@ -101,7 +101,7 @@ const tests: Record<string, () => void> = {
     assert.deepEqual(zero.size, make_size())
     assert.equal(zero.fragment.ink, null)
     assert.doesNotMatch(zero.svg, /NaN|Infinity/)
-    assert.deepEqual(new LayoutPass().layout(new Svg({ max_width: px(100), max_height: px(100) })).size, make_size())
+    assert.deepEqual(new LayoutPass().layout(new Page({ max_width: px(100), max_height: px(100) })).size, make_size())
     const minimum = render_element(child, { wrap: { min_width: px(100), max_height: px(50) } })
     assert.deepEqual(minimum.size, { width: 100, height: 50 })
     assert.deepEqual(minimum.fragment.children[0].transform, [0.25, 0, 0, 0.25, 0, 0])

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Group, Svg, Box, Rect, Circle, Text, Fonts, LayoutPass, define_element, evaluate,
+  Group, Page, Box, Rect, Circle, Text, Fonts, LayoutPass, define_element, evaluate,
   px, em, available, exact, make_request, make_size, make_fragment, finish_size, render_svg,
 } from '../src/index'
 import type { FontProvider } from '../src/index'
@@ -10,16 +10,16 @@ function near(actual: number, expected: number): void {
 }
 
 const tests: Record<string, () => void> = {
-  'Group adopts a viewport before measuring children and Svg hugs an explicit canvas'() {
+  'Group adopts a viewport before measuring children and Page hugs an explicit canvas'() {
     const pass = new LayoutPass()
-    const root = pass.layout(evaluate(`<Svg width={px(200)} height={px(100)}>
+    const root = pass.layout(evaluate(`<Page width={px(200)} height={px(100)}>
       <Group><Rect fill="teal" stroke="none"/></Group>
-    </Svg>`))
+    </Page>`))
     const group = root.children[0].fragment, rect = group.children[0].fragment
     assert.deepEqual(group.size, { width: 200, height: 100 })
     assert.deepEqual(rect.size, group.size)
     assert.deepEqual(pass.stats, { queries: 3, layouts: 3, hits: 0 })
-    const natural = pass.layout(new Svg({ children: new Group({ width: px(200), height: px(100) }) }))
+    const natural = pass.layout(new Page({ children: new Group({ width: px(200), height: px(100) }) }))
     assert.deepEqual(natural.size, group.size)
     assert.equal(natural.ink, null)
     assert.ok(!render_svg(root).includes('translate(0 0)'))
@@ -40,10 +40,10 @@ const tests: Record<string, () => void> = {
   },
 
   'canvas aspect derives one axis while exact dimensions win and pixel strokes stay fixed'() {
-    const source = evaluate(`<Svg width={px(400)}><Group aspect={2}>
+    const source = evaluate(`<Page width={px(400)}><Group aspect={2}>
       <Circle pos={[0.25, 0.5]} anchor="center" width={em(2)} stroke_width={px(2)}/>
       <Rect pos={[0.5, 0.25]} width={0.5} height={0.5} stroke_width={px(2)}/>
-    </Group></Svg>`)
+    </Group></Page>`)
     const before = JSON.stringify(source), pass = new LayoutPass()
     const first = pass.layout(source)
     const second = pass.layout(source, make_request({ width: exact(640) }))

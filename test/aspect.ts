@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  Box, Frame, Text, Span, HStack, VStack, Svg, Spacer, Overlay, Attach,
+  Box, Frame, Text, Span, HStack, VStack, Page, Spacer, Overlay, Attach,
   Rotate, TransformBox, Rect, Square, Circle, Graph, Group, Slide, TitleFrame,
   LayoutPass, define_element, make_fragment, make_size, make_request,
   exact, available, px, resolve_sizing, prepare_request, finish_size, render_svg,
@@ -51,7 +51,7 @@ const tests: Record<string, () => void> = {
   'elements share explicit aspect sizing without per-type opt-in'() {
     const pass = new LayoutPass()
     const leaf = new Fixed({ content_width: px(30), content_height: px(10) })
-    for (const Container of [Box, Frame, HStack, VStack, Svg, Overlay, Attach,
+    for (const Container of [Box, Frame, HStack, VStack, Page, Overlay, Attach,
       Rotate, TransformBox, Group, Graph, Slide, TitleFrame]) {
       const fragment = pass.layout(new Container({ width: px(200), aspect: 2, children: leaf }))
       assert.deepEqual(fragment.size, { width: 200, height: 100 }, Container.name)

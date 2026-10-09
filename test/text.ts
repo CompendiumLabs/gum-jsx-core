@@ -5,7 +5,7 @@ import { parse } from 'opentype.js'
 import { create } from 'fontkit'
 import type { Font } from 'fontkit'
 import {
-  Fonts, EMOJI_FAMILY, LayoutPass, Text, Span, Svg, Rect, em, px, make_request, available, exact,
+  Fonts, EMOJI_FAMILY, LayoutPass, Text, Span, Page, Rect, em, px, make_request, available, exact,
   resolve_style, render_svg, make_fragment, make_size, place_fragment, make_point, evaluate,
 } from '../src/index'
 import type { Drawing, FontProvider, Fragment, TextProps } from '../src/index'
@@ -37,8 +37,8 @@ const tests: Record<string, () => void> = {
       assert.equal(resolve_style({}, style).font_weight, weight)
       assert.equal(resolve_style({ font_weight: 'normal' }, style).font_weight, 400)
       const children = new Text({ children: ['Inherited ', new Span({ font_weight: 'bold', children: 'bold' })] })
-      const named = pass.layout(new Svg({ font_weight: name, children }))
-      const numeric = pass.layout(new Svg({ font_weight: weight,
+      const named = pass.layout(new Page({ font_weight: name, children }))
+      const numeric = pass.layout(new Page({ font_weight: weight,
         children: new Text({ children: ['Inherited ', new Span({ font_weight: 700, children: 'bold' })] }) }))
       assert.equal(render_svg(named), render_svg(numeric))
     }
@@ -208,7 +208,7 @@ const tests: Record<string, () => void> = {
     }
     assert.equal(fonts.resolve('IBM Plex Sans', 600, 'normal'), fonts.resolve('IBM Plex Sans', 700, 'normal'))
     const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
-    const root = new Svg({ width: px(100), height: px(40), children: new Text({ children: 'iii' }) })
+    const root = new Page({ width: px(100), height: px(40), children: new Text({ children: 'iii' }) })
     const before = pass.layout(root), svg = render_svg(before)
     // Parsing a sliced byte buffer must respect its offset and length.
     const buffer = new Uint8Array(mono.length + 14); buffer.set(mono, 7)

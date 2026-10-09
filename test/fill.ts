@@ -147,7 +147,7 @@ const tests: Record<string, () => void> = {
   },
 
   'one explicit document width carries through nested content and alignment selects compact children'() {
-    const source = evaluate(`<Svg width={px(400)}>
+    const source = evaluate(`<Page width={px(400)}>
       <TextBox width="fill" padding={px(20)}><TextCol gap={0}>
         <HStack><Text>Left</Text><Spacer /><Text>Right</Text></HStack>
         <Frame><Text>Content</Text></Frame>
@@ -156,7 +156,7 @@ const tests: Record<string, () => void> = {
           <Frame align-self="start"><Text>Small</Text></Frame>
         </TextCol></TextFrame>
       </TextCol></TextBox>
-    </Svg>`)
+    </Page>`)
     const pass = new LayoutPass(), svg = pass.layout(source)
     const panel = svg.children[0].fragment, column = panel.children[0].fragment
     assert.equal(panel.size.width, 400)

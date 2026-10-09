@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  HStack, VStack, Spacer, Box, Svg, Rect, Square, Text, Fonts, LayoutPass,
+  HStack, VStack, Spacer, Box, Page, Rect, Square, Text, Fonts, LayoutPass,
   define_element, evaluate, px, em, make_request, exact, available,
   make_fragment, make_size, finish_size,
 } from '../src/index'
@@ -16,9 +16,9 @@ const paragraph = 'A growing paragraph shares its row with a fixed label and a f
 
 const tests: Record<string, () => void> = {
   'natural rows and columns hug their children with one query per element'() {
-    const source = evaluate(`<Svg><HStack gap={px(4)}>
+    const source = evaluate(`<Page><HStack gap={px(4)}>
       <Square width={px(32)} stroke="none"/>{false}<><Square width={px(16)} stroke="none"/></>
-    </HStack></Svg>`)
+    </HStack></Page>`)
     const before = JSON.stringify(source), pass = new LayoutPass()
     const root = pass.layout(source), row = root.children[0].fragment
     assert.deepEqual(root.size, { width: 52, height: 32 })
@@ -136,7 +136,7 @@ const tests: Record<string, () => void> = {
       return { ...font, shape(text) { shapes++; return font.shape(text); } }
     } }
     const pass = new LayoutPass({ fonts: { value: provider, version: 0 } })
-    const source = new Svg({ width: px(500), children: new HStack({ width: 1, gap: px(10),
+    const source = new Page({ width: px(500), children: new HStack({ width: 1, gap: px(10),
       align: 'center', font_size: px(18), children: [
         new Text({ children: 'Label', width: px(70) }),
         new Text({ children: paragraph, grow: 1, shrink: 1 }),

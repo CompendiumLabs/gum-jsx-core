@@ -10,16 +10,16 @@ import { theme_color } from '../engine/theme'
 import { normalize_length } from '../engine/units'
 import type { UnitLength, LengthString } from '../engine/units'
 
-type SvgProps = ElementProps & Readonly<{ width?: UnitLength | LengthString; height?: UnitLength | LengthString; background?: string }>
+type PageProps = ElementProps & Readonly<{ width?: UnitLength | LengthString; height?: UnitLength | LengthString; background?: string }>
 
-class Svg extends Element<SvgProps> {
-  static layout(props: SvgProps, query: LayoutQuery) {
+class Page extends Element<PageProps> {
+  static layout(props: PageProps, query: LayoutQuery) {
     // Omitted axes hug content. Specified viewport lengths remain explicit pixels;
     // a tight resize changes layout rather than magnifying a completed drawing.
     for (const axis of ['width', 'height'] as const) {
       const length = props[axis]
       if (length !== undefined && normalize_length(length, `${query.measure.path}.${axis}`).unit !== 'px') {
-        throw new TypeError(`Svg.${axis} requires pixels: px() or a "px" string`)
+        throw new TypeError(`Page.${axis} requires pixels: px() or a "px" string`)
       }
     }
     const child = content_child(props.children)
@@ -58,7 +58,7 @@ class Svg extends Element<SvgProps> {
   }
 }
 
-export { Svg }
-export type { SvgProps }
+export { Page }
+export type { PageProps }
 export { Rect } from './shapes'
 export type { RectProps } from './shapes'

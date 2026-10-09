@@ -120,7 +120,7 @@ const tests: Record<string, () => void> = {
       const r = { x: 10, y: 10 }
       assert.deepEqual(radius_of(fragment), typeof radius === 'object' && 't' in radius ? corners({ tl: r, tr: r }) : r)
     }
-    const source = evaluate('<Svg width={px(200)} height={px(100)}><BarPlot values={[1, 2]} border-radius={{t: px(4)}} /></Svg>')
+    const source = evaluate('<Page width={px(200)} height={px(100)}><BarPlot values={[1, 2]} border-radius={{t: px(4)}} /></Page>')
     assert.match(render_svg(pass.layout(source)), /A4 4 0 0 1/)
   },
 

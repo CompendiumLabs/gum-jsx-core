@@ -142,8 +142,8 @@ const tests: Record<string, () => void> = {
   'formatting spaces do not become layout children in element containers'() {
     const pass = new LayoutPass()
     for (const code of [
-      '<Svg> <HStack> <Rect width={px(10)} height={px(10)}/> <Rect width={px(10)} height={px(10)}/> </HStack> </Svg>',
-      '<Svg>\n  <HStack>\n    <Rect width={px(10)} height={px(10)}/>\n    <Rect width={px(10)} height={px(10)}/>\n  </HStack>\n</Svg>',
+      '<Page> <HStack> <Rect width={px(10)} height={px(10)}/> <Rect width={px(10)} height={px(10)}/> </HStack> </Page>',
+      '<Page>\n  <HStack>\n    <Rect width={px(10)} height={px(10)}/>\n    <Rect width={px(10)} height={px(10)}/>\n  </HStack>\n</Page>',
     ]) {
       const root = evaluate(code)
       const [stack] = element_children(root.props.children)

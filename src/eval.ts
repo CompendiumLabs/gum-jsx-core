@@ -3,7 +3,8 @@ import { freeze_owned } from './lib/immutable'
 import { runJSX, runPrelude } from './lib/parse'
 import { Element, define_element, define_component, element_children } from './engine/element'
 import { prefix_split, prefix_join } from './lib/props'
-import { Svg } from './elems/svg'
+import { Page } from './elems/page'
+import { Document } from './document'
 import { PngImage } from './elems/image'
 import { Rect, RoundedRect, Square, Circle, Ellipse, Path, Dot } from './elems/shapes'
 import { Box, Frame } from './elems/box'
@@ -51,7 +52,7 @@ function evaluation_scope({ scope, seed }: EvaluateOptions, defaults: EvaluateOp
     ...constants, ...math, ...arrays, ...vectors, interp, palette, RNG, THEMES, theme_color,
     setSeed: (seed: number) => { rng.setSeed(seed); },
     random: rng.random, uniform: rng.uniform, normal: rng.normal, integer: rng.integer,
-    Svg, PngImage, Box, Frame, HStack, VStack, Spacer, Grid, Group, Rect, RoundedRect, Square, Circle, Ellipse,
+    Document, Page, PngImage, Box, Frame, HStack, VStack, Spacer, Grid, Group, Rect, RoundedRect, Square, Circle, Ellipse,
     Path, Dot, Text, Span,
     Graph, Plot, BarPlot, Legend, LegendItem, OuterLabel, Overlay, TransformBox, Rotate, Attach, Node, Edge, Network,
     Line, HLine, VLine, UnitLine, Polygon, Triangle, Polyline, Spline, RoundedLine,

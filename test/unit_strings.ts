@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Box, Polyline, Graph, LayoutPass, Rect, Svg, UnresolvedLengthError,
+  Box, Polyline, Graph, LayoutPass, Rect, Page, UnresolvedLengthError,
   available, em, evaluate, make_measure, make_request, measure_length, normalize_length,
   prepare_request, px, render_element, render_svg, resolve_font_size, resolve_insets, resolve_length,
   resolve_line_height, resolve_sizing,
@@ -74,7 +74,7 @@ const tests: Record<string, () => void> = {
 
   'quoted JSX lengths render identically across root fonts, flex layout, rounded corners, and paint'() {
     const strings = evaluate(`
-      <Svg width="800px" height="600px" font-size="24px">
+      <Page width="800px" height="600px" font-size="24px">
         <Box width="50%" padding={["1em", "12px"]} border-width="0.25em" border-radius={{ t: "0.5em", b: "8px" }}>
           <HStack width="100%" gap="8px">
             <Rect basis="35%" height="60px" border-radius="1em" stroke-width="3px" stroke-dasharray={["8px", "0.5em"]} />
@@ -83,10 +83,10 @@ const tests: Record<string, () => void> = {
             </Text>
           </HStack>
         </Box>
-      </Svg>
+      </Page>
     `)
     const helpers = evaluate(`
-      <Svg width={px(800)} height={px(600)} font-size={px(24)}>
+      <Page width={px(800)} height={px(600)} font-size={px(24)}>
         <Box width={0.5} padding={[em(1), px(12)]} border-width={em(0.25)} border-radius={{ t: em(0.5), b: px(8) }}>
           <HStack width={1} gap={px(8)}>
             <Rect basis={0.35} height={px(60)} border-radius={em(1)} stroke-width={px(3)} stroke-dasharray={[px(8), em(0.5)]} />
@@ -95,24 +95,24 @@ const tests: Record<string, () => void> = {
             </Text>
           </HStack>
         </Box>
-      </Svg>
+      </Page>
     `)
     const pass = new LayoutPass()
     assert.equal(render_svg(pass.layout(strings)), render_svg(pass.layout(helpers)))
   },
 
   'maximum-only roots accept string lengths and keep fill distinct from lengths'() {
-    const actual = new Svg({ max_width: '320px', max_height: '200px', font_size: '24px',
+    const actual = new Page({ max_width: '320px', max_height: '200px', font_size: '24px',
       children: new Box({ padding: '1em', children: new Rect({ width: '4em', height: '2em' }) }) })
-    const expected = new Svg({ max_width: px(320), max_height: px(200), font_size: px(24),
+    const expected = new Page({ max_width: px(320), max_height: px(200), font_size: px(24),
       children: new Box({ padding: em(1), children: new Rect({ width: em(4), height: em(2) }) }) })
     assert.equal(render_element(actual).svg, render_element(expected).svg)
     const request = make_request({ width: available(300) })
     const sizing = resolve_sizing({ width: 'fill', min_width: '10px', max_width: '50%' },
       { reference: { width: 400 } }, request)
     assert.deepEqual(prepare_request(request, sizing).width, { kind: 'exact', value: 200 })
-    assert.throws(() => new LayoutPass().layout(new Svg({ width: '2em' })), /requires pixels/)
-    assert.equal(new LayoutPass().layout(new Svg({ width: '0', height: '0' })).size.width, 0)
+    assert.throws(() => new LayoutPass().layout(new Page({ width: '2em' })), /requires pixels/)
+    assert.equal(new LayoutPass().layout(new Page({ width: '0', height: '0' })).size.width, 0)
   },
 
   'graph numbers retain data mapping while strings resolve in local length coordinates'() {
@@ -138,7 +138,7 @@ console.log(`${Object.keys(tests).length} unit string checks passed.`)
 if (false) {
   const length: LengthString = '1.5em'
   new Box({ padding: [length, '5%'], width: 'fill' })
-  new Svg({ width: '800px', height: '600px', font_size: '24px' })
+  new Page({ width: '800px', height: '600px', font_size: '24px' })
   // @ts-expect-error Nonzero unitless strings have no implied unit.
   const missing: Length = '12'
   // @ts-expect-error Unsupported units are rejected for host callers too.

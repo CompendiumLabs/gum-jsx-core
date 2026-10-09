@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Graph, Plot, BarPlot, HBars, Svg, Box, Bars, Polyline, Points, SymLine, HAxis, VAxis,
+  Graph, Plot, BarPlot, HBars, Page, Box, Bars, Polyline, Points, SymLine, HAxis, VAxis,
   HScale, HLabels, HLabel, HMesh, VMesh, Mesh2D, Text, Fonts,
   LayoutPass, define_element, make_fragment, shape_size, make_request, exact, px,
   infer_coordinates, map_point, unmap_point, linear_ticks, render_svg, evaluate,
@@ -53,8 +53,8 @@ const tests: Record<string, () => void> = {
           pass.layout(new Container({ ...props, padding: canonical }), fixed), Container.name)
       }
     }
-    const jsx = evaluate('<Svg><BarPlot values={[10, 20]} padding={[0.2, 0.4]} /></Svg>')
-    const named = evaluate('<Svg><BarPlot values={[10, 20]} padding={{h: 0.2, v: 0.4}} /></Svg>')
+    const jsx = evaluate('<Page><BarPlot values={[10, 20]} padding={[0.2, 0.4]} /></Page>')
+    const named = evaluate('<Page><BarPlot values={[10, 20]} padding={{h: 0.2, v: 0.4}} /></Page>')
     assert.deepEqual(pass.layout(jsx), pass.layout(named))
   },
 
@@ -327,7 +327,7 @@ const tests: Record<string, () => void> = {
       const svg = render_svg(fragment)
       assert.ok(!/NaN|Infinity/.test(svg))
     }
-    const root = new LayoutPass().layout(evaluate('<Svg width={px(680)} height={px(420)}><Plot/></Svg>'))
+    const root = new LayoutPass().layout(evaluate('<Page width={px(680)} height={px(420)}><Plot/></Page>'))
     assert.deepEqual(root.children[0].fragment.size, root.size)
     assert.deepEqual(new LayoutPass().layout(new Graph()).size, { width: 480, height: 320 })
   },
@@ -356,21 +356,21 @@ const tests: Record<string, () => void> = {
   'hugging viewports grow by reserved outsets while established axes keep their size'() {
     const plot = new Plot({ bounds: 'frame', width: px(300), height: px(200), title: 'Title' })
     const pass = new LayoutPass(), { outset } = pass.layout(plot)
-    const root = pass.layout(new Svg({ children: plot }))
+    const root = pass.layout(new Page({ children: plot }))
     assert.deepEqual(root.size, { width: 300 + outset!.left + outset!.right, height: 200 + outset!.top + outset!.bottom })
     assert.deepEqual(root.children[0].offset, { x: outset!.left, y: outset!.top })
     assert.equal(root.outset, undefined)
     const ink = root.children[0].fragment.ink!
     assert.ok(ink.x + outset!.left >= 0 && ink.y + outset!.top >= 0)
     // Padding absorbs part of the outset; the viewport adds only the remainder.
-    const padded = pass.layout(new Svg({ children: new Box({ padding: px(10), children: plot }) }))
+    const padded = pass.layout(new Page({ children: new Box({ padding: px(10), children: plot }) }))
     assert.deepEqual(padded.size, { width: root.size.width, height: root.size.height })
     assert.equal(pass.layout(new Box({ padding: px(1000), children: plot })).outset, undefined)
     assert.equal(pass.layout(new Box({ clip: true, children: plot })).outset, undefined)
-    const wide = pass.layout(new Svg({ width: px(300), children: plot }))
+    const wide = pass.layout(new Page({ width: px(300), children: plot }))
     assert.equal(wide.size.width, 300)
     assert.deepEqual(wide.children[0].offset, { x: 0, y: outset!.top })
-    const exact_root = pass.layout(new Svg({ children: plot }), make_request({ width: exact(300), height: exact(200) }))
+    const exact_root = pass.layout(new Page({ children: plot }), make_request({ width: exact(300), height: exact(200) }))
     assert.deepEqual(exact_root.size, { width: 300, height: 200 })
     assert.deepEqual(exact_root.children[0].offset, { x: 0, y: 0 })
   },

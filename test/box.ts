@@ -1,7 +1,7 @@
 import { FREEZE_ENABLED } from '../src/lib/immutable'
 import assert from 'node:assert/strict'
 import {
-  Box, Frame, Svg, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
+  Box, Frame, Page, Square, Rect, Text, TextBox, TextFrame, TitleBox, TitleFrame,
   TextFigure, Legend, Slide, Fonts, LayoutPass, evaluate,
   px, em, make_request, exact, available, make_size, make_insets,
   render_svg, inspect_fragment,
@@ -14,10 +14,10 @@ function near(actual: number, expected: number): void {
 }
 
 const tests: Record<string, () => void> = {
-  'Svg and Box hug a Square with one query per element'() {
-    const source = evaluate(`<Svg><Box padding={em(1)} border_width={px(2)}>
+  'Page and Box hug a Square with one query per element'() {
+    const source = evaluate(`<Page><Box padding={em(1)} border_width={px(2)}>
       <Square width={px(64)} fill="teal" stroke="none"/>
-    </Box></Svg>`)
+    </Box></Page>`)
     const before = JSON.stringify(source)
     const pass = new LayoutPass()
     const root = pass.layout(source)
@@ -34,7 +34,7 @@ const tests: Record<string, () => void> = {
     assert.equal(JSON.stringify(source), before)
     assert.match(render_svg(root), /width="100" height="100" viewBox="0 0 100 100"/)
     assert.match(inspect_fragment(root), /content=18,18,64,64/)
-    assert.deepEqual(pass.layout(new Svg({ children: new Box({ children: new Square() }) })).size,
+    assert.deepEqual(pass.layout(new Page({ children: new Box({ children: new Square() }) })).size,
       { width: 16, height: 16 })
   },
 
@@ -48,7 +48,7 @@ const tests: Record<string, () => void> = {
     const box = new Box({
       padding: { left: px(7), top: px(8), right: px(9), bottom: px(10) }, children: inner,
     })
-    const root = pass.layout(new Svg({ children: box }))
+    const root = pass.layout(new Page({ children: box }))
     const wrapper = root.children[0].fragment, frame = wrapper.children[0]
     assert.deepEqual(root.size, { width: 68, height: 52 })
     assert.equal(wrapper.name, 'Box')
@@ -92,7 +92,7 @@ const tests: Record<string, () => void> = {
     const pass = new LayoutPass()
     for (const padding of ['{ h: px(3), v: px(4) }', '[px(3), px(4)]',
       '{ t: px(4), b: px(4), l: px(3), r: px(3) }', '[px(4), px(4), px(3), px(3)]']) {
-      const source = evaluate(`<Svg><Box padding={${padding}}><Square width={px(20)} /></Box></Svg>`)
+      const source = evaluate(`<Page><Box padding={${padding}}><Square width={px(20)} /></Box></Page>`)
       assert.deepEqual(pass.layout(source).size, { width: 26, height: 28 })
     }
     const length = { value: 3, unit: 'px' as const }
@@ -201,7 +201,7 @@ const tests: Record<string, () => void> = {
 
   'each box resolves em padding with its own font before measuring children'() {
     const pass = new LayoutPass()
-    const source = new Svg({ font_size: px(10), children: new Box({
+    const source = new Page({ font_size: px(10), children: new Box({
       font_size: em(2), padding: em(0.5), border_width: em(0.1),
       children: new Box({ font_size: em(0.5), padding: em(0.5),
         children: new Square({ width: em(2) }),
@@ -218,7 +218,7 @@ const tests: Record<string, () => void> = {
 
   'nested boxes establish their own percentage references after padding'() {
     const pass = new LayoutPass()
-    const source = new Svg({ width: px(200), height: px(100), children: new Box({
+    const source = new Page({ width: px(200), height: px(100), children: new Box({
       width: 1, height: 1, padding: px(10), children: new Box({
         width: 1, height: 1, padding: 0.1,
         children: new Rect({ width: 0.5, height: px(20), stroke: 'none' }),
@@ -245,7 +245,7 @@ const tests: Record<string, () => void> = {
     const hugging = new Box({ children: new Rect({ width: 0.5 }) })
     assert.throws(() => pass.layout(hugging, make_request({ width: available(200) }),
       { reference: { width: 200 } }), /Box\/Rect\[0\]\.width.*definite fraction reference/)
-    assert.throws(() => pass.layout(new Svg({ children: new Box({ padding: 0.1 }) })),
+    assert.throws(() => pass.layout(new Page({ children: new Box({ padding: 0.1 }) })),
       /Box\[0\]\.padding.left.*definite fraction reference/)
     assert.throws(() => pass.layout(new Box({ width: px(100), children: new Rect({ height: 0.5 }) })),
       /Rect\[0\]\.height.*definite fraction reference/)
@@ -278,7 +278,7 @@ const tests: Record<string, () => void> = {
     near(narrow.guides.baseline!, 14 + b.guides.baseline!)
     assert.equal(JSON.stringify(text), source)
     assert.deepEqual(pass.stats, { queries: 4, layouts: 4, hits: 0 })
-    const root = pass.layout(new Svg({ width: px(180), children: box }))
+    const root = pass.layout(new Page({ width: px(180), children: box }))
     near(root.size.height, narrow.size.height)
     assert.equal(root.size.width, 180)
   },

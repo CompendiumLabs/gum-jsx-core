@@ -14,8 +14,8 @@ import { probes } from './fixtures/contracts'
 const tests: Record<string, () => void> = {
   'measurement contexts keep local references independent and derive immutable font and path changes'() {
     const reference = { width: 200, height: 0 }
-    const parent = make_measure({ font_size: 20, reference, path: 'Svg/Box[0]' })
-    const child = make_measure(parent, { font_size: 10, path: 'Svg/Box[0]/Text[0]' })
+    const parent = make_measure({ font_size: 20, reference, path: 'Page/Box[0]' })
+    const child = make_measure(parent, { font_size: 10, path: 'Page/Box[0]/Text[0]' })
     reference.width = 400
     assert.ok((Object.isFrozen(parent) === FREEZE_ENABLED) && (Object.isFrozen(parent.reference) === FREEZE_ENABLED))
     assert.ok(!Object.isFrozen(reference))
@@ -25,7 +25,7 @@ const tests: Record<string, () => void> = {
     assert.equal(resolve_length(0.5, child, child.reference.height), 0)
     assert.throws(() => resolve_length(0.5, child, undefined, 'gap'), error => {
       assert.ok(error instanceof UnresolvedLengthError)
-      assert.equal(error.path, 'Svg/Box[0]/Text[0].gap')
+      assert.equal(error.path, 'Page/Box[0]/Text[0].gap')
       return true
     })
     assert.deepEqual(measure_length(em(1), make_measure(child, { font_size: undefined })), { value: 1, unit: 'em' })
