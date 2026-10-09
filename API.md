@@ -413,10 +413,10 @@ do not move elements inside Box or a stack, or acquire behavior in LayoutPass.
 
 Set `debug` on an element to outline its allocated box in solid red and its
 content box, when provided, in dashed blue. The flag applies only to that element;
-children can opt in separately. SVG output draws the boxes above the artwork,
+children can opt in separately. SVG, PNG, and terminal output draw the boxes above the artwork,
 following placement transforms and bypassing content clips within the viewport.
-These diagnostics do not change layout, ink, or overflow and also appear in PNG
-and terminal output. See [Debugging layout](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/rendering.md#debugging-layout).
+These diagnostics do not change layout, ink, or overflow. See
+[Debugging layout](https://github.com/CompendiumLabs/gum-jsx-docs/blob/master/docs/guides/text/rendering.md#debugging-layout).
 
 A layout method finishes its measured size with `finish_size` or `shape_size`, then
 returns `make_fragment(...)`. The pass validates its result against the request and
@@ -757,11 +757,14 @@ completed main-axis slots; `align`/`align_self` position their cross axes; `Text
 positions text inside its own allocation. Center/end can use negative offsets
 for overflowing content. Distributed spacing only adds positive free space to gaps.
 
-`Spacer` is an empty element whose source defaults are `{ basis: 0, grow: 1 }`.
-It needs no parent type check, has no ink, and is zero-sized naturally. Override
-its basis, weights, or bounds like any other stack child. For a fixed spacer, use
-`<Spacer basis={px(20)} grow={0}/>`; its default zero basis takes precedence over
-a preferred main-axis dimension.
+`Spacer` is an empty element with no ink. Without dimensions, its source defaults
+are `{ basis: 0, grow: 1 }` and it is zero-sized naturally. Set `width` or `height`
+for fixed spacing, such as `<Spacer width={px(20)}/>` in a row or
+`<Spacer height={em(1)}/>` in a column. Setting either dimension changes the defaults
+to `{ basis: 'auto', grow: 0 }`, preserving both dimensions through ordinary sizing.
+Explicit flex props still win: `grow={1}` adds spare space to the requested size,
+and an explicit `basis` overrides its main-axis dimension. Bounds and shrinking
+work like any other stack child; no parent type check is needed.
 
 The pure [flex allocator](./src/lib/flex.ts) accepts resolved pixel bases and bounds and
 returns immutable sizes. The [stack implementation](./src/elems/stack.ts) owns child queries,

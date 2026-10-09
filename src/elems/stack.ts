@@ -296,6 +296,13 @@ class VStack extends Element<StackProps> {
 // The defaults live in the description, so parents treat Spacer like any item.
 class Spacer extends Element<ElementProps> {
   static defaults: Partial<ElementProps> = { basis: 0, grow: 1 }
+
+  // Explicit dimensions make a fixed spacer unless flex props override them.
+  static normalize(props: ElementProps): ElementProps {
+    return props.width === undefined && props.height === undefined ? props
+      : { basis: 'auto', grow: 0, ...props }
+  }
+
   static layout(props: ElementProps, query: LayoutQuery) {
     if (element_children(props.children).length) throw new TypeError('Spacer has no content children')
     return make_fragment({ size: finish_size(make_size(), query.request, query.sizing) })
