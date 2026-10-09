@@ -2,7 +2,8 @@ import type { LayoutQuery } from '../engine/pass'
 import { nonnegative } from '../lib/checks'
 import { frame_bounds, resolve_alignment, definite_reference } from '../lib/composition'
 import type { Bounds } from '../lib/composition'
-import { theme_color } from '../engine/theme'
+import { Page, page_fragment } from './page'
+import type { PageProps } from './page'
 import { Box, Frame, box_layout } from './box'
 import type { BoxProps } from './box'
 import { Element, content_child, element_children } from '../engine/element'
@@ -23,7 +24,6 @@ import { Text, Span } from './text'
 import type { TextOptions } from './text'
 import { make_measure, em, px } from '../engine/units'
 import type { Length } from '../engine/units'
-import { draw_rect } from '../engine/drawing'
 
 type TextStackProps = StackProps & Readonly<{ direction?: 'horizontal' | 'vertical' }>
 type TextBoxProps = BoxProps & Prefixed<'text', TextOptions>
@@ -43,9 +43,9 @@ type TitleFrameData = BoxProps & Readonly<{
   title_box?: Element; title_position?: TitleFrameProps['title_position']
   frame_aspect?: number; bounds?: Bounds
 }>
-type SlideProps = ElementProps & Prefixed<'title', TextOptions> & Readonly<{
+type SlideProps = PageProps & Prefixed<'title', TextOptions> & Readonly<{
   title?: Child; title_style?: TextOptions; padding?: InsetSpec
-  gap?: Length; background?: string; clip?: boolean
+  gap?: Length; clip?: boolean
 }>
 type SlideData = SlideProps & Readonly<{ body: Element }>
 type BulletsProps = ElementProps & Readonly<{
@@ -242,10 +242,9 @@ class Bullets extends Element<StackProps, BulletsProps> {
   }
 }
 
-// Slides are ordinary fixed canvases with a measured title and flexible content
+// Slides are pages with a measured title and flexible content
 // region. Text uses pixels/em; resizing never silently magnifies the type scale.
-class Slide extends Element<SlideData, SlideProps> {
-  static defaults: Partial<SlideData> = { aspect: 16 / 9 }
+class Slide extends Page<SlideData, SlideProps> {
   static data_bounds() {
     return null
   }
@@ -263,18 +262,18 @@ class Slide extends Element<SlideData, SlideProps> {
     }
   }
   static layout(props: SlideData, query: LayoutQuery) {
-    const size = graph_size(query, 16 / 9)
+    // Resolve the fallback after document defaults and host overrides, so a
+    // deck can supply its aspect without repeating it on every slide.
+    const sizing = { ...query.sizing, aspect: query.sizing.aspect ?? 16 / 9 }
+    const size = graph_size({ ...query, sizing })
     const padding = resolve_insets(props.padding ?? em(1.5),
       make_measure(query.measure, { reference: size }))
     const inner = deflate_size(size, padding)
     const fragment = query.child(props.body, make_request({ width: exact(inner.width), height: exact(inner.height) }), inner)
-    const area = make_rect(0, 0, size.width, size.height)
-    const background = theme_color(props.background ?? 'none', query.style.theme)
-    return make_fragment({ size, content: make_rect(padding.left, padding.top, inner.width, inner.height),
-      draw: background === 'none' ? [] : [draw_rect(area, { fill: background, stroke: 'none', stroke_width: 0,
-        opacity: query.style.opacity })],
+    return page_fragment(props, query, {
+      size, content: make_rect(padding.left, padding.top, inner.width, inner.height),
       children: [place_fragment(fragment, make_point(padding.left, padding.top))],
-      clip: props.clip ? area : undefined })
+    }, props.clip ?? false)
   }
 }
 

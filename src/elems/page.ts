@@ -3,22 +3,36 @@ import { fit_scale, layout_content } from '../lib/composition'
 import { Element, content_child } from '../engine/element'
 import type { ElementProps } from '../engine/element'
 import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
+import type { FragmentSpec } from '../engine/fragment'
 import { make_rect, make_point, make_size, make_insets, inflate_size } from '../engine/geometry'
 import { prepare_request, finish_size } from '../engine/layout'
 import { draw_rect } from '../engine/drawing'
 import { theme_color } from '../engine/theme'
 import { normalize_length } from '../engine/units'
-import type { UnitLength, LengthString } from '../engine/units'
 
-type PageProps = ElementProps & Readonly<{ width?: UnitLength | LengthString; height?: UnitLength | LengthString; background?: string }>
+// Subclasses can use ordinary element dimensions; plain Page validates pixels.
+type PageProps = ElementProps & Readonly<{ background?: string }>
 
-class Page extends Element<PageProps> {
+// Page subclasses share viewport painting while choosing their own sizing and
+// content layout. Plain pages clip; embedded slide layouts can leave ink visible.
+function page_fragment(props: Pick<PageProps, 'background'>, query: LayoutQuery,
+  layout: FragmentSpec, clip = true) {
+  const { width, height } = layout.size
+  const area = make_rect(0, 0, width, height)
+  const background = theme_color(props.background ?? 'none', query.style.theme)
+  const draw = background === 'none' ? [] : [draw_rect(area,
+    { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity })]
+  return make_fragment({ ...layout, clip: clip ? area : undefined, draw })
+}
+
+class Page<Props extends PageProps = PageProps, Input extends PageProps = Props> extends Element<Props, Input> {
   static layout(props: PageProps, query: LayoutQuery) {
     // Omitted axes hug content. Specified viewport lengths remain explicit pixels;
     // a tight resize changes layout rather than magnifying a completed drawing.
     for (const axis of ['width', 'height'] as const) {
       const length = props[axis]
-      if (length !== undefined && normalize_length(length, `${query.measure.path}.${axis}`).unit !== 'px') {
+      if (length === 'fill' || length !== undefined
+        && normalize_length(length, `${query.measure.path}.${axis}`).unit !== 'px') {
         throw new TypeError(`Page.${axis} requires pixels: px() or a "px" string`)
       }
     }
@@ -50,15 +64,11 @@ class Page extends Element<PageProps> {
       make_point((layout.placement.offset.x + outset.left) * scale, (layout.placement.offset.y + outset.top) * scale),
       scale === 1 ? undefined : [scale, 0, 0, scale, 0, 0])] : []
     const guides = transform_guides(layout.guides, outset.top * scale, scale)
-    const clip = make_rect(0, 0, size.width, size.height)
-    const background = theme_color(props.background ?? 'none', query.style.theme)
-    const draw = background === 'none' ? [] : [draw_rect(clip,
-      { fill: background, stroke: 'none', stroke_width: 0, opacity: query.style.opacity })]
-    return make_fragment({ size, children, guides, clip, draw })
+    return page_fragment(props, query, { size, children, guides })
   }
 }
 
-export { Page }
+export { Page, page_fragment }
 export type { PageProps }
 export { Rect } from './shapes'
 export type { RectProps } from './shapes'

@@ -1562,21 +1562,18 @@ element result when the argument is statically an `Element`.
 element with the same sizing, background, and clipping behavior. A standalone
 Page or bare element remains sufficient for single-page output.
 
-`Document` is an immutable top-level collection of one or more Page children.
+`Document` is an immutable top-level collection of one or more Page children,
+including Slide subclasses.
 Construct it with `{ children, title?, ...page_defaults }`, or use JSX:
 
 ```jsx
 <Document title="My talk" width={px(960)} height={px(540)} font-size={px(28)}>
-  <Page>
-    <Slide width="fill" height="fill" title="Introduction">
-      <Text>One file, multiple pages.</Text>
-    </Slide>
-  </Page>
-  <Page>
-    <Slide width="fill" height="fill" title="Details">
-      <Text>Every page lays out independently.</Text>
-    </Slide>
-  </Page>
+  <Slide title="Introduction">
+    <Text>One file, multiple pages.</Text>
+  </Slide>
+  <Slide title="Details">
+    <Text>Every page lays out independently.</Text>
+  </Slide>
 </Document>
 ```
 
@@ -1595,9 +1592,14 @@ in each `pages` entry, assigning page-specific definition prefixes so all pages
 can be embedded together. The overloads return `DocumentLayoutResult` and
 `DocumentRenderResult` for a statically typed Document.
 
-`Slide` remains a title/body layout inside Page. Document does not paginate
-overflow or stack its pages. The CLI exports a single-file Document to PDF or
-PPTX; use `--page 2` to select one page for an image or a single-page export.
+`Slide` extends Page with a title/body layout, padding, and a 16:9 fallback aspect.
+Document defaults can supply dimensions, aspect, background, and typography;
+individual slide props take precedence. Slides retain their finite canvas sizing
+and optional clipping, and existing Page-wrapped slides remain supported.
+Standalone slides are already viewports, so host `wrap` options do not apply.
+Document does not paginate overflow or stack its pages. The CLI exports a
+single-file Document to PDF or PPTX; use `--page 2` to select one page for an image
+or a single-page export.
 
 Both entry points accept `text_mode`, which is applied during layout. A reused
 pass invalidates its cached fragments when the mode changes; omitting the option

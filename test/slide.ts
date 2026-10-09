@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {
-  Page, Slide, Text, Box, Graph, Plot, LayoutPass, evaluate,
-  px, em, exact, make_request, make_insets, render_svg,
+  Page, Slide, Document, Text, Box, Graph, Plot, LayoutPass, evaluate,
+  px, em, exact, make_request, make_insets, render_svg, render_element,
 } from '../src/index'
 import type { Fragment } from '../src/index'
 
@@ -14,6 +14,42 @@ function near(actual: number, expected: number) {
 }
 
 const tests: Record<string, () => void> = {
+  'slides are document pages with shared defaults and their own layout'() {
+    const first = new Slide({ title: 'First', children: 'Body' })
+    const second = new Slide({ aspect: 2, font_size: px(20), background: 'blue', children: 'Second' })
+    const page: Page = first
+    assert.ok(page instanceof Page)
+    const document = new Document({ width: px(640), aspect: 4 / 3,
+      font_size: px(24), background: 'white', children: [first, second, new Page()] })
+    const before = JSON.stringify(document)
+    const result = render_element(document)
+    assert.deepEqual(result.pages.map(page => page.size), [
+      { width: 640, height: 480 }, { width: 640, height: 320 }, { width: 640, height: 480 },
+    ])
+    assert.deepEqual(result.pages.map(page => page.fragment.name), ['Slide', 'Slide', 'Page'])
+    assert.deepEqual(result.pages.map(page => page.fragment.draw[0]?.fill), ['white', 'blue', 'white'])
+    near(named(result.pages[0].fragment, 'Text')[1].children[0].fragment.size.height, 24 * 1.2)
+    near(named(result.pages[1].fragment, 'Text')[0].children[0].fragment.size.height, 20 * 1.2)
+    const overridden = render_element(document, { overrides: { width: px(320), height: px(180) } })
+    for (const page of overridden.pages) assert.deepEqual(page.size, { width: 320, height: 180 })
+    assert.equal(JSON.stringify(document), before)
+
+    // Standalone slides are already viewports; generated-wrapper options do not apply.
+    const standalone = render_element(first, { wrap: { max_width: px(100) } })
+    assert.equal(standalone.fragment.name, 'Slide')
+    assert.deepEqual(standalone.size, { width: 480, height: 270 })
+    const source = evaluate(`<Document width="640px" height="360px">
+      <Slide title="First">
+        Body
+      </Slide>
+      <Slide title="Second">
+        <Plot />
+      </Slide>
+    </Document>`)
+    assert.ok(source instanceof Document)
+    assert.equal(render_element(source).pages.length, 2)
+  },
+
   'slides inherit the Page font and honor local overrides at every viewport size'() {
     for (const base of [12, 24]) {
       for (const [font_size, resolved] of [[undefined, base], [em(1.5), base * 1.5], [px(18), 18]] as const) {
