@@ -35,7 +35,7 @@ type LayoutQuery = Readonly<{
     element: Element, request: LayoutRequest, reference?: ReferenceBox, index?: number,
     context?: Pick<LayoutContext, 'coordinates' | 'style' | 'math'>,
   ) => Fragment
-  resource: <T>(name: string) => T
+  resource: <T>(name: string, fallback?: T) => T
   prepare: <T>(name: string, compute: () => T) => T
 }>
 
@@ -112,9 +112,12 @@ class LayoutPass {
   }
 
   // Resource access occurs during measurement; the renderer needs no resources.
-  resource<T>(name: string): T {
+  resource<T>(name: string, fallback?: T): T {
     const resource = this.#resources.get(name)
-    if (!resource) throw new Error(`Missing layout resource: ${name}`)
+    if (!resource) {
+      if (fallback !== undefined) return fallback
+      throw new Error(`Missing layout resource: ${name}`)
+    }
     return resource.value as T
   }
 
@@ -177,7 +180,7 @@ class LayoutPass {
           child: (child, offer, basis = {}, index = 0, context = {}) => this.layout(child, offer, {
             style, coordinates, math, ...context, reference: basis, path: `${path}/${child.type.name}[${index}]`,
           }),
-          resource: <T>(name: string) => this.resource<T>(name),
+          resource: <T>(name: string, fallback?: T) => this.resource<T>(name, fallback),
           // Preparation depends on inherited style, math context, and resources.
           // Local offers and percentage references do not affect it.
           prepare: <T>(name: string, compute: () => T): T => {

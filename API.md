@@ -394,7 +394,7 @@ The layout function receives readonly props and a frozen query:
 | `style` | Inherited font and paint; font size is resolved, relative line height and stroke width retain their units. |
 | `measure` | Shared font size, established parent reference, and diagnostic path for length resolution. |
 | `child(element, request, reference?, index?)` | Query a child with inherited style and its own path. |
-| `resource(name)` | Read a pass-owned resource during measurement. |
+| `resource(name, fallback?)` | Read a pass-owned resource; use the optional fallback when absent. |
 | `prepare(name, compute)` | Cache source/style/resource work independently of requests and parent references. |
 
 Pass a child's percentage reference explicitly once the container establishes its
@@ -439,6 +439,10 @@ parent results. Existing fragments remain independent of subsequent resource
 changes. Prepared content is invalidated along with layout results. A preparation
 must not depend on the current request, percentage reference, or diagnostic path.
 Finer resource dependency tracking can follow measured need.
+
+`pass.resource(name, fallback)` and `query.resource(name, fallback)` return a
+fallback without registering it. Without a fallback, missing resources throw.
+Installing a resource later invalidates any layouts that used the fallback.
 
 ## Box composition
 
@@ -1021,6 +1025,18 @@ const pass = new LayoutPass({ fonts: { value: fonts, version: fonts.version } })
 // After later registrations, explicitly invalidate any reused pass:
 pass.set_resource('fonts', fonts, fonts.version)
 ```
+
+`fonts.register(bytes, options?)` infers the family, weight, and style from an
+individual font face and returns its registered family. Optional `family`,
+`weight`, `style`, and `fallback` settings override that registration. The
+preferred typographic family is used when present, grouping extended weights
+with regular and bold faces. The explicit `register(family, bytes, options?)`
+form keeps its 400/normal defaults. Font collections are rejected; variable
+fonts use their default instance.
+
+To select an inherited default for one render, pass
+`{ fonts, defaults: { font_family: family } }` to `render_element` or
+`layout_element`. Explicit source font choices take precedence.
 
 The replaceable `FontProvider.resolve(family, weight, style)` returns ascent,
 descent, and `shape(text)`. Metrics use em, with positive ascent/descent distances;

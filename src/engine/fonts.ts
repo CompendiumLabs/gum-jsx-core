@@ -109,6 +109,17 @@ function parse_font(data: FontData): Font {
   return font
 }
 
+// Prefer the typographic family so light and other extended weights stay grouped.
+function font_metadata(font: Font, options: FontOptions & { family?: string }) {
+  const head = (font as Font & { head: { macStyle: { italic: boolean; bold: boolean } } }).head
+  const os2 = font['OS/2']
+  const family = options.family ?? (font.getName('preferredFamily', 'en') || font.familyName)
+  const weight = options.weight ?? os2?.usWeightClass ?? (head.macStyle.bold ? 700 : 400)
+  const italic = os2?.fsSelection.italic || os2?.fsSelection.oblique || head.macStyle.italic
+  const style = options.style ?? (italic ? 'italic' : 'normal')
+  return { family, weight, style, fallback: options.fallback }
+}
+
 // Fontkit 2.0.4 reads a glyf header even when loca says the glyph is empty.
 // Plex Mono's trailing space glyphs then read past the table. Give only those
 // glyph instances their correct zero bounds; advances still come from hmtx.
@@ -294,10 +305,19 @@ class Fonts implements FontProvider {
   get version(): number { return this.#version; }
 
   // Registration copies/parses bytes now. Notify a reused pass of this new version.
-  register(family: string, data: FontData, options: FontOptions = {}): void {
+  // Without an explicit name, infer metadata and return the registered family.
+  register(data: FontData, options?: FontOptions & { family?: string }): string
+  register(family: string, data: FontData, options?: FontOptions): void
+  register(input: string | FontData, value: FontData | (FontOptions & { family?: string }) = {},
+    options: FontOptions = {}): string | void {
+    const named = typeof input === 'string'
+    const data = (named ? value : input) as FontData
     const bytes = data instanceof Uint8Array ? new Uint8Array(data) : new Uint8Array(data.slice(0))
-    const face = { ...font_options(family, options), font: parse_font(bytes), data: bytes }
-    this.#register(face)
+    const font = parse_font(bytes)
+    const { family, ...settings } = named ? { family: input, ...options }
+      : font_metadata(font, value as FontOptions & { family?: string })
+    this.#register({ ...font_options(family, settings), font, data: bytes })
+    if (!named) return family
   }
 
   // Register asset metadata without I/O. Identical registration preserves loaded

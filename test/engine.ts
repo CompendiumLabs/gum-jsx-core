@@ -11,6 +11,21 @@ import type { ElementProps } from '../src/index'
 import { Fixed, Expanding, Wrapping } from './fixtures/leaves'
 
 const tests: Record<string, () => void> = {
+  'optional resources use a fallback until the pass installs a value'() {
+    const pass = new LayoutPass()
+    const Probe = define_element('OptionalResource', (_, query) =>
+      make_fragment({ size: make_size(query.resource('extra_width', 10), 1) }))
+    const source = new Probe()
+    const before = pass.layout(source)
+    assert.equal(before.size.width, 10)
+    assert.equal(pass.resource('extra_width', 0), 0)
+    assert.throws(() => pass.resource('extra_width'), /Missing layout resource/)
+    pass.set_resource('extra_width', 20, 0)
+    assert.equal(pass.resource('extra_width', 10), 20)
+    assert.equal(pass.layout(source).size.width, 20)
+    assert.equal(before.size.width, 10)
+  },
+
   'construction snapshots nested source data without measuring'() {
     let calls = 0
     const Probe = define_element<ElementProps & { data?: { values: number[] } }>('Probe', (_, q) => {

@@ -247,6 +247,27 @@ const tests: Record<string, () => void> = {
     assert.throws(() => pass.layout(new Text({ children: '\u{10ffff}' })), /U\+10FFFF/)
   },
 
+  'byte registration infers family and weight while retaining explicit aliases'() {
+    const fonts = new Fonts()
+    const light = readFileSync(new URL('../src/fonts/IBMPlexSans-Light.ttf', import.meta.url))
+    const bold = readFileSync(new URL('../src/fonts/IBMPlexSans-Bold.ttf', import.meta.url))
+    for (const [data, weight] of [[regular, 400], [light, 300], [bold, 700]] as const) {
+      assert.equal(fonts.register(data), 'IBM Plex Sans')
+      const source = fonts.font_sources().find(face => face.family === 'IBM Plex Sans' && face.weight === weight)
+      assert.ok(source?.source instanceof Uint8Array)
+      assert.equal(fonts.resolve('IBM Plex Sans', weight, 'normal').face?.weight, weight)
+    }
+    // Inferred registration allows overrides; the old named form still defaults to 400/normal.
+    assert.equal(fonts.register(bold, { family: 'Alias', weight: 600, style: 'italic' }), 'Alias')
+    const face = fonts.resolve('Alias', 600, 'italic').face!
+    assert.deepEqual([face.family, face.weight, face.style, face.oblique], ['Alias', 600, 'italic', false])
+    fonts.register('Explicit', bold)
+    assert.equal(fonts.resolve('Explicit', 400, 'normal').face?.weight, 400)
+    fonts.register(bold, { family: undefined, weight: undefined, style: undefined })
+    assert.equal(fonts.resolve('IBM Plex Sans', 700, 'normal').face?.weight, 700)
+    assert.throws(() => fonts.register(regular, { family: '' }), /Invalid font registration/)
+  },
+
   'a color face measures whole clusters from cmap and hmtx, with no outlines'() {
     for (const table of ['CBDT', 'sbix', 'COLR', 'SVG ']) {
       const fonts = new Fonts()
