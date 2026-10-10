@@ -1563,7 +1563,9 @@ element with the same sizing, background, and clipping behavior. A standalone
 Page or bare element remains sufficient for single-page output.
 
 `Document` is an immutable top-level collection of one or more Page children,
-including Slide subclasses.
+including Slide subclasses and components that adopt Page or Slide through
+`define_component`. Adopted pages retain their viewport behavior and receive
+document defaults directly.
 Construct it with `{ children, title?, ...page_defaults }`, or use JSX:
 
 ```jsx

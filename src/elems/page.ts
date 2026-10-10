@@ -1,7 +1,7 @@
 import type { LayoutQuery } from '../engine/pass'
 import { fit_scale, layout_content } from '../lib/composition'
 import { Element, content_child } from '../engine/element'
-import type { ElementProps } from '../engine/element'
+import type { ElementProps, ElementType } from '../engine/element'
 import { make_fragment, place_fragment, transform_guides } from '../engine/fragment'
 import type { FragmentSpec } from '../engine/fragment'
 import { make_rect, make_point, make_size, make_insets, inflate_size } from '../engine/geometry'
@@ -12,6 +12,14 @@ import { normalize_length } from '../engine/units'
 
 // Subclasses can use ordinary element dimensions; plain Page validates pixels.
 type PageProps = ElementProps & Readonly<{ background?: string }>
+
+// Components keep their source layout descriptor even when adopting a new name.
+const page_layouts = new WeakSet<ElementType['layout']>()
+
+// Recognize page behavior through protocol adoption as well as subclassing.
+function is_page(element: Element): element is Page {
+  return page_layouts.has(element.type.layout)
+}
 
 // Page subclasses share viewport painting while choosing their own sizing and
 // content layout. Plain pages clip; embedded slide layouts can leave ink visible.
@@ -26,6 +34,12 @@ function page_fragment(props: Pick<PageProps, 'background'>, query: LayoutQuery,
 }
 
 class Page<Props extends PageProps = PageProps, Input extends PageProps = Props> extends Element<Props, Input> {
+  // Register the descriptor once constructed; source data stays immutable.
+  constructor(...args: [props?: Input] | [type: ElementType, props: Props]) {
+    super(...args)
+    page_layouts.add(this.type.layout)
+  }
+
   static layout(props: PageProps, query: LayoutQuery) {
     // Omitted axes hug content. Specified viewport lengths remain explicit pixels;
     // a tight resize changes layout rather than magnifying a completed drawing.
@@ -68,7 +82,7 @@ class Page<Props extends PageProps = PageProps, Input extends PageProps = Props>
   }
 }
 
-export { Page, page_fragment }
+export { Page, page_fragment, is_page }
 export type { PageProps }
 export { Rect } from './shapes'
 export type { RectProps } from './shapes'

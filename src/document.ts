@@ -1,6 +1,6 @@
 import { copy_data, element_children } from './engine/element'
-import { Page } from './elems/page'
-import type { PageProps } from './elems/page'
+import { is_page } from './elems/page'
+import type { Page, PageProps } from './elems/page'
 
 type DocumentProps = PageProps & Readonly<{ title?: string }>
 
@@ -15,13 +15,13 @@ class Document {
   constructor({ children, title, ...defaults }: DocumentProps = {}) {
     const pages = element_children(children)
     if (!pages.length) throw new TypeError('Document requires at least one Page')
-    if (!pages.every(page => page instanceof Page)) {
+    if (!pages.every(is_page)) {
       throw new TypeError('Document children must be Page elements')
     }
     if (title !== undefined && typeof title !== 'string') {
       throw new TypeError('Document.title must be a string')
     }
-    this.pages = pages as readonly Page[]
+    this.pages = pages
     this.defaults = copy_data(defaults)
     this.title = title
     Object.freeze(this)

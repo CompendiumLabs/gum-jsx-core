@@ -4,7 +4,7 @@ import type { FontProvider } from './engine/fonts'
 import type { LayoutRequest } from './engine/layout'
 import type { Fragment } from './engine/fragment'
 import type { Size } from './engine/geometry'
-import { Page } from './elems/page'
+import { Page, is_page } from './elems/page'
 import type { PageProps } from './elems/page'
 import { render_svg } from './svg'
 import type { SvgOptions } from './svg'
@@ -63,9 +63,9 @@ function resolve_pass({ pass, fonts, text_mode = 'path' }: LayoutElementOptions)
 }
 
 // A bare element gets a viewport that hugs it. An existing viewport keeps its
-// layout descriptor and props, so custom Page subclasses survive the host policy.
+// layout descriptor and props, including subclasses and adopted page components.
 function make_viewport(element: Element, { defaults = {}, overrides = {}, wrap = {} }: ViewportOptions = {}): Page {
-  const viewport = element instanceof Page ? element
+  const viewport = is_page(element) ? element
     : new Page({ ...defined(wrap), children: element })
   return new Page(viewport.type, { ...defined(defaults), ...defined(viewport.props), ...defined(overrides) })
 }
