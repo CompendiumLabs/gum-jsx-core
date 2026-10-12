@@ -18,6 +18,7 @@ const yellow = '#ffb300'
 const purple = '#9c27b0'
 const lightgray = '#f6f6f6'
 const darkgray = '#888888'
+const charcoal = '#333333'
 const slate = '#1e252e'
 
 const e = Math.E
@@ -29,6 +30,6 @@ const d2r = Math.PI / 180
 
 export {
   sans, mono, italic, light, regular, bold,
-  none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, slate,
+  none, black, white, gray, blue, red, green, yellow, purple, lightgray, darkgray, charcoal, slate,
   e, pi, tau, phi, r2d, d2r,
 }
